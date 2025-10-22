@@ -45,15 +45,31 @@ obclient -h127.0.0.1 -P2881 -uroot@test -p
 # 密码输入 12345678
 ```
 
+进入了test租户的root用户界面
 之后可以在数据库中创建用户和DataBase：
 
 我们实际开发demo时,按下面的方法创建用户即可：
 ```
-# Create a database user 'odc' and schema 'odc_metadb' within the tenant. Replace <password> with the actual password of your choice.
+# Create a database user 'paperQA' and database schema 'default1' within the tenant. Replace <password> with the actual password of your choice.
 CREATE USER paperQA IDENTIFIED BY '12345678';
 CREATE DATABASE default1;
 GRANT ALL ON default1.* TO paperQA;
 ```
 
+为test租户的paperQA用户授予建表权限和远程访问权限
+```
+
+GRANT CREATE ON *.* TO paperQA;
+-- 给 paperQA@test 授予数据库 obqademo 的常规数据操作权限
+GRANT SELECT, INSERT, UPDATE, DELETE, DROP ON *.* TO paperQA;
+GRANT ALL PRIVILEGES ON *.* TO paperQA WITH GRANT OPTION;
+```
+
 执行下面的命令开启向量数据库的检索功能
 ALTER SYSTEM SET ob_vector_memory_limit_percentage = 30;
+
+# 部署后端的python-conda环境：
+
+下面有1个已经部署好的环境：
+使用conda activate quest
+
