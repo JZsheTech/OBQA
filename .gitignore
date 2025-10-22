@@ -1,0 +1,11 @@
+*
+!*/
+!*.py
+!*.md
+!*.txt
+!.gitignore
+
+sample_data
+log/
+testpy/
+# !*.pyc
