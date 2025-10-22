@@ -43,14 +43,15 @@ def demo_vector_exact_no_index():
     # 3️⃣ 查询（Top-5 最近向量）
     query_vec = [random.uniform(-1, 1) for _ in range(64)]
 
-    res = client.ann_search(
+    # res = client.post_ann_search 先标量过滤，再ann后过滤。
+    res = client.precise_search(
         table_name=tbl,
         vec_data=query_vec,
         vec_column_name="embedding",
         distance_func=func.l2_distance,
         topk=5,
         output_column_names=["id", "title", "tag", "embedding"],
-    )
+    ) # 混合检索时可以带 where_clause
 
     print("\nTop-5 相似结果：")
     for r in res:
