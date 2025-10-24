@@ -5,7 +5,7 @@ import json
 model_config_dict = json.load(open("dependency/api_key/mymodelkey.json"))
 
 # used_model = "gpt-4.1-mini"
-used_model = "qwen3-8b" # "llama3.1"
+used_model = "qwen3-8b" # "qwen3-8b" # "llama3.1"
 
 your_openai_api_key = model_config_dict[used_model]["api_key"]
 your_openai_base_url = model_config_dict[used_model]["base_url"]
