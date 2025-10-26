@@ -5,16 +5,30 @@
 
 ```
 conda create -n jzMinerUVllm python=3.12
+
+conda activate jzMinerUVllm
+
 export UV_DEFAULT_INDEX=https://mirrors.aliyun.com/pypi/simple/
+(临时环境变量)
 
 pip install --upgrade pip
 pip install uv
+或者
+pip install uv -i https://pypi.org/simple/
 uv pip install -U "mineru[core]"
 
 # 首次运行时指定镜像站下载必要的模型文件，然后转换一个文件触发所有模型的下载
 export MINERU_MODEL_SOURCE=modelscope
 # <input_path>是pdf文件路径+文件名， <output_path>是转换后文件保存路径
 mineru -p <input_path> -o <output_path>
+
+比如:
+
+mineru -p  "sample_data/pdf_doc/1-Cui et al. - 2019 - Class-Balanced Loss Based on Effective Number of Samples.pdf"  -o  "sample_data/test_convert"
+
+建议把大文件用符号链接链接到本地的另一个数据盘中，方便迁移。
+ln -s  /home/jzshe/project/bigData/sample_data     ./sample_data 
+cd sample_data/minerUtemp
 
 # 上述测试文件转换成功后在服务器上启动web服务，可以通过内网穿透等方法转发端口到公网或者用vscode把端口转发到本机。
 # demo的测试和开发都在服务器端，所以不用转发
@@ -31,16 +45,26 @@ test 租户的passwd
 
 ```
 sudo docker pull oceanbase/oceanbase-ce:4.3.5-lts
+国内如果不行可以尝试下面的镜像：
+sudo docker pull quay.io/oceanbase/oceanbase-ce:4.3.5-lts
 
-sudo docker run -p 2881:2881 -v /oceanBaseData/ob:/root/ob   --name oceanBaseODCtest  --restart=always  -e MODE=NORMAL -e OB_TENANT_PASSWORD=12345678 -e OB_MEMORY_LIMIT=32G -d  oceanbase/oceanbase-ce:4.3.5-lts
 
+对于高性能服务器：具有大内存
+```
+sudo docker run -p 2881:2881 -v /oceanBaseData/ob:/root/ob   --name obstandalone  --restart=always  -e MODE=NORMAL -e OB_TENANT_PASSWORD=12345678 -e OB_MEMORY_LIMIT=32G -d  oceanbase/oceanbase-ce:4.3.5-lts
+```
 
+对于本地单机测试：只有32GB内存。
+```
+sudo    docker run   --name obstandalone -e MINI_MODE=1 -d    -e OB_MEMORY_LIMIT=8G -e OB_DATAFILE_SIZE=10G  --restart=always  -e OB_CLUSTER_NAME=ailab2024 -e OB_SERVER_IP=127.0.0.1 -p 127.0.0.1:2881:2881  -e OB_TENANT_PASSWORD=12345678     quay.io/oceanbase/oceanbase-ce:4.3.5-lts
 
-> sudo docker logs oceanBaseODCtest | tail -50
+```
+
+> sudo docker logs obstandalone | tail -50
 # 出现下面的输出表示启动成功,并且前面几行没有Error出现。
 < boot success!
 
-sudo docker exec -it oceanBaseODCtest /bin/bash
+sudo docker exec -it obstandalone /bin/bash
 obclient -h127.0.0.1 -P2881 -uroot@test -p
 # 密码输入 12345678
 ```
@@ -70,6 +94,11 @@ ALTER SYSTEM SET ob_vector_memory_limit_percentage = 30;
 
 # 部署后端的python-conda环境：
 
-下面有1个已经部署好的环境：
-使用conda activate quest
+conda create -n obEviQA python=3.10
 
+
+conda activate obEviQA
+pip install dspy==3.0.3  -i https://pypi.org/simple/
+pip install PyMySQL==1.1.1   -i https://pypi.org/simple/
+pip install SQLAlchemy==2.0.40  -i https://pypi.org/simple/
+pip install pyobvector==0.2.16  -i https://pypi.org/simple/

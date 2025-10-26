@@ -15,11 +15,11 @@ def demo_vector_exact_no_index():
     tbl = OB_DEMO_TABLE
     print(f"\n[Demo1] 向量精确检索（无索引）- 表: {tbl}")
 
-    client = ensure_pyobvector_client()
-
     # 测试开始：先清理再建表
     with engine_conn() as conn:
         create_demo_table(conn, table_name=tbl)
+
+    client = ensure_pyobvector_client()
 
     # 2️⃣ 插入数据
     random.seed(20241023)

@@ -5,6 +5,7 @@
 !*.md
 !*.txt
 !.gitignore
+!dependency/api_key/**
 
 sample_data
 log/
