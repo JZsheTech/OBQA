@@ -102,3 +102,6 @@ pip install dspy==3.0.3  -i https://pypi.org/simple/
 pip install PyMySQL==1.1.1   -i https://pypi.org/simple/
 pip install SQLAlchemy==2.0.40  -i https://pypi.org/simple/
 pip install pyobvector==0.2.16  -i https://pypi.org/simple/
+pip install mlflow  -i https://pypi.org/simple/
+pip install notebook -i https://pypi.org/simple/
+pip install debugpy -i https://pypi.org/simple/
