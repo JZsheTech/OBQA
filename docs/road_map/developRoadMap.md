@@ -1,11 +1,3 @@
-# 技术栈：
-
-前端： ReAct
-后端: FastAPI
-数据库： OceanBase (dependency中包含相关的数据库操作demo)
-文档预处理： MinerU (pdf解析成Elements)
-Agent组织和LLM调用： DsPY
-
 # 数据模型
 
 ## 基础表
