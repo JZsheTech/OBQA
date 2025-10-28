@@ -2,6 +2,13 @@ import dspy
 import os
 import json
 
+import mlflow
+
+mlflow.set_tracking_uri("http://localhost:5000")
+mlflow.set_experiment("DSPy")
+
+mlflow.dspy.autolog()
+
 model_config_dict = json.load(open("dependency/api_key/mymodelkey.json"))
 
 # used_model = "gpt-4.1-mini"
