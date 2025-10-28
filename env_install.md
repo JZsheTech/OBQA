@@ -94,10 +94,10 @@ ALTER SYSTEM SET ob_vector_memory_limit_percentage = 30;
 
 # 部署后端的python-conda环境：
 
-conda create -n obEviQA python=3.10
+conda create -n quest python=3.10
 
 
-conda activate obEviQA
+conda activate quest
 pip install dspy==3.0.3  -i https://pypi.org/simple/
 pip install PyMySQL==1.1.1   -i https://pypi.org/simple/
 pip install SQLAlchemy==2.0.40  -i https://pypi.org/simple/

@@ -1,23 +1,3 @@
-# 数据模型
-
-## 基础表
-collections(id, name, created_at)
-documents(id, collection_id, file_name, file_path, num_pages, meta_json)
-elements(id, doc_id, elem_type, section_name, level_nav, text_content, text_caption, image_base64, bbox_json, page_no, vec_embedding)
-
-chats(id, collection_id, created_at)
-turns(id, chat_id, user_question, llm_answer_md, thought_log, created_at)
-
-
-## 桥表(多对多)
-
-每个chat中evidence_no都从1开始编号，并且唯一关联到一个element_id
-evidence2element(chat_id, evidence_no, element_id)
-
-
-非常好，你现在的目标（先把**后端打通，再带动前端同步上线**）完全符合系统设计文档【6】【7】中提到的分层思路。结合这两份文档与我上面那份详细版本的路线图，我为你精简并重新组织了一个更贴合你开发顺序的「**后端优先 RoadMap v2**」，以阶段递进的形式引导你构建整个多模态论文问答系统。
-
----
 
 # 🔧 PaperEvidenceQA RoadMap（后端优先版）
 
