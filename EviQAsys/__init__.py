@@ -1,1 +1,0 @@
-"""EviQAsys root package."""
