@@ -11,7 +11,7 @@
 
   * 基础表（collections、documents、elements、chats、turns）
   * 桥表（evidence2element，唯一约束 `(chat_id, evidence_no)`）。
-* 封装数据库访问层（DAO / SQLAlchemy ORM）。
+* 封装数据库访问层（DAO / SQLAlchemy Core 用text封装sql去执行。）。
   **验证点**：能创建 collection，上传文件记录入库；所有表可 CRUD。
 
 ---
