@@ -4,6 +4,7 @@
 !*.ipynb
 !*.md
 !*.txt
+!*.gitkeep
 !.gitignore
 !dependency/api_key/**
 
