@@ -47,26 +47,26 @@ Each agent runs synchronously during request handling; no background workers or 
 │   ├── en
 │   └── zh
 ├── EviQAsys
-│   └── backend
-│       └── app
+│   ├── backend
+│   │   └── app
+│   │       ├── api
+│   │       ├── repositories
+│   │       ├── schemas
+│   │       └── services
+│   │           ├── db_access
+│   │           ├── embedding
+│   │           ├── index
+│   │           ├── integrations
+│   │           ├── llm
+│   │           ├── memory
+│   │           ├── preprocess
+│   │           ├── qa_flow
+│   │           └── retrieval
+│   └── frontend
+│       └── src
 │           ├── api
-│           ├── repositories
-│           ├── schemas
-│           └── services
-│               ├── db_access
-│               ├── embedding
-│               ├── index
-│               ├── integrations
-│               ├── llm
-│               ├── memory
-│               ├── preprocess
-│               ├── qa_flow
-│               └── retrieval
-├── frontend
-│   └── src
-│       ├── api
-│       ├── components
-│       └── pages
+│           ├── components
+│           └── pages
 ├── log -> /data2/jproject/mylogging/log
 ├── sample_data -> /data/QUEST/jzshe/project/OBpaperQA/sample_data
 └── scripts
