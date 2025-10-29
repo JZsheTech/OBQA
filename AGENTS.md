@@ -26,6 +26,7 @@ These instructions apply to the entire repository. They distill the English docu
   - `scripts/` for ad-hoc utilities (seed database, run pipeline samples).
   - `docs/en/` for living architecture assets (update or extend as milestones evolve).
 - Use `.gitkeep` files when you must commit empty directories (per Road Map Milestone 1).【docs/en/Develop_Road_Map.md】
+- Database Access: Keep repository modules lightweight—no ORM layer is needed. Use sqlalchemy.text() for direct SQL execution and map results manually to Pydantic models.
 
 ## Data & Contracts
 - Adopt the unified global schema: `collections`, `documents`, `elements`, `chats`, `turns`, and `turn2evidence`. Keep foreign keys and indexes aligned with the specification and favor straightforward CRUD repositories.【docs/en/Data_Model.md】
