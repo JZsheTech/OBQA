@@ -13,7 +13,7 @@ os.environ['DASHSCOPE_API_KEY'] = 'sk-aa5f15008e5b420bbcbaf822bb782718'  # 请�
 # 调用模型接口
 resp = dashscope.MultiModalEmbedding.call(
     api_key=os.getenv('DASHSCOPE_API_KEY'),
-    model="qwen2.5-vl-embedding",
+    model="multimodal-embedding-v1",
     input=input
 )
 
