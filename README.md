@@ -29,3 +29,46 @@ This repository hosts a sequential Paper Question-Answering demo that ties answe
 - **Answer Agent** (services/llm + qa_flow) builds multimodal prompts and formats answers with `[Evidence#no]` anchors.
 
 Each agent runs synchronously during request handling; no background workers or asynchronous orchestrators are introduced until later milestones.
+
+## project structure
+
+
+```
+.
+├── debug
+├── dependency
+│   ├── api_key
+│   ├── DspyDemo
+│   ├── minerUparseDemo
+│   ├── multiModalEmbedding
+│   └── oceanBaseDemo
+├── docs
+│   ├── diagrams
+│   ├── en
+│   └── zh
+├── EviQAsys
+│   └── backend
+│       └── app
+│           ├── api
+│           ├── repositories
+│           ├── schemas
+│           └── services
+│               ├── db_access
+│               ├── embedding
+│               ├── index
+│               ├── integrations
+│               ├── llm
+│               ├── memory
+│               ├── preprocess
+│               ├── qa_flow
+│               └── retrieval
+├── frontend
+│   └── src
+│       ├── api
+│       ├── components
+│       └── pages
+├── log -> /data2/jproject/mylogging/log
+├── sample_data -> /data/QUEST/jzshe/project/OBpaperQA/sample_data
+└── scripts
+```
+
