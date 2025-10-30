@@ -23,7 +23,7 @@ export MINERU_MODEL_SOURCE=modelscope
 mineru -p <input_path> -o <output_path>
 
 比如:
-
+export MINERU_MODEL_SOURCE=modelscope # 用之前一定要加上这一个，否则又会去hugging face下载模型。
 mineru -p  "sample_data/pdf_doc/1-Cui et al. - 2019 - Class-Balanced Loss Based on Effective Number of Samples.pdf"  -o  "sample_data/test_convert"
 
 建议把大文件用符号链接链接到本地的另一个数据盘中，方便迁移。
