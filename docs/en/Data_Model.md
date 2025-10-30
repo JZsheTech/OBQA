@@ -51,15 +51,17 @@
 | `id`            | BIGINT (PK)                            | Primary key, auto-increment ID                                      |
 | `doc_id`        | BIGINT (FK)                            | Belonging document                                                  |
 | `order`         | INT                                    | Reading order parsed from `content_list`                            |
-| `elem_type`     | ENUM('text','image','table','formula') | Element type                                                        |
+| `elem_type`     | ENUM('text','header','image','table','equation') | Element type                                                        |
 | `section_name`  | VARCHAR                                | Section title                                                       |
 | `level_nav`     | VARCHAR                                | Hierarchical navigation info                                        |
 | `text_content`  | TEXT                                   | Text content                                                        |
 | `text_caption`  | TEXT                                   | Caption for image or table                                          |
-| `image_base64`  | BLOB (Base64)                          | Image content (Base64 encoded)                                      |
+| `image_base64`  | TEXT                         | Image content (Base64 encoded)                                      |
 | `bbox_json`     | JSON                                   | Position info in PDF (list of 4 integers representing bounding box) |
 | `page_no`       | INT                                    | Page number                                                         |
-| `vec_embedding` | BLOB                                   | Vector embedding (for similarity search)                            |
+| `vec_embedding` | VECTOR                                   | Vector embedding (for similarity search)                            |
+| `section_span` | VARCHAR | The range of the section corresponding to the Header element, represented as (order_start, order_end). |
+
 
 **Constraints:**
 
