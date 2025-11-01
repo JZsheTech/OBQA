@@ -33,7 +33,7 @@
 
    * The `preprocess_header()` function scans and repairs the document’s hierarchical heading structure (based on title patterns such as `1`, `1.1`, `2.1.2`, etc.), adding for each Element:
 
-     * `section_name`: the nearest parent heading title
+     * `header_name`: the nearest parent heading title
      * `level_nav`: the complete hierarchical navigation path
 
 4. **Section Aggregation and Summary Generation**
@@ -47,11 +47,11 @@
 
      | Type          | `text_content` Construction                        | `image_content`   |
      | ------------- | -------------------------------------------------- | ----------------- |
-     | **pure_text** | `section_name + level_nav + text_content`          | —                 |
-     | **header**    | `section_name + level_nav + section_summary`       | —                 |
-     | **image**     | `section_name + level_nav + image_caption`         | base64 image data |
-     | **table**     | `section_name + level_nav + table_caption`         | base64 image data |
-     | **equation**  | `section_name + level_nav + equation_text (LaTeX)` | base64 image data |
+     | **pure_text** | `header_name + level_nav + text_content`          | —                 |
+     | **header**    | `header_name + level_nav + section_summary`       | —                 |
+     | **image**     | `header_name + level_nav + image_caption`         | base64 image data |
+     | **table**     | `header_name + level_nav + table_caption`         | base64 image data |
+     | **equation**  | `header_name + level_nav + equation_text (LaTeX)` | base64 image data |
 
 6. **Vectorization and Storage**
 

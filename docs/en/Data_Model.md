@@ -52,7 +52,7 @@
 | `doc_id`        | BIGINT (FK)                            | Belonging document                                                  |
 | `order`         | INT                                    | Reading order parsed from `content_list`                            |
 | `elem_type`     | ENUM('text','header','image','table','equation') | Element type                                                        |
-| `section_name`  | VARCHAR                                | Section title                                                       |
+| `header_name`  | VARCHAR                                | Section title                                                       |
 | `level_nav`     | VARCHAR                                | Hierarchical navigation info                                        |
 | `text_content`  | TEXT                                   | Text content                                                        |
 | `text_caption`  | TEXT                                   | Caption for image or table                                          |

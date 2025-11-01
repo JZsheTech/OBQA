@@ -30,7 +30,7 @@ These instructions apply to the entire repository. They distill the English docu
 
 ## Data & Contracts
 - Adopt the unified global schema: `collections`, `documents`, `elements`, `chats`, `turns`, and `turn2evidence`. Keep foreign keys and indexes aligned with the specification and favor straightforward CRUD repositories.【docs/en/Data_Model.md】
-- For MinerU ingestion, ensure each Element carries `section_name`, `level_nav`, `text_content`, optional captions, `image_base64`, `bbox_json`, and `page_no`. Maintain the standardized multimodal fields even when stubbing data.【docs/en/Design_Document.md】
+- For MinerU ingestion, ensure each Element carries `header_name`, `level_nav`, `text_content`, optional captions, `image_base64`, `bbox_json`, and `page_no`. Maintain the standardized multimodal fields even when stubbing data.【docs/en/Design_Document.md】
 - Maintain evidence numbering continuity via the `(chat_id, turn_id, evidence_no)` triplet stored in `turn2evidence`.
 - Document every external interface contract (MinerU, OceanBase, DsPy) either in code docstrings or `docs/en/service_interface_use.md`.
 
