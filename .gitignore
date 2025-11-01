@@ -7,6 +7,9 @@
 !*.gitkeep
 !.gitignore
 !dependency/api_key/**
+!EviQAsys/frontend/**
+
+EviQAsys/frontend/node_modules/**
 
 debug/
 sample_data
