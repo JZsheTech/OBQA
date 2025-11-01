@@ -1,52 +1,158 @@
-# Development Road Map
+Here’s the English translation of your milestone-based roadmap:
 
-**Guiding principles**
-- Keep the pipeline sequential: upload → parse → store → retrieve → answer → highlight.
-- Favor the documented stack (FastAPI, DsPy, MinerU demo service, OceanBase) with minimal abstractions.
-- Target demo-ready functionality first; defer optimizations, concurrency, and automation.
+---
 
-## Milestone 0 · Environment Baseline (0.5 day)
-- Confirm working access to MinerU (`dependency/minerUparseDemo/parse_pdf_minerU.py`) and OceanBase demo scripts; capture example payloads for later stubs.
-- Create a lightweight `.env.sample` covering OceanBase DSN, MinerU endpoint, LLM keys; document activation steps for `quest` and `jzMinerUVllm` Conda envs.
-- Prepare seed data: at least one sample PDF and an empty OceanBase schema cloned from `Data_Model.md`.
-- Deliverable: README snippet describing how to start supporting services and verify connections.
+## Serial Phase Division (6 Milestones)
 
-## Milestone 1 · Architecture Blueprint & Directory Layout (0.5 day)
-- Draft a high-level component diagram covering MinerU parsing service, FastAPI backend modules (ingest, retrieval, QA), OceanBase storage, and React client; emphasize sequential flow and data handoffs.
-- Define the repository directory scaffold under `EviQAsys/` (e.g., `backend/app/{api,services,repositories,schemas}`, `frontend/src/{pages,components,api}`, `scripts/`, `docs/diagrams/`); ensure names stay simple and match teaching goals.
-- Add placeholder `README` sections describing module responsibilities and how agents interact (Control/Retrieval/Memory/Answer).
-- Deliverable: Architecture sketch saved under `docs/en/` (markdown or diagram export) plus committed directory stubs with `.gitkeep` where needed.
+> Each phase defines a **Definition of Done (DoD)** and a **Main Task List** (in execution order).
+> Complete the items sequentially in this order.
 
-## Milestone 2 · Interface & Data Contracts (1.5 days)
-- Define FastAPI Pydantic models reflecting the global schema (`collections`, `documents`, `elements`, `chats`, `turns`, `turn2evidence`) plus DTOs for upload, retrieval, and chat requests.
-- Draft OpenAPI routes (no logic yet) for: collection CRUD, document upload, indexing trigger, chat start, turn submit, evidence lookup. Ensure responses expose `[Evidence#no]`, `bbox`, and `page_no`.
-- Establish simple MinerU and OceanBase client adapters: sequential wrapper functions with typed request/response payloads based on captured samples.
-- Capture interface assumptions in `docs/en/service_interface_use.md` notes or inline comments (e.g., synchronous blocking calls, basic error formats).
-- Deliverable: FastAPI skeleton with routes, schemas, and contract docstrings checked in; mock unit tests asserting schema serialization.
+---
 
-## Milestone 3 · Backend Implementation & Self-Testing (3 days)
-- Implement sequential pipeline services:
-  1. `upload_document`: save file, call MinerU parse service synchronously, persist document metadata.
-  2. `index_elements`: transform MinerU `content_list` into unified element structure, generate section summaries, request embeddings (stub with deterministic vectors for now), write to OceanBase via simple repository functions.
-  3. `qa_turn`: rewrite query (DsPy wrapper), perform sequential retrieval against OceanBase (text first, optional image/table follow-up), build prompt, call LLM, store turn/evidence links.
-- Keep orchestration linear; use blocking calls and explicit `try/except` logging rather than background jobs.
-- Add self-tests:
-  - CLI or pytest script that runs the full pipeline against the seed PDF with mocked external calls (MinerU, embeddings, LLM).
-  - In-memory validation ensuring evidence numbering continuity and Turn2Evidence integrity.
-- Deliverable: Backend runs locally via `uvicorn`, all self-tests pass, and sample JSON transcripts (question → answer + evidence) stored under `sample_data/backend/`.
+### **M0. Development Environment & Repository Skeleton**
 
-## Milestone 4 · Frontend Integration (2 days)
-- Scaffold a minimal React single-page app (Vite + TypeScript optional) served statically; use fetch + plain hooks, no state managers.
-- Implement flows:
-  - Collection & document management: forms for creating collections, uploading PDFs, viewing status.
-  - QA workspace: chat panel showing turn history, answer text with clickable `[Evidence#no]`, evidence list panel displaying section metadata, page number, and thumbnail if available.
-  - Document viewer: iframe or canvas overlay that highlights bounding boxes based on `bbox` and `page_no`; rely on sequential loading rather than virtualization.
-- Wire to backend endpoints; handle loading/error states with simple banners.
-- Smoke-test end-to-end by performing upload → index → question in the browser using the seed PDF.
-- Deliverable: Frontend served locally, minimal CSS, demonstration script recorded or documented outlining the full workflow.
+*(Goal: Launch an empty API)*
 
-## Milestone 5 · Demo Polish & Handover (0.5 day)
-- Write a concise demo script plus troubleshooting FAQ highlighting the sequential pipeline and evidence traceability.
-- Capture environment startup scripts (e.g., shell snippets to launch MinerU FastAPI, OceanBase Docker, backend, frontend).
-- Optional stretch if time remains: replace embedding/LLM stubs with actual services, ensuring graceful fallback if unavailable.
-- Deliverable: Updated `README` with demo instructions, checklist confirming all milestones verified.
+**DoD:** On local/server, `uvicorn` can launch FastAPI; frontend can send a minimal GET health check.
+**Main Tasks:**
+
+1. Create two Conda environments:
+   `quest` (for FastAPI + DsPy) and `jzMinerUVllm` (for the local MinerU service).
+   Start OceanBase Docker (minimal single-node setup).
+2. Organize repository directories (recommended):
+   `backend/`, `frontend/`, `dependency/` (link directly to existing examples).
+3. Backend: create minimal route group → `GET /healthz → {ok:true}`.
+4. Frontend: implement the thinnest possible `fetch` wrapper to call the health check (no state management framework needed).
+
+---
+
+### **M1. Database Initialization & Repository Layer**
+
+*(Goal: Tables available, CRUD testable)*
+
+**DoD:** Six tables created in OceanBase; backend can perform CRUD via repository functions; `GET /collections` returns an empty list.
+**Main Tasks:**
+
+1. Write DDL according to the unified data model:
+
+   * Tables: `collections / documents / elements / chats / turns / turn2evidence`
+   * Key FKs & Indexes:
+     `documents.collection_id`, `elements.doc_id`,
+     `turn2evidence (turn_id, evidence_no) PK`,
+     `idx_chat_turn`, `idx_turn_element`
+
+2. Implement **non-ORM** table gateways (repository layer):
+   `collections_repo.py`, `documents_repo.py`, `elements_repo.py`, `chats_repo.py`, `turns_repo.py`, `t2e_repo.py`
+
+3. Use the connection example from `dependency/oceanBaseDemo` to validate connection and transaction handling.
+
+---
+
+### **M2. Document Upload → MinerU Parsing → Storage**
+
+*(Goal: First PDF parsed into Elements and stored)*
+
+**DoD:** Frontend uploads one PDF; backend runs synchronously:
+calls MinerU → receives `content_list + md_text` → normalizes → writes into `documents/elements`; frontend shows the PDF in “Document List.”
+**Main Tasks:**
+
+1. Backend `POST /collections/{id}/documents` (multipart): control service receives file, saves metadata, **blocking call** to MinerU API to obtain `content_list / md_text`.
+
+2. Perform “Header hierarchy repair + unified elementization”:
+   For each element, write `header_name / level_nav / page_no / bbox / text_caption`, etc.;
+   generate brief section summaries for header nodes; enforce “**element is the minimal index unit**.”
+
+3. Store data under **unified text view**:
+
+   * Plain text: `header_name + level_nav + text_content`
+   * Header: `header_name + level_nav + section_summary`
+   * Image/Table: use caption as `text_content`, store image as base64 in `image_base64`
+
+4. Use `dependency/minerUparseDemo/parse_pdf_minerU.py` as integration sample.
+
+> Note: Unlike “frontend polling status,” this demo adopts **synchronous storage** for predictability and simplicity — aligned with the blueprint’s “synchronous and deterministic services” principle.
+
+---
+
+### **M3. Embedding & Retrieval**
+
+*(Goal: Retrieve vector candidates successfully)*
+
+**DoD:** Backend script or API triggers embedding for newly stored elements, writing to `elements.vec_embedding`; `/retrieval/test` can return candidate elements with metadata.
+**Main Tasks:**
+
+1. Textual elements (text/table/equation): embed `text_content`;
+   visual elements (image): embed `image_base64`.
+   Use Qwen-series or multimodal embedding models — start from `dependency/multiModalEmbedding` demo, then encapsulate in `embedding_service.py`.
+2. Extend repository layer with **simple vector similarity search** (cosine + TopK).
+   Retrieval returns `doc_id / page_no / bbox / elem_type`.
+3. Reserve interface hooks for “deduplication and type bucketing” (skip complex logic for now).
+
+---
+
+### **M4. QA Backbone (DsPy Orchestration & Evidence Binding)**
+
+*(Goal: Return answers with `[Evidence#no]` anchors)*
+
+**DoD:** Within a collection, user can create a Chat;
+`POST /chats/{chat_id}/turns` returns `answer` text containing `[Evidence#1]...[Evidence#n]`;
+`turn2evidence` table records mappings;
+`GET /turns/{turn_id}/evidences` returns each evidence’s `doc_id/page_no/bbox/snippet`.
+**Main Tasks:**
+
+1. **Question Rewriting:** use DsPy/LLM to perform lightweight rewrite for retrieval.
+2. **Retrieval:** run vector search with rewritten query, group/filter by type, obtain candidate evidence elements.
+3. **Memory:** concatenate last few turns (e.g., 3); summarize older ones.
+4. **Answer Generation:** construct multimodal prompt (text + image list) and **explicitly instruct model to output anchors** (`[Evidence#no]`);
+   after generation, write `(turn_id, evidence_no → element_id)` into the bridge table to ensure traceability.
+5. Use `dependency/DspyDemo` as the base for LLM/orchestration integration.
+
+---
+
+### **M5. Minimal Frontend (Collections / Upload / Chat / Highlight Navigation)**
+
+*(Goal: End-to-end demo is runnable)*
+
+**DoD:** Frontend includes four minimal pages/views:
+Collections list, Document page (with upload), Chat page (multi-turn log), and PDF viewer with evidence highlighting.
+Clicking `[Evidence#no]` navigates and highlights the source region.
+**Main Tasks:**
+
+1. **API Integration:** Implement and connect these minimal endpoints:
+
+   * `GET /collections`, `POST /collections`, `DELETE /collections/{id}`
+   * `POST /collections/{id}/documents`, `GET /documents/{doc_id}/file`
+   * `POST /collections/{id}/chats`, `GET /chats/{chat_id}`
+   * `POST /chats/{chat_id}/turns`, `GET /turns/{turn_id}/evidences`
+
+2. **Anchor Parsing & Jump:**
+   Chat UI renders `[Evidence#no]` as clickable links;
+   clicking calls the evidences API, triggers PDF viewer to jump to `page_no` and highlight via `bbox`.
+
+3. **UI Thinness:**
+   Implement with pure React + `fetch` wrapper, no global state library;
+   adopt unified response envelope.
+
+---
+
+## **Suggested Implementation Order (Codex Agent Task List)**
+
+1. **M0:** Initialize Conda envs and empty FastAPI; verify `GET /healthz`.
+2. **M1:** Execute DDL, finish `collections_repo` & `documents_repo`, verify `GET /collections`.
+3. **M2:** Integrate MinerU parsing, finish `POST /collections/{id}/documents` with synchronous storage; minimal upload form on frontend.
+4. **M3:** Implement `embedding_service`, vectorize stored elements; add `/retrieval/test`.
+5. **M4:** Connect DsPy pipeline: rewrite → retrieve → answer (with anchors); store in `turns` & `turn2evidence`.
+6. **M5:** Complete chat page + PDF highlight navigation; unify response envelope; build an end-to-end demo script.
+
+---
+
+## **M6. Acceptance Script (End-to-End Self-Test)**
+
+* **Create Collection** → `POST /collections {name:"Demo"}` → returns `id`
+* **Upload PDF** → returns `doc_id`
+* **Vectorize** → trigger batch process
+* **Create Chat** → `POST /collections/{id}/chats`
+* **Ask Question** → `POST /chats/{chat_id}/turns` → answer includes `[Evidence#1]`
+* **Click Anchor** → frontend calls `GET /turns/{turn_id}/evidences` → PDF viewer navigates and highlights
+
+Each step aligns with the system’s **Requirements**, **Data Model**, **Blueprint**, and **Interaction Design**.
