@@ -31,9 +31,11 @@
 | `id`            | BIGINT (PK) | Primary key, auto-increment ID |
 | `collection_id` | BIGINT (FK) | Belonging collection           |
 | `title`         | VARCHAR     | Paper title                    |
+| `md_text`         | TEXT     | the markdown full text of the paper  |
 | `file_name`     | VARCHAR     | File name                      |
 | `file_path`     | VARCHAR     | File path                      |
 | `num_pages`     | INT         | Number of pages                |
+| `element_count`     | INT       | Number of parsed elements in doc    |
 | `created_at`    | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP) |
 
 **Constraints:**

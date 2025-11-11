@@ -217,4 +217,6 @@ batch_upsert → elements表
 
 docs/dev_log/M2/ref_code
 
+# 参考的mineru解析出的数据格式：
+docs/dev_log/M2/ref_data_format
 
