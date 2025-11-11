@@ -1,7 +1,22 @@
 from sqlalchemy import create_engine, text
+from contextlib import contextmanager
+from pathlib import Path
 
-# 方案 A：MySQL 方言 + PyMySQL（通用）
-engine = create_engine("mysql+pymysql://paperQA%40test:12345678@127.0.0.1:2881/obqademo", future=True)
+# === 环境变量定义（示例，可从os.getenv中加载）===
+OB_HOST = "127.0.0.1"
+OB_PORT = 2881
+OB_USER = "paperQA@test"
+OB_PASSWORD = "12345678"
+OB_DATABASE = "obqademo"
+OB_TIMEOUT = 30  # seconds
+
+# === Engine 初始化 ===
+engine = create_engine(
+    f"mysql+pymysql://{OB_USER}:{OB_PASSWORD}@{OB_HOST}:{OB_PORT}/{OB_DATABASE}"
+    f"?connect_timeout={OB_TIMEOUT}",
+    future=True,
+)
+
 
 with engine.begin() as conn:
     # 删除可能已存在的表，保证用例自洽

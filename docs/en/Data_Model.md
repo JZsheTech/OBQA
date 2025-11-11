@@ -15,7 +15,7 @@
 | ------------- | ----------- | ------------------------------ |
 | `id`          | BIGINT (PK) | Primary key, auto-increment ID |
 | `name`        | VARCHAR     | Collection name                |
-| `created_at`  | DATETIME    | Creation time                  |
+| `created_at`  | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP) |
 | `description` | VARCHAR     | Collection description         |
 
 **Constraints:**
@@ -34,39 +34,41 @@
 | `file_name`     | VARCHAR     | File name                      |
 | `file_path`     | VARCHAR     | File path                      |
 | `num_pages`     | INT         | Number of pages                |
-| `created_at`    | DATETIME    | Creation time                  |
+| `created_at`    | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP) |
 
 **Constraints:**
 
 * `PRIMARY KEY (id)`
-* `FOREIGN KEY (collection_id)` → `collections(id)`
-  (Cascade delete or set NULL depending on business logic)
+* `FOREIGN KEY (collection_id)` → `collections(id)` ON DELETE CASCADE
 
 ---
 
 ### **3. elements**
 
-| Field           | Type                                   | Description                                                         |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------- |
-| `id`            | BIGINT (PK)                            | Primary key, auto-increment ID                                      |
-| `doc_id`        | BIGINT (FK)                            | Belonging document                                                  |
-| `order`         | INT                                    | Reading order parsed from `content_list`                            |
-| `elem_type`     | ENUM('text','header','image','table','equation') | Element type                                                        |
-| `header_name`  | VARCHAR                                | Section title                                                       |
-| `level_nav`     | VARCHAR                                | Hierarchical navigation info                                        |
-| `text_content`  | TEXT                                   | Text content                                                        |
-| `text_caption`  | TEXT                                   | Caption for image or table                                          |
-| `image_base64`  | TEXT                         | Image content (Base64 encoded)                                      |
-| `bbox_json`     | JSON                                   | Position info in PDF (list of 4 integers representing bounding box) |
-| `page_no`       | INT                                    | Page number                                                         |
-| `vec_embedding` | VECTOR                                   | Vector embedding (for similarity search)                            |
-| `section_span` | VARCHAR | The range of the section corresponding to the Header element, represented as (order_start, order_end). |
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | BIGINT (PK) | Primary key, auto-increment ID |
+| `doc_id` | BIGINT (FK) | Associated document ID |
+| `order` | INT | Reading order parsed from the content_list, starting from 0 |
+| `elem_type` | VARCHAR | Element type (`text`/`header`/`image`/`table`/`equation`); enforce via CHECK constraint |
+| `header_name` | VARCHAR | Chapter/section title (e.g., 1.1.1 message passing), excluding parent titles. |
+| `header_level` | INT | Header level (only for elements of type 'header') |
+| `level_nav` | VARCHAR | Hierarchical navigation path (e.g., 1. introduction > 1.1 GNN > 1.1.1 message passing) |
+| `text_content` | TEXT | Text content |
+| `text_caption` | TEXT | Caption/annotation for images or tables |
+| `image_base64` | TEXT | Image content (Base64 encoded) |
+| `bbox_json` | JSON | Element's position information in the PDF; a list of 4 integers representing the bounding box |
+| `page_no` | INT | Page number |
+| `vec_embedding` | VECTOR | Vector embedding (for similarity search); dimension configurable via `VECTOR_DIM` env var |
+| `order_start` | VARCHAR | The starting element ID of the section corresponding to a Header element |
+| `order_end` | VARCHAR | The ending element ID of the section corresponding to a Header element |
+| | | |
 
 
 **Constraints:**
 
 * `PRIMARY KEY (id)`
-* `FOREIGN KEY (doc_id)` → `documents(id)`
+* `FOREIGN KEY (doc_id)` → `documents(id)` ON DELETE CASCADE
 
 ---
 
@@ -76,14 +78,15 @@
 | ----------------- | ----------- | ----------------------------------- |
 | `id`              | BIGINT (PK) | Primary key, auto-increment ID      |
 | `collection_id`   | BIGINT (FK) | Belonging collection                |
-| `created_at`      | DATETIME    | Chat creation time                  |
+| `created_at`      | DATETIME    | Chat creation time (DEFAULT CURRENT_TIMESTAMP) |
 | `title`           | VARCHAR     | Chat title                          |
-| `max_evidence_no` | BIGINT      | Maximum evidence number in the chat |
+| `max_evidence_no` | BIGINT      | Maximum evidence number in the chat, start from 1 |
+| `max_turn_order` | BIGINT      | the numer of turns in the chat, start from 1 |
 
 **Constraints:**
 
 * `PRIMARY KEY (id)`
-* `FOREIGN KEY (collection_id)` → `collections(id)`
+* `FOREIGN KEY (collection_id)` → `collections(id)` ON DELETE CASCADE
 
 ---
 
@@ -97,14 +100,14 @@
 | `user_question`    | TEXT        | User question                            |
 | `llm_answer_text`  | MEDIUMTEXT  | LLM answer                               |
 | `llm_thought_text` | MEDIUMTEXT  | LLM reasoning process (chain of thought) |
-| `created_at`       | DATETIME    | Creation time                            |
+| `created_at`       | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP) |
 | `response_tokens`  | INT         | Token consumption for this turn          |
 | `used_llm_model`   | VARCHAR     | LLM model identifier (e.g., gpt-4o-mini) |
 
 **Constraints:**
 
 * `PRIMARY KEY (id)`
-* `FOREIGN KEY (chat_id)` → `chats(id)`
+* `FOREIGN KEY (chat_id)` → `chats(id)` ON DELETE CASCADE
 
 ---
 
@@ -125,16 +128,16 @@ Each `turn` directly binds its evidences to specific `element_id` entries, with 
 | `turn_order`  | INT         | The turn’s order within the chat (redundant field for quick context recovery)      |
 | `evidence_no` | INT         | Evidence index starting from 1 in each turn (e.g., `[Evidence#1]`, `[Evidence#2]`) |
 | `element_id`  | BIGINT (FK) | Linked element ID (`elements.id`)                                                  |
-| `created_at`  | DATETIME    | Record creation time                                                               |
+| `created_at`  | DATETIME    | Record creation time (DEFAULT CURRENT_TIMESTAMP)                                   |
 
 **Constraints:**
 
 * `PRIMARY KEY (turn_id, evidence_no)` → ensures unique evidence numbering per turn
-* `FOREIGN KEY (chat_id)` → `chats(id)`
-* `FOREIGN KEY (turn_id)` → `turns(id)`
-* `FOREIGN KEY (element_id)` → `elements(id)`
-* `INDEX idx_chat_turn (chat_id, turn_order)` → speeds up restoration of recent conversation context
-* `INDEX idx_turn_element (turn_id, element_id)` → accelerates evidence content retrieval
+* `FOREIGN KEY (chat_id)` → `chats(id)` ON DELETE CASCADE
+* `FOREIGN KEY (turn_id)` → `turns(id)` ON DELETE CASCADE
+* `FOREIGN KEY (element_id)` → `elements(id)` ON DELETE CASCADE
+
+Performance indexes (e.g., on `(chat_id, turn_order)` or `(turn_id, element_id)`) are deferred to later milestones and intentionally omitted in M1.
 
 ---
 
@@ -144,3 +147,5 @@ Each `turn` directly binds its evidences to specific `element_id` entries, with 
 * The `elements` table serves as the **core indexing layer**, supporting multimodal retrieval (text + image + table).
 * The `turn2evidence` table dynamically binds **Turn ↔ Evidence ↔ Element**, enabling traceable evidence linkage.
 * `evidence_no` **increments independently within each chat**, starting from 1.
+
+Timestamp convention: tables include `created_at` with `DEFAULT CURRENT_TIMESTAMP`; no `updated_at` fields in M1.

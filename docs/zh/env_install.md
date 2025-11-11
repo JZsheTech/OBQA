@@ -32,7 +32,7 @@ cd sample_data/minerUtemp
 
 # 上述测试文件转换成功后在服务器上启动web服务，可以通过内网穿透等方法转发端口到公网或者用vscode把端口转发到本机。
 # demo的测试和开发都在服务器端，所以不用转发
-mineru-api --host 0.0.0.0 --port 8000
+mineru-api --host 0.0.0.0 --port 18543
 ```
 
 # 用docker部署oceanbase
