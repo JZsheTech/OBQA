@@ -51,19 +51,36 @@ class ElementsRepository:
             row = row_to_dict(fetched)
         return row or {}
 
-    def bulk_create(self, records: Iterable[dict[str, Any]]) -> RepositoryResult:
-        payloads = []
+    def batch_insert(self, records: Iterable[dict[str, Any]], *, batch_size: int = 32) -> RepositoryResult:
+        rows: list[dict[str, Any]] = []
         for record in records:
-            payload = {key: record[key] for key in record if key in self.writable_fields}
-            if not payload:
-                continue
-            payloads.append(payload)
+            payload = {key: record.get(key) for key in self.writable_fields}
+            if payload.get("doc_id") is None:
+                raise ValueError("doc_id is required for element rows.")
+            if payload.get("order") is None:
+                raise ValueError("order is required for element rows.")
+            if payload.get("elem_type") is None:
+                raise ValueError("elem_type is required for element rows.")
+            rows.append(payload)
+        if not rows:
+            return RepositoryResult(rows=None, rowcount=0)
+
         inserted = 0
+        columns = sorted({column for row in rows for column in row.keys() if row[column] is not None or column in {"doc_id", "order", "elem_type"}})
+        placeholders = ", ".join(f":{column}" for column in columns)
+        columns_clause = ", ".join(f"`{column}`" for column in columns)
+        sql = f"INSERT INTO {self.table_name} ({columns_clause}) VALUES ({placeholders})"
+
+        def _chunk(payloads: list[dict[str, Any]], size: int) -> Iterable[list[dict[str, Any]]]:
+            for start in range(0, len(payloads), size):
+                yield payloads[start : start + size]
+
         with self._connection_provider() as connection:
-            for payload in payloads:
-                sql, params = dict_to_insert(self.table_name, payload)
-                connection.execute(text(sql), params)
-                inserted += 1
+            for chunk in _chunk(rows, max(1, batch_size)):
+                normalized_chunk = [{column: row.get(column) for column in columns} for row in chunk]
+                connection.execute(text(sql), normalized_chunk)
+                inserted += len(chunk)
+
         return RepositoryResult(rows=None, rowcount=inserted)
 
     def get_by_id(self, element_id: int) -> dict[str, Any] | None:

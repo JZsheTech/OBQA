@@ -1,42 +1,118 @@
-#root {
-  max-width: 1280px;
+.app {
   margin: 0 auto;
+  max-width: 960px;
   padding: 2rem;
-  text-align: center;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+header {
+  margin-bottom: 2rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+header h1 {
+  margin-bottom: 0.25rem;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
-.card {
-  padding: 2em;
+.panel__label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
 
-.read-the-docs {
-  color: #888;
+.panel__row {
+  display: flex;
+  gap: 1rem;
+}
+
+.panel input[type="number"],
+.panel input[type="file"] {
+  flex: 1;
+  padding: 0.6rem;
+  border: 1px solid #cbd5f5;
+  border-radius: 8px;
+}
+
+button {
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.empty {
+  margin: 0;
+  color: #64748b;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+}
+
+th {
+  font-size: 0.9rem;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status {
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  text-transform: capitalize;
+}
+
+.status--parsed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status--uploaded {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.message {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #0f172a;
 }

@@ -36,7 +36,11 @@ def main() -> None:
             title="Manual Repo Test",
             file_name="manual.pdf",
             file_path="/tmp/manual.pdf",
+            file_sha256="manual-hash",
+            file_size_bytes=1234,
             num_pages=1,
+            md_text="# Manual Repo Test",
+            element_count=0,
         )
         print(f"Created document: {document}")
 
@@ -46,7 +50,12 @@ def main() -> None:
             print(f"  - {doc['id']}: {doc.get('title')} (pages={doc.get('num_pages')})")
 
         print("Updating document metadata...")
-        documents_repo.update_document(document["id"], title="Manual Repo Test (updated)", num_pages=2)
+        documents_repo.update_document(
+            document["id"],
+            title="Manual Repo Test (updated)",
+            num_pages=2,
+            element_count=5,
+        )
         refreshed = documents_repo.get_by_id(document["id"])
         print(f"Updated document: {refreshed}")
 

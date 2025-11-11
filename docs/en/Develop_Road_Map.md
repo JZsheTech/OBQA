@@ -70,6 +70,13 @@ calls MinerU → receives `content_list + md_text` → normalizes → writes int
 
 > Note: Unlike “frontend polling status,” this demo adopts **synchronous storage** for predictability and simplicity — aligned with the blueprint’s “synchronous and deterministic services” principle.
 
+**M2 Delivery Snapshot**
+
+- Backend now exposes `POST /api/collections/{id}/documents` (multipart upload) and `GET /api/collections/{id}/documents` (list view). Both return the unified `{code,data}` envelope with derived `parse_status`.
+- `DocumentIngestor` orchestrates MinerU HTTP calls, header repair, TF-IDF summaries, normalization, and transactional writes to `documents`/`elements`. Deduplication uses `collection_id + file_name + file_sha256`.
+- New env knobs: `UPLOAD_DIR`, `MAX_UPLOAD_MB`, `MINERU_MODE`, `MINERU_ENDPOINT`, `MINERU_TIMEOUT_S`, `BATCH_SIZE` (ingest batch). Defaults live in `app/env_setting.py`.
+- Manual validation script `EviQAsys/backend/tests/manual/test_m2_ingest.py` ingests a real PDF, prints element stats, and cleans up rows (no pytest dependency).
+
 ---
 
 ### **M3. Embedding & Retrieval**

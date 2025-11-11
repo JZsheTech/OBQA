@@ -27,14 +27,22 @@ class DocumentsRepository:
         title: str | None = None,
         file_name: str | None = None,
         file_path: str | None = None,
+        file_sha256: str | None = None,
+        file_size_bytes: int | None = None,
         num_pages: int | None = None,
+        md_text: str | None = None,
+        element_count: int | None = None,
     ) -> dict[str, Any]:
         payload = {
             "collection_id": collection_id,
             "title": title,
             "file_name": file_name,
             "file_path": file_path,
+            "file_sha256": file_sha256,
+            "file_size_bytes": file_size_bytes,
             "num_pages": num_pages,
+            "md_text": md_text,
+            "element_count": element_count,
         }
         sql, params = dict_to_insert(self.table_name, payload)
         with self._connection_provider() as connection:
@@ -42,7 +50,8 @@ class DocumentsRepository:
             doc_id = result.lastrowid
             fetched = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, file_name, file_path, num_pages, created_at "
+                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": doc_id},
@@ -54,7 +63,8 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, file_name, file_path, num_pages, created_at "
+                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": document_id},
@@ -65,7 +75,8 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, file_name, file_path, num_pages, created_at "
+                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, created_at "
                     "FROM documents WHERE collection_id = :collection_id "
                     "ORDER BY created_at DESC, id DESC",
                 ),
@@ -74,7 +85,16 @@ class DocumentsRepository:
             return rows_to_dicts(result)
 
     def update_document(self, document_id: int, **fields: Any) -> RepositoryResult:
-        allowed_fields = {"title", "file_name", "file_path", "num_pages"}
+        allowed_fields = {
+            "title",
+            "file_name",
+            "file_path",
+            "file_sha256",
+            "file_size_bytes",
+            "num_pages",
+            "element_count",
+            "md_text",
+        }
         payload = {key: value for key, value in fields.items() if key in allowed_fields}
         if not payload:
             return RepositoryResult(rows=[], rowcount=0)
@@ -83,6 +103,31 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(text(sql), params)
         return RepositoryResult(rows=None, rowcount=result.rowcount)
+
+    def find_duplicate(
+        self,
+        *,
+        collection_id: int,
+        file_name: str,
+        file_sha256: str,
+    ) -> dict[str, Any] | None:
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, created_at "
+                    "FROM documents "
+                    "WHERE collection_id = :collection_id AND file_name = :file_name "
+                    "AND file_sha256 = :file_sha256 "
+                    "ORDER BY created_at DESC LIMIT 1",
+                ),
+                {
+                    "collection_id": collection_id,
+                    "file_name": file_name,
+                    "file_sha256": file_sha256,
+                },
+            )
+            return row_to_dict(result)
 
     def delete_document(self, document_id: int) -> RepositoryResult:
         with self._connection_provider() as connection:
