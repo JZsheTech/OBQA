@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from pathlib import Path
+import sys
+PROJECT_ROOT = Path(__file__).resolve().parents[4]
+sys.path.append(str(PROJECT_ROOT))
+
 from EviQAsys.backend.app.env_setting import get_oceanbase_settings
 from EviQAsys.backend.app.repositories import (
     CollectionsRepository,

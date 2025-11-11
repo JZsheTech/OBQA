@@ -44,3 +44,44 @@
      api/collections call, then record the observed logs in docs/dev_log/M1.md to finish
   the M1
      verification checklist.
+
+# test脚本测试结果：
+
+## check_documents_repo
+python  /data2/jproject/OBQA/EviQAsys/backend/tests/repositories/check_documents_repo.py
+
+```
+(quest) shejunzhi@chai03:/data2/jproject/OBQA$ python  /data2/jproject/OBQA/EviQAsys/backend/tests/repositories/check_documents_repo.py
+== Documents Repository Manual Check ==
+[2025-11-11 08:10:40.602545] Target DB: obqa_dev @ 127.0.0.1:2881
+Ensuring schema is applied...
+Temporary collection: {'id': 2, 'name': 'manual-doc-check', 'description': 'Temp collection for document script.', 'created_at': datetime.datetime(2025, 11, 11, 8, 10, 40)}
+Created document: {'id': 1, 'collection_id': 2, 'title': 'Manual Repo Test', 'file_name': 'manual.pdf', 'file_path': '/tmp/manual.pdf', 'num_pages': 1, 'created_at': datetime.datetime(2025, 11, 11, 8, 10, 40)}
+Listing documents for the temp collection...
+  - 1: Manual Repo Test (pages=1)
+Updating document metadata...
+Updated document: {'id': 1, 'collection_id': 2, 'title': 'Manual Repo Test (updated)', 'file_name': 'manual.pdf', 'file_path': '/tmp/manual.pdf', 'num_pages': 2, 'created_at': datetime.datetime(2025, 11, 11, 8, 10, 40)}
+Cleaning up document row...
+Deleting temporary collection...
+Document repository check completed.
+
+```
+
+## check_collections_repo
+python  /data2/jproject/OBQA/EviQAsys/backend/tests/repositories/check_collections_repo.py
+
+```
+(quest) shejunzhi@chai03:/data2/jproject/OBQA$ python  /data2/jproject/OBQA/EviQAsys/backend/tests/repositories/check_collections_repo.py
+== Collection Repository Manual Check ==
+[2025-11-11 08:07:56.913292] Target DB: obqa_dev @ 127.0.0.1:2881
+Initializing schema (idempotent)...
+Existing collections:
+Creating a sample collection...
+Created row: {'id': 1, 'name': 'manual-check', 'description': 'Temp collection for repository check.', 'created_at': datetime.datetime(2025, 11, 11, 8, 7, 57)}
+Fetched by ID: {'id': 1, 'name': 'manual-check', 'description': 'Temp collection for repository check.', 'created_at': datetime.datetime(2025, 11, 11, 8, 7, 57)}
+Updating description...
+Updated row: {'id': 1, 'name': 'manual-check', 'description': 'Updated via manual test script.', 'created_at': datetime.datetime(2025, 11, 11, 8, 7, 57)}
+Cleaning up inserted collection...
+Cleanup complete.
+
+```
