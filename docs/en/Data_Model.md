@@ -46,21 +46,24 @@
 
 ### **3. elements**
 
-| Field           | Type                                   | Description                                                         |
-| --------------- | -------------------------------------- | ------------------------------------------------------------------- |
-| `id`            | BIGINT (PK)                            | Primary key, auto-increment ID                                      |
-| `doc_id`        | BIGINT (FK)                            | Belonging document                                                  |
-| `order`         | INT                                    | Reading order parsed from `content_list`                            |
-| `elem_type`     | ENUM('text','header','image','table','equation') | Element type                                                        |
-| `header_name`  | VARCHAR                                | Section title                                                       |
-| `level_nav`     | VARCHAR                                | Hierarchical navigation info                                        |
-| `text_content`  | TEXT                                   | Text content                                                        |
-| `text_caption`  | TEXT                                   | Caption for image or table                                          |
-| `image_base64`  | TEXT                         | Image content (Base64 encoded)                                      |
-| `bbox_json`     | JSON                                   | Position info in PDF (list of 4 integers representing bounding box) |
-| `page_no`       | INT                                    | Page number                                                         |
-| `vec_embedding` | VECTOR                                   | Vector embedding (for similarity search)                            |
-| `section_span` | VARCHAR | The range of the section corresponding to the Header element, represented as (order_start, order_end). |
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `id` | BIGINT (PK) | Primary key, auto-increment ID |
+| `doc_id` | BIGINT (FK) | Associated document ID |
+| `order` | INT | Reading order parsed from the content_list, starting from 0 |
+| `elem_type` | ENUM('text','header','image','table','equation') | Element type |
+| `header_name` | VARCHAR | Chapter/section title (e.g., 1.1.1 message passing), excluding parent titles. |
+| `header_level` | INT | Header level (only for elements of type 'header') |
+| `level_nav` | VARCHAR | Hierarchical navigation path (e.g., 1. introduction > 1.1 GNN > 1.1.1 message passing) |
+| `text_content` | TEXT | Text content |
+| `text_caption` | TEXT | Caption/annotation for images or tables |
+| `image_base64` | TEXT | Image content (Base64 encoded) |
+| `bbox_json` | JSON | Element's position information in the PDF; a list of 4 integers representing the bounding box |
+| `page_no` | INT | Page number |
+| `vec_embedding` | VECTOR | Vector embedding (for similarity search) |
+| `order_start` | VARCHAR | The starting element ID of the section corresponding to a Header element |
+| `order_end` | VARCHAR | The ending element ID of the section corresponding to a Header element |
+| | | |
 
 
 **Constraints:**
@@ -78,7 +81,8 @@
 | `collection_id`   | BIGINT (FK) | Belonging collection                |
 | `created_at`      | DATETIME    | Chat creation time                  |
 | `title`           | VARCHAR     | Chat title                          |
-| `max_evidence_no` | BIGINT      | Maximum evidence number in the chat |
+| `max_evidence_no` | BIGINT      | Maximum evidence number in the chat, start from 1 |
+| `max_turn_order` | BIGINT      | the numer of turns in the chat, start from 1 |
 
 **Constraints:**
 
