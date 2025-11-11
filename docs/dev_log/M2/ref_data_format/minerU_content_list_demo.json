@@ -1,0 +1,70 @@
+[
+  {
+    "type": "text",
+    "text": "Class-Balanced Loss Based on Effective Number of Samples ",
+    "text_level": 1,
+    "bbox": [
+        199,
+        141,
+        803,
+        162
+    ],
+    "page_idx": 0
+  },
+  {
+    "type": "text",
+    "text": "Covering and Effective Sample Size. Our theoretical framework is inspired by the random covering problem [18], where the goal is to cover a large set by a sequence of i.i.d. random small sets. We simplify the problem in Section 3 by making reasonable assumptions. Note that the effective number of samples proposed in this paper is different from the concept of effective sample size in statistics. The effective sample size is used to calculate variance when samples are correlated. ",
+    "bbox": [
+      511,
+      765,
+      900,
+      898
+    ],
+    "page_idx": 1
+  },
+  {
+    "type": "image",
+    "img_path": "images/24fabfa3ea1ee8d758f5941fcb3f852a9f752c3617e7720e8ef7a57a10a42c53.jpg",
+    "image_caption": [
+      "Figure 2. Giving the set of all possible data with volume $N$ and the set of previously sampled data, a new sample with volume 1 has the probability of $p$ being overlapped with previous data and the probability of $1 - p$ not being overlapped. "
+    ],
+    "image_footnote": [],
+    "bbox": [
+      521,
+      87,
+      892,
+      265
+    ],
+    "page_idx": 2
+  },
+  {
+    "type": "equation",
+    "img_path": "images/a708d371819b82a75b8dadcbc7fc3e2967f53d0bee58a1495c2298274f4e2f66.jpg",
+    "text": "$$\nE _ { n } = p E _ { n - 1 } + ( 1 - p ) ( E _ { n - 1 } + 1 ) = 1 + { \\frac { N - 1 } { N } } E _ { n - 1 } .\n$$",
+    "text_format": "latex",
+    "bbox": [
+      517,
+      540,
+      875,
+      570
+    ],
+    "page_idx": 2
+  },
+  {
+    "type": "table",
+    "img_path": "images/b63091583968bbc7e2d8d14b314c92cab5ab1d5da738beae5058b1bd9a291d54.jpg",
+    "table_caption": [
+      "Table 1. Datasets that are used to evaluate the effectiveness of class-balanced loss. We created 5 long-tailed versions of both CIFAR-10 and CIFAR-100 with imbalance factors of 10, 20, 50, 100 and 200 respectively. "
+    ],
+    "table_footnote": [],
+    "table_body": "<table><tr><td>Dataset Name</td><td># Classes</td><td>Imbalance</td></tr><tr><td>Long-Tailed CIFAR-10</td><td>10</td><td>10.00- 200.00</td></tr><tr><td>Long-Tailed CIFAR-100</td><td>100</td><td>10.00 - 200.00</td></tr><tr><td>iNaturalist 2017</td><td>5,089</td><td>435.44</td></tr><tr><td>iNaturalist 2018</td><td>8,142</td><td>500.00</td></tr><tr><td>ILSVRC 2012</td><td>1,000</td><td>1.78</td></tr></table>",
+    "bbox": [
+      514,
+      304,
+      897,
+      398
+    ],
+    "page_idx": 4
+  }
+
+]
