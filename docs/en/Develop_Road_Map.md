@@ -30,19 +30,17 @@ Here’s the English translation of your milestone-based roadmap:
 
 *(Goal: Tables available, CRUD testable)*
 
-**DoD:** Six tables created in OceanBase; backend can perform CRUD via repository functions; `GET /collections` returns an empty list.
+**DoD:** Six tables created in OceanBase; backend can perform CRUD via repository functions; `GET /api/collections` returns an empty list in the unified envelope.
 **Main Tasks:**
 
 1. Write DDL according to the unified data model:
 
    * Tables: `collections / documents / elements / chats / turns / turn2evidence`
-   * Key FKs & Indexes:
-     `documents.collection_id`, `elements.doc_id`,
-     `turn2evidence (turn_id, evidence_no) PK`,
-     `idx_chat_turn`, `idx_turn_element`
+   * Key FKs: `documents.collection_id`, `elements.doc_id`, and bridge table PK `turn2evidence (turn_id, evidence_no)`.
+   * Use `ON DELETE CASCADE` on relevant foreign keys; defer optional performance indexes (e.g., `idx_chat_turn`, `idx_turn_element`) to later milestones.
 
 2. Implement **non-ORM** table gateways (repository layer):
-   `collections_repo.py`, `documents_repo.py`, `elements_repo.py`, `chats_repo.py`, `turns_repo.py`, `t2e_repo.py`
+   `collections_repo.py`, `documents_repo.py`, `elements_repo.py`, `chats_repo.py`, `turns_repo.py`, `turn2evidence_repo.py`
 
 3. Use the connection example from `dependency/oceanBaseDemo` to validate connection and transaction handling.
 
@@ -118,12 +116,12 @@ Collections list, Document page (with upload), Chat page (multi-turn log), and P
 Clicking `[Evidence#no]` navigates and highlights the source region.
 **Main Tasks:**
 
-1. **API Integration:** Implement and connect these minimal endpoints:
+1. **API Integration:** Implement and connect these minimal endpoints (base path `/api`):
 
-   * `GET /collections`, `POST /collections`, `DELETE /collections/{id}`
-   * `POST /collections/{id}/documents`, `GET /documents/{doc_id}/file`
-   * `POST /collections/{id}/chats`, `GET /chats/{chat_id}`
-   * `POST /chats/{chat_id}/turns`, `GET /turns/{turn_id}/evidences`
+   * `GET /api/collections`, `POST /api/collections`, `DELETE /api/collections/{id}`
+   * `POST /api/collections/{id}/documents`, `GET /api/documents/{doc_id}/file`
+   * `POST /api/collections/{id}/chats`, `GET /api/chats/{chat_id}`
+   * `POST /api/chats/{chat_id}/turns`, `GET /api/turns/{turn_id}/evidences`
 
 2. **Anchor Parsing & Jump:**
    Chat UI renders `[Evidence#no]` as clickable links;
@@ -148,11 +146,11 @@ Clicking `[Evidence#no]` navigates and highlights the source region.
 
 ## **M6. Acceptance Script (End-to-End Self-Test)**
 
-* **Create Collection** → `POST /collections {name:"Demo"}` → returns `id`
+* **Create Collection** → `POST /api/collections {name:"Demo"}` → returns `id`
 * **Upload PDF** → returns `doc_id`
 * **Vectorize** → trigger batch process
-* **Create Chat** → `POST /collections/{id}/chats`
-* **Ask Question** → `POST /chats/{chat_id}/turns` → answer includes `[Evidence#1]`
-* **Click Anchor** → frontend calls `GET /turns/{turn_id}/evidences` → PDF viewer navigates and highlights
+* **Create Chat** → `POST /api/collections/{id}/chats`
+* **Ask Question** → `POST /api/chats/{chat_id}/turns` → answer includes `[Evidence#1]`
+* **Click Anchor** → frontend calls `GET /api/turns/{turn_id}/evidences` → PDF viewer navigates and highlights
 
 Each step aligns with the system’s **Requirements**, **Data Model**, **Blueprint**, and **Interaction Design**.
