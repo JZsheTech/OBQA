@@ -53,7 +53,7 @@ def demo_scalar_filter_vector_approx_post():
 
     # 4️⃣ 向量近似检索 + 标量过滤（post-search）
     query_vec = [random.uniform(-1, 1) for _ in range(64)]
-    print("→ 仅在 tag='cv' 的子集上执行近似向量匹配 (post-search)…")
+    print("先执行近似向量匹配， 再从向量检索得到的topK结果中筛选出满足 tag='cv' 的子集 (post-search)…")
 
     res = client.post_ann_search(
         table_name=tbl,
