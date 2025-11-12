@@ -3,7 +3,6 @@ import base64
 import os
 import sys
 from pathlib import Path
-
 from PIL import Image
 import dspy
 
@@ -33,51 +32,43 @@ except (ModuleNotFoundError, ImportError):
 
     OLLAMA_OPENAI_BASE_URL = _default_ollama_openai_base_url()
 
-# ======== 配置你的 LLM ========
+# ======== 配置 LLM ========
 lm = dspy.LM(
     "openai/qwen2.5vl:72b",
     api_base=OLLAMA_OPENAI_BASE_URL,
-    api_key="ollama",       # 根据你的设置
-    model_type="chat"
+    api_key="ollama",
+    model_type="chat",
 )
 dspy.configure(lm=lm)
 
-# ======== 定义 Signature （输入包括图片 + 文本） ========
-class ImageQASignature(dspy.Signature):
+# ======== 定义 Signature（只输入图片，输出描述） ========
+class ImageDescribeSignature(dspy.Signature):
     image: dspy.Image = dspy.InputField(desc="The image to be described")
-    question: str = dspy.InputField(desc="A question about the image")
-    answer: str = dspy.OutputField(desc="The answer returned by the model")
+    description: str = dspy.OutputField(desc="A concise and accurate description of the image content")
 
-# ======== 定义 Module（Predictor） ========
-# 选择最简单的 Predict 模块（你也可用 ChainOfThought 等）
-qa_model = dspy.Predict(
-    signature=ImageQASignature,
+# ======== 定义 Module（Predict 模块） ========
+image_describer = dspy.Predict(
+    signature=ImageDescribeSignature,
     instruction="""
-    Given an image and a question about it, answer the question in a concise sentence.
-    """.strip()
+    You are a vision model. Given an image, describe its visible content in one or two sentences.
+    Avoid speculation or unrelated commentary.
+    """.strip(),
 )
 
-# ======== Helper: 从文件生成 base64 或直接用 PIL/bytes ========
-def path_to_base64_uri(path: str) -> str:
+# ======== Helper: 将图片转换为 base64 URI ========
+def path_to_base64_uri(path: str, fmt: str = "jpg") -> str:
     with open(path, "rb") as f:
         b = f.read()
-    return "data:image/png;base64," + base64.b64encode(b).decode('utf-8').replace('\n', '')
+    return f"data:image/{fmt};base64," + base64.b64encode(b).decode("utf-8").replace("\n", "")
 
 # ======== 调用示例 ========
 if __name__ == "__main__":
-    image_path = "/data2/jproject/OBQA/sample_data/image_demo/demo2.jpg" # 一个损失函数的公式
+    image_path = "/data2/jproject/OBQA/sample_data/image_demo/demo2.jpg"
 
-    # 方法 A：直接传文件路径／PIL
-    # img_obj = image_path
-    # 或 方法 B：如果你已经有 base64 uri
-    uri = path_to_base64_uri(image_path)
+    # 转换为 base64 URI
+    uri = path_to_base64_uri(image_path, "jpg")
     img_obj = uri
-    # 或 方法 C：如果你有 raw bytes:
-    # with open(image_path, "rb") as f:
-    #     img_bytes = f.read()
-    # img_obj = img_bytes
 
-    q = "Describe the image"
-
-    result = qa_model(image=img_obj, question=q)
-    print("Answer:", result.answer)
+    # 执行推理
+    result = image_describer(image=img_obj)
+    print("Description:", result.description)
