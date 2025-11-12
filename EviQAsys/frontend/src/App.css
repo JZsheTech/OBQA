@@ -14,6 +14,24 @@ header h1 {
   margin-bottom: 0.25rem;
 }
 
+.page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.nav-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.nav-link:hover {
+  text-decoration: underline;
+}
+
 .panel {
   background: #ffffff;
   border: 1px solid #e2e8f0;

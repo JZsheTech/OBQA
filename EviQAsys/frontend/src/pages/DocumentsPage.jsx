@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import { listDocuments, uploadDocument } from "../api/client"
 import DocumentList from "../components/DocumentList"
 import UploadForm from "../components/UploadForm"
@@ -44,9 +45,14 @@ export default function DocumentsPage() {
 
     return (
         <div className="app">
-            <header>
-                <h1>EviQAsys Document Console</h1>
-                <p>Upload PDFs and verify MinerU ingestion results.</p>
+            <header className="page-header">
+                <div>
+                    <h1>EviQAsys Document Console</h1>
+                    <p>Upload PDFs and verify MinerU ingestion results.</p>
+                </div>
+                <Link className="nav-link" to="/">
+                    ← Back to status
+                </Link>
             </header>
 
             <section className="panel">
