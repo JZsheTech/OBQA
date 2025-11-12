@@ -10,7 +10,7 @@ This repository hosts a sequential Paper Question-Answering demo that ties answe
   - `preprocess`: normalize MinerU content and repair headers.
   - `index`: create section aggregates and deterministic embeddings.
   - `db_access`: thin helpers for OceanBase reads/writes.
-  - `embedding`: adapters for Qwen embedding calls or stubs.
+  - `embedding`: adapters for Jina_embedding_v4 embedding calls or stubs.
   - `llm`: DsPy orchestrators targeting Alibaba LLMs.
   - `memory`: maintain per-chat state and evidence numbering.
   - `qa_flow`: sequential orchestration combining rewrite → retrieve → answer.
