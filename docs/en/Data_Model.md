@@ -108,7 +108,7 @@
 | `llm_thought_text` | MEDIUMTEXT  | LLM reasoning process (chain of thought) |
 | `created_at`       | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP) |
 | `response_tokens`  | INT         | Token consumption for this turn          |
-| `used_llm_model`   | VARCHAR     | LLM model identifier (e.g., gpt-4o-mini) |
+| `used_llm_model`   | VARCHAR     | LLM model identifier (e.g., llama3:70b or qwen2.5vl:72b) |
 
 **Constraints:**
 

@@ -55,10 +55,10 @@
 
 6. **Vectorization and Storage**
 
-   * Unified multimodal embeddings are generated using the **Qwen** series embedding models:
+   * Unified embeddings are generated using the local vLLM–served **Jina Embeddings v4** model (`jina_embedding_v4`).
 
-     * **Textual types** (Text, Table, Equation): embeddings are generated from `text_content` only (Table/Equation types do not use image modality).
-     * **Image type**: embeddings are generated from `image_content`.
+     * **Textual types** (Text, Table, Equation): embed `text_content` only (Table/Equation do not use image modality).
+     * **Image type**: embed `image_content`.
    * The embeddings, along with metadata (`collection_id`, `doc_id`, etc.), are stored in the `Elements` table within OceanBase.
 
 ---
@@ -68,7 +68,7 @@
 7. **Question Input and Rewriting**
 
    * The user selects a target `Collection` and submits a question.
-   * An Alibaba LLM performs **query rewriting** to produce a more retrieval-friendly version of the question.
+   * A local LLM via Ollama (e.g., `llama3:70b`) performs lightweight **query rewriting** to produce a retrieval‑friendly question.
 
 8. **Vector Retrieval and Evidence Generation**
 
@@ -83,7 +83,10 @@
 
      * **Text modality**: concatenate multiple `text_content` blocks with delimiters, each labeled with its Evidence number.
      * **Image modality**: include corresponding base64 images in an `images` list and explicitly describe the mapping between each image index and its Evidence number in the prompt.
-   * The Alibaba multimodal **VLM model** (text + image input) generates an Answer containing embedded `[Evidence#no]` anchors.
+   * Use local Ollama models for generation:
+     * **Text‑only QA**: `llama3:70b`.
+     * **Multimodal (text + image) QA**: `qwen2.5vl:72b`.
+   * The model outputs an Answer containing embedded `[Evidence#no]` anchors.
 
 10. **Front-End Interaction**
 

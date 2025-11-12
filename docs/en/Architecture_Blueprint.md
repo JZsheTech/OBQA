@@ -19,7 +19,7 @@ graph TD
     subgraph External
         C1[MinerU Parsing API]
         C2[OceanBase Storage]
-        C3[DsPy + Alibaba LLMs]
+        C3[DsPy + Local Ollama LLMs]
     end
 
     A -->|Upload PDF| B1 -->|forward file| B2
@@ -42,13 +42,13 @@ graph TD
 | **Backend API** | `api` routers + Pydantic `schemas` | Define HTTP entry points for upload, indexing trigger, and QA turns. Marshal requests into synchronous service calls and serialize responses with `[Evidence#no]`, `bbox`, and `page_no`. |
 | **Services** | `preprocess`, `index`, `db_access`, `embedding`, `retrieval`, `memory`, `llm`, `qa_flow`, `integrations` | Each module owns one pipeline step. Functions are synchronous and composable, orchestrated in `qa_flow`. `integrations` wraps MinerU, OceanBase clients, and DsPy flows without extra abstraction layers. |
 | **Repositories** | OceanBase table gateways | Provide direct CRUD helpers for `collections`, `documents`, `elements`, `chats`, `turns`, `turn2evidence`. No ORM required; keep SQL explicit and simple. |
-| **External Systems** | MinerU, OceanBase, DsPy/LLMs | Operate as authoritative services. The backend treats them as blocking calls with explicit error handling and retries when needed. |
+| **External Systems** | MinerU, OceanBase, DsPy/LLMs | Operate as authoritative services. The backend treats them as blocking calls with explicit error handling and retries when needed. LLMs run via local Ollama (text: `llama3:70b`, multimodal: `qwen2.5vl:72b`). |
 
 ## Data & Control Flow Summary
 
 1. **Upload** – The frontend uploads a PDF. The backend control service stores metadata, calls MinerU, normalizes the returned `content_list`, and persists documents/elements in OceanBase using repository helpers.
-2. **Index** – `index` services generate deterministic embeddings (Qwen or stubs), attach section metadata, and write unified element records. All work occurs within the request scope.
-3. **Question** – The control service rewrites the question via DsPy, the retrieval service performs vector and metadata lookups in OceanBase, and the memory service ensures evidence numbering continuity.
-4. **Answer** – The answer service builds a multimodal prompt, calls the Alibaba LLM through DsPy, stores the new turn plus evidence links, and returns the answer with `[Evidence#no]` anchors. The frontend resolves anchors to highlight PDF regions using the stored `bbox` and `page_no`.
+2. **Index** – `index` services generate embeddings with local vLLM‑served Jina Embeddings v4 (`jina_embedding_v4`), attach section metadata, and write unified element records. All work occurs within the request scope.
+3. **Question** – The control service rewrites the question via DsPy using local Ollama (`llama3:70b`), the retrieval service performs vector and metadata lookups in OceanBase, and the memory service ensures evidence numbering continuity.
+4. **Answer** – The answer service builds a multimodal prompt and calls local Ollama models (text: `llama3:70b`, multimodal: `qwen2.5vl:72b`) through DsPy, stores the new turn plus evidence links, and returns the answer with `[Evidence#no]` anchors. The frontend resolves anchors to highlight PDF regions using the stored `bbox` and `page_no`.
 
 This structure keeps the architecture intentionally small: a single FastAPI application coordinating deterministic modules with predictable side effects. No background queues or event buses are introduced until the core demo flow is complete.

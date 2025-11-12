@@ -88,7 +88,7 @@ calls MinerU → receives `content_list + md_text` → normalizes → writes int
 
 1. Textual elements (text/table/equation): embed `text_content`;
    visual elements (image): embed `image_base64`.
-   Use Qwen-series or multimodal embedding models — start from `dependency/multiModalEmbedding` demo, then encapsulate in `embedding_service.py`.
+   Use local vLLM with Jina Embeddings v4 (`jina_embedding_v4`). Start from `dependency/multiModalEmbedding` demo for the vLLM `/v1/embeddings` flow, then encapsulate in `embedding_service.py`.
 2. Extend repository layer with **simple vector similarity search** (cosine + TopK).
    Retrieval returns `doc_id / page_no / bbox / elem_type`.
 3. Reserve interface hooks for “deduplication and type bucketing” (skip complex logic for now).
@@ -106,9 +106,11 @@ calls MinerU → receives `content_list + md_text` → normalizes → writes int
 **Main Tasks:**
 
 1. **Question Rewriting:** use DsPy/LLM to perform lightweight rewrite for retrieval.
+   Use local Ollama `llama3:70b` for text‑only rewriting.
 2. **Retrieval:** run vector search with rewritten query, group/filter by type, obtain candidate evidence elements.
 3. **Memory:** concatenate last few turns (e.g., 3); summarize older ones.
 4. **Answer Generation:** construct multimodal prompt (text + image list) and **explicitly instruct model to output anchors** (`[Evidence#no]`);
+   use local Ollama models: text‑only → `llama3:70b`; multimodal → `qwen2.5vl:72b`.
    after generation, write `(turn_id, evidence_no → element_id)` into the bridge table to ensure traceability.
 5. Use `dependency/DspyDemo` as the base for LLM/orchestration integration.
 
