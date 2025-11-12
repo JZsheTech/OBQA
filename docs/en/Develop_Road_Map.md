@@ -86,8 +86,8 @@ calls MinerU → receives `content_list + md_text` → normalizes → writes int
 **DoD:** Backend script or API triggers embedding for newly stored elements, writing to `elements.vec_embedding`; `/retrieval/test` can return candidate elements with metadata.
 **Main Tasks:**
 
-1. Textual elements (text/table/equation): embed `text_content`;
-   visual elements (image): embed `image_base64`.
+1. For text-only elements (text, header): embed `text_content` only;
+   for elements with both text and image modalities (image, table, equation): jointly embed `text_content` + `image_base64` into a single unified vector.
    Use local vLLM with Jina Embeddings v4 (`jina_embedding_v4`). Start from `dependency/multiModalEmbedding` demo for the vLLM `/v1/embeddings` flow, then encapsulate in `embedding_service.py`.
 2. Extend repository layer with **simple vector similarity search** (cosine + TopK).
    Retrieval returns `doc_id / page_no / bbox / elem_type`.

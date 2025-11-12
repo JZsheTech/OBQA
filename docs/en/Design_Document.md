@@ -57,8 +57,8 @@
 
    * Unified embeddings are generated using the local vLLM–served **Jina Embeddings v4** model (`jina_embedding_v4`).
 
-     * **Textual types** (Text, Table, Equation): embed `text_content` only (Table/Equation do not use image modality).
-     * **Image type**: embed `image_content`.
+     * **Text-only elements** (Text, Header): embed `text_content` only.
+     * **Elements with both text and image modalities** (Image, Table, Equation): jointly embed `text_content` and `image_content` (base64) into a single unified vector.
    * The embeddings, along with metadata (`collection_id`, `doc_id`, etc.), are stored in the `Elements` table within OceanBase.
 
 ---
