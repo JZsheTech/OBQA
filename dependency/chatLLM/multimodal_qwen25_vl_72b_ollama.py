@@ -8,17 +8,47 @@ Requirements:
 Preconditions:
     1. Ollama server is running:   ollama serve
     2. Model is available locally: ollama pull qwen2.5vl
-    3. API endpoint: http://localhost:11434/v1/chat/completions
+    3. API endpoint: http://localhost:${OLLAMA_PORT}/v1/chat/completions
 """
 
 import base64
+import os
+import sys
+from pathlib import Path
+
 from openai import OpenAI
 from PIL import Image
-import os
+
+
+def _ensure_repo_root_on_path() -> None:
+    """Ensure shared settings are importable when running the script directly."""
+    repo_root = None
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "EviQAsys").exists():
+            repo_root = parent
+            break
+    if repo_root is not None and str(repo_root) not in sys.path:
+        sys.path.append(str(repo_root))
+
+
+_ensure_repo_root_on_path()
+
+try:
+    from EviQAsys.backend.app.env_setting import OLLAMA_OPENAI_BASE_URL
+except (ModuleNotFoundError, ImportError):
+    def _default_ollama_openai_base_url() -> str:
+        protocol = os.getenv("OLLAMA_PROTOCOL", "http")
+        host = os.getenv("OLLAMA_HOST", "localhost")
+        port = os.getenv("OLLAMA_PORT", "11434")
+        base_url = os.getenv("OLLAMA_BASE_URL", f"{protocol}://{host}:{port}")
+        return os.getenv("OLLAMA_OPENAI_BASE_URL", f"{base_url}/v1")
+
+    OLLAMA_OPENAI_BASE_URL = _default_ollama_openai_base_url()
 
 
 # ======== Configuration ========
-BASE_URL = "http://localhost:11434/v1"   # Ollama’s OpenAI-compatible endpoint
+# Ollama’s OpenAI-compatible endpoint
+BASE_URL = OLLAMA_OPENAI_BASE_URL
 API_KEY = "ollama"                       # placeholder (Ollama ignores key)
 MODEL = "qwen2.5vl:72b"                      # your local multimodal model name / ollama/
 

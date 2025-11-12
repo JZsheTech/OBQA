@@ -35,6 +35,11 @@ class OceanBaseSettings:
 DB_CHARSET: str = _get_env("DB_CHARSET", "utf8mb4")
 VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 64)
 INGEST_BATCH_SIZE: int = _get_int_env("BATCH_SIZE", 32)
+OLLAMA_PROTOCOL: str = _get_env("OLLAMA_PROTOCOL", "http")
+OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
+OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
+OLLAMA_BASE_URL: str = f"{OLLAMA_PROTOCOL}://{OLLAMA_HOST}:{OLLAMA_PORT}"
+OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 
 
 @dataclass(frozen=True)
@@ -76,6 +81,11 @@ __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
     "INGEST_BATCH_SIZE",
+    "OLLAMA_PROTOCOL",
+    "OLLAMA_HOST",
+    "OLLAMA_PORT",
+    "OLLAMA_BASE_URL",
+    "OLLAMA_OPENAI_BASE_URL",
     "OceanBaseSettings",
     "MinerUSettings",
     "UploadSettings",
