@@ -81,7 +81,7 @@ def test_text_only():
 def test_text_and_image():
     print("\n=== Multimodal example (image + question) ===")
 
-    image_path = "/mnt/data/sharedData/dataset/jztest/minerU_converted_pdf/1-Cui et al. - 2019 - Class-Balanced Loss Based on Effective Number of Samples/auto/images/3c4cf82faaa8797f32723d49fca86e1b9cd1375b7280c624df3d180cf5a95f58.jpg"
+    image_path = "/data2/jproject/OBQA/sample_data/image_demo/demo1.jpg"
     if not os.path.exists(image_path):
         raise FileNotFoundError(f"Missing test image: {image_path}")
 

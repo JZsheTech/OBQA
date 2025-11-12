@@ -35,9 +35,9 @@ except (ModuleNotFoundError, ImportError):
 
 # ======== 配置你的 LLM ========
 lm = dspy.LM(
-    "ollama_chat/qwen2.5vl:72b",
+    "openai/qwen2.5vl:72b",
     api_base=OLLAMA_OPENAI_BASE_URL,
-    api_key="",       # 根据你的设置
+    api_key="ollama",       # 根据你的设置
     model_type="chat"
 )
 dspy.configure(lm=lm)
@@ -65,18 +65,19 @@ def path_to_base64_uri(path: str) -> str:
 
 # ======== 调用示例 ========
 if __name__ == "__main__":
-    image_path = "/data2/jproject/OBQA/sample_data/image_demo/demo1.jpg"
+    image_path = "/data2/jproject/OBQA/sample_data/image_demo/demo2.jpg" # 一个损失函数的公式
+
     # 方法 A：直接传文件路径／PIL
-    img_obj = dspy.Image(image_path)
+    img_obj = image_path
     # 或 方法 B：如果你已经有 base64 uri
     # uri = path_to_base64_uri(image_path)
-    # img_obj = dspy.Image(uri)
+    # img_obj = uri
     # 或 方法 C：如果你有 raw bytes:
     # with open(image_path, "rb") as f:
     #     img_bytes = f.read()
-    # img_obj = dspy.Image(img_bytes)
+    # img_obj = img_bytes
 
-    q = "What is shown in this image? Describe it in one sentence."
+    q = "Describe the image"
 
     result = qa_model(image=img_obj, question=q)
     print("Answer:", result.answer)
