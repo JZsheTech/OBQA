@@ -114,29 +114,49 @@ calls MinerU → receives `content_list + md_text` → normalizes → writes int
 
 ---
 
-### **M5. Minimal Frontend (Collections / Upload / Chat / Highlight Navigation)**
+### **M5. Minimal Frontend in Sub‑Phases (M5a–M5d)**
 
-*(Goal: End-to-end demo is runnable)*
+To reduce complexity, split the original M5 into four individually verifiable sub‑phases and progress sequentially.
 
-**DoD:** Frontend includes four minimal pages/views:
-Collections list, Document page (with upload), Chat page (multi-turn log), and PDF viewer with evidence highlighting.
-Clicking `[Evidence#no]` navigates and highlights the source region.
+#### M5a. Page Skeleton & Routing (Goal: navigable pages, no backend)
+
+**DoD:** Frontend provides four minimal pages/views and can navigate between them: Collections, Documents (with an upload placeholder), Chat (message list placeholder), and PDF Preview (viewer placeholder). No backend calls; only static placeholders and the thinnest `fetch` wrapper (not actually sending requests).
 **Main Tasks:**
 
-1. **API Integration:** Implement and connect these minimal endpoints (base path `/api`):
+1. Set up base routing and layout skeleton; implement the four page components and navigation.
+2. Prepare a unified `fetch` wrapper and env config, returning placeholder data only (no backend wiring).
+
+#### M5b. API Wiring & Debug (Goal: endpoints reachable, unified envelope)
+
+**DoD:** From a lightweight “API Debug” page/panel or the browser console, successfully call the minimal backend endpoints and observe real responses in the unified envelope; error codes and failure paths are visible.
+**Main Tasks:**
+
+3. Wire up the following minimal endpoints (base path `/api`):
 
    * `GET /api/collections`, `POST /api/collections`, `DELETE /api/collections/{id}`
    * `POST /api/collections/{id}/documents`, `GET /api/documents/{doc_id}/file`
    * `POST /api/collections/{id}/chats`, `GET /api/chats/{chat_id}`
    * `POST /api/chats/{chat_id}/turns`, `GET /api/turns/{turn_id}/evidences`
 
-2. **Anchor Parsing & Jump:**
-   Chat UI renders `[Evidence#no]` as clickable links;
-   clicking calls the evidences API, triggers PDF viewer to jump to `page_no` and highlight via `bbox`.
+4. Implement the frontend API client and a minimal logging/debug view (print request/response, status, latency). Keep the unified response envelope; still avoid complex rendering.
 
-3. **UI Thinness:**
-   Implement with pure React + `fetch` wrapper, no global state library;
-   adopt unified response envelope.
+#### M5c. Text‑Only QA Rendering (no Evidence jumps)
+
+**DoD:** On the Chat page, within a selected Collection/Chat, send a question and render the returned `answer` text in the message list. If the answer contains `[Evidence#no]`, display it as plain text (not clickable).
+**Main Tasks:**
+
+5. Complete basic chat interactions: create a Chat, send a question via `POST /chats/{chat_id}/turns`, and render the turn history.
+6. Handle loading/failure states and minimal input validation; do not parse anchors or integrate with the PDF viewer yet.
+
+#### M5d. PDF Highlight & Anchor Navigation
+
+**DoD:** `[Evidence#no]` becomes clickable; clicking calls `GET /turns/{turn_id}/evidences`, and the PDF viewer jumps to `page_no` and highlights the `bbox`. Multiple evidences can be navigated; if `bbox` is missing, show a clear fallback message.
+**Main Tasks:**
+
+7. Implement anchor parsing and click handling in the chat area.
+8. Integrate or wrap a PDF viewer to support page jumps and `bbox`-based highlighting.
+9. Connect with `GET /documents/{doc_id}/file` to load the original PDF by `doc_id`.
+10. Provide explicit UI feedback for edge cases (missing `bbox`, out-of-range page, network errors).
 
 ---
 
@@ -147,7 +167,10 @@ Clicking `[Evidence#no]` navigates and highlights the source region.
 3. **M2:** Integrate MinerU parsing, finish `POST /collections/{id}/documents` with synchronous storage; minimal upload form on frontend.
 4. **M3:** Implement `embedding_service`, vectorize stored elements; add `/retrieval/test`.
 5. **M4:** Connect DsPy pipeline: rewrite → retrieve → answer (with anchors); store in `turns` & `turn2evidence`.
-6. **M5:** Complete chat page + PDF highlight navigation; unify response envelope; build an end-to-end demo script.
+6. **M5a:** Page skeleton & routing (no backend).
+7. **M5b:** API wiring & debug (unified envelope).
+8. **M5c:** Text-only QA rendering (no Evidence jumps).
+9. **M5d:** PDF highlight & anchor navigation; build an end-to-end demo script.
 
 ---
 
