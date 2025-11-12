@@ -28,7 +28,22 @@ def clear_tables(tables: Sequence[str] | None = None) -> None:
     logger.info("Clearing tables: %s", ", ".join(target_tables))
     with db_connection() as connection:
         for table in target_tables:
+            # DELETE keeps referential integrity intact while allowing AUTO_INCREMENT reset.
             connection.execute(text(f"DELETE FROM `{table}`"))
+            auto_inc_count = connection.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = :table_name
+                      AND EXTRA LIKE '%auto_increment%'
+                    """
+                ),
+                {"table_name": table},
+            ).scalar_one()
+            if auto_inc_count:
+                connection.execute(text(f"ALTER TABLE `{table}` AUTO_INCREMENT = 1"))
 
 
 def clear_upload_storage(*, recreate: bool = True, upload_settings: UploadSettings | None = None) -> Path:
