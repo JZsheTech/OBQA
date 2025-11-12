@@ -8,7 +8,7 @@ import numpy as np
 from nltk.tokenize import sent_tokenize
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-_NLTK_DATA = Path(__file__).resolve().parents[4] / "model" / "nltk_data"
+_NLTK_DATA = Path(__file__).resolve().parents[5] / "model" / "nltk_data"
 if str(_NLTK_DATA) not in nltk.data.path:
     nltk.data.path.clear()
     nltk.data.path.append(str(_NLTK_DATA))

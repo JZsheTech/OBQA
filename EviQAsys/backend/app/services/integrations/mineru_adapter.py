@@ -34,6 +34,7 @@ class MinerUAdapter:
             raise FileNotFoundError(f"PDF not found: {path}")
         payload = self._build_payload()
         pdf_name = file_name or path.name
+        result_key = Path(pdf_name).stem
         logger.info("Submitting PDF %s to MinerU at %s", pdf_name, self._settings.endpoint)
         with path.open("rb") as stream:
             files = {"files": (pdf_name, stream, "application/pdf")}
@@ -50,7 +51,6 @@ class MinerUAdapter:
             logger.error("MinerU request failed (%s): %s", exc, body_preview)
             raise RuntimeError("MinerU service returned an error.") from exc
         data = response.json()
-        result_key = path.stem
         results = data.get("results") or {}
         if result_key not in results:
             raise RuntimeError(f"MinerU response missing key for {result_key}")
