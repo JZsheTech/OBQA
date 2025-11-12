@@ -26,24 +26,26 @@
 
 ### **2. documents**
 
-| Field           | Type        | Description                                       |
-| --------------- | ----------- | ------------------------------------------------- |
-| `id`            | BIGINT (PK) | Primary key, auto-increment ID                    |
-| `collection_id` | BIGINT (FK) | Belonging collection                              |
-| `title`         | VARCHAR     | Paper title                                       |
-| `md_text`       | TEXT        | Markdown full text returned by MinerU             |
-| `file_name`     | VARCHAR     | Original filename                                 |
-| `file_path`     | VARCHAR     | Absolute path of the persisted PDF                |
-| `file_sha256`   | VARCHAR     | SHA-256 hash of the uploaded PDF for dedup checks |
-| `file_size_bytes` | BIGINT    | Binary size of the upload in bytes                |
-| `num_pages`     | INT         | Number of pages                                   |
-| `element_count` | INT         | Number of parsed elements in doc                  |
-| `created_at`    | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP)         |
+| Field             | Type        | Description                                       |
+| ----------------- | ----------- | ------------------------------------------------- |
+| `id`              | BIGINT (PK) | Primary key, auto-increment ID                    |
+| `collection_id`   | BIGINT (FK) | Belonging collection                              |
+| `title`           | VARCHAR     | Paper title                                       |
+| `md_text`         | TEXT        | Markdown full text returned by MinerU             |
+| `file_name`       | VARCHAR     | Original filename                                 |
+| `file_path`       | VARCHAR     | Absolute path of the persisted PDF                |
+| `file_sha256`     | VARCHAR     | SHA-256 hash used for deduplication checks        |
+| `file_size_bytes` | BIGINT      | Raw file size in bytes                            |
+| `num_pages`       | INT         | Number of pages                                   |
+| `element_count`   | INT         | Number of parsed elements in doc                  |
+| `created_at`      | DATETIME    | Creation time (DEFAULT CURRENT_TIMESTAMP)         |
 
 **Constraints:**
 
 * `PRIMARY KEY (id)`
 * `FOREIGN KEY (collection_id)` → `collections(id)` ON DELETE CASCADE
+
+> `collection_id + file_name + file_sha256` forms the ingestion dedup key to avoid re-parsing the same PDF.
 
 ---
 
