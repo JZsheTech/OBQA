@@ -163,7 +163,7 @@ class ElementsRepository:
                 )
         sql = text(
             f"UPDATE {self.table_name} "
-            f"SET vec_embedding = CAST(:vec_embedding AS VECTOR({VECTOR_DIM})) "
+            f"SET vec_embedding = :vec_embedding "
             "WHERE id = :element_id",
         )
         payloads = [
