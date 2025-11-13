@@ -72,3 +72,23 @@ Each agent runs synchronously during request handling; no background workers or 
 └── scripts
 ```
 
+## Embedding & Retrieval Configuration
+
+- Set `VECTOR_DIM` to the dimensionality returned by the embedding model (default: `2048` for `jinaembeddingv4`).
+- Configure the embedding adapter via environment variables (default values shown):
+  - `EMBEDDING_ENDPOINT=http://localhost:7701/v1/embeddings`
+  - `EMBEDDING_MODEL=jinaembeddingv4`
+  - `EMBEDDING_TIMEOUT_S=60`
+  - `EMBEDDING_MAX_RETRIES=1`
+  - `EMBEDDING_API_KEY` / `EMBEDDING_API_KEY_HEADER` (optional, for hosted gateways).
+- Trigger manual validation with:
+
+```bash
+conda activate quest
+python EviQAsys/backend/tests/manual/test_m3_embedding_and_retrieval.py \
+  --collection-id 1 \
+  --query "graph neural network pretraining" \
+  --top-k 5
+```
+
+The script embeds any `elements.vec_embedding IS NULL` rows, records the effective vector dimension, and prints TopK retrieval samples via `/services/retrieval`.

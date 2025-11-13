@@ -33,7 +33,7 @@ class OceanBaseSettings:
 
 
 DB_CHARSET: str = _get_env("DB_CHARSET", "utf8mb4")
-VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 64)
+VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 2048)
 INGEST_BATCH_SIZE: int = _get_int_env("BATCH_SIZE", 32)
 OLLAMA_PROTOCOL: str = _get_env("OLLAMA_PROTOCOL", "http")
 OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
@@ -59,6 +59,16 @@ class UploadSettings:
     max_upload_mb: int = _get_int_env("MAX_UPLOAD_MB", 200)
 
 
+@dataclass(frozen=True)
+class EmbeddingSettings:
+    endpoint: str = _get_env("EMBEDDING_ENDPOINT", "http://localhost:7701/v1/embeddings")
+    model: str = _get_env("EMBEDDING_MODEL", "jinaembeddingv4")
+    timeout_s: int = _get_int_env("EMBEDDING_TIMEOUT_S", 60)
+    max_retries: int = _get_int_env("EMBEDDING_MAX_RETRIES", 1)
+    api_key: str = _get_env("EMBEDDING_API_KEY", "")
+    api_key_header: str = _get_env("EMBEDDING_API_KEY_HEADER", "Authorization")
+
+
 @lru_cache(maxsize=1)
 def get_oceanbase_settings() -> OceanBaseSettings:
     """Return cached OceanBase connection settings."""
@@ -77,6 +87,12 @@ def get_upload_settings() -> UploadSettings:
     return UploadSettings()
 
 
+@lru_cache(maxsize=1)
+def get_embedding_settings() -> EmbeddingSettings:
+    """Return embedding service configuration."""
+    return EmbeddingSettings()
+
+
 __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
@@ -89,7 +105,9 @@ __all__ = [
     "OceanBaseSettings",
     "MinerUSettings",
     "UploadSettings",
+    "EmbeddingSettings",
     "get_oceanbase_settings",
     "get_mineru_settings",
     "get_upload_settings",
+    "get_embedding_settings",
 ]
