@@ -10,9 +10,7 @@
 
 ### 使用建议
 1. 启动 OceanBase + MinerU + vLLM 后，设置 `EMBEDDING_*` 环境变量并确保 `VECTOR_DIM` 与模型维度一致。
-2. 执行 `python EviQAsys/backend/tests/manual/test_m3_embedding_and_retrieval.py --collection-id <id> --query "<question>"`，脚本会：
-   - scanning `vec_embedding IS NULL` rows 分批嵌入并记录维度；
-   - 输出 `Retriever` TopK 结果，包含 `doc_id/page_no/bbox/elem_type/score/text preview`。
+2. 执行  `python EviQAsys/backend/tests/manual/test_m3_e2e_documents_parse_and_query.py --reset-db --clear-uploads` ，完成后端建立索引-向量存储-检索测试一条龙流程。
 3. 后端启动后，可通过 `GET /api/retrieval/test?collection_id=<id>&query=...&top_k=5` 与可选 `doc_id / elem_types / search_mode` 做联调。
 
 > 若后续接入 OceanBase 原生向量函数，可在 `ElementsRepository.topk_by_collection()` 中替换为 SQL 侧计算并保留现有 Python 逻辑作为兜底。
