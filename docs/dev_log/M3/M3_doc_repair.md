@@ -32,7 +32,7 @@ M3 文档修复：
 
 # 3 elements.order_start/order_end 含义与类型不一致
 这个东西不是起止 element ID，而是起止的阅读顺序order_id
-  - 表示阅读顺序索引：更名为 `order_start_index`/`order_end_index`，类型用 `INT`，语义为元素的 `order` 范围。
+  - 表示阅读顺序索引：更名为 `order_start`/`order_end`，类型用 `INT`，语义为元素的 `order` 范围。
 
 # 4 同步/异步流程表述冲突
 

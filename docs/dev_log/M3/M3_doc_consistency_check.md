@@ -33,7 +33,7 @@ M3 文档一致性检查（仅阅读、未做修改）
   - 英文数据模型将其描述为“section 的起止 element ID”，但字段名带 `order_` 且类型为 VARCHAR：docs/en/Data_Model.md:69-70。
   - 中文数据模型写明“起始/结束元素id”，同为 VARCHAR：docs/zh/数据模型.md:68-69。
 - 建议（两种做法二选一）：
-  - 若表示阅读顺序索引：更名为 `order_start_index`/`order_end_index`，类型用 `INT`，语义为元素的 `order` 范围。
+  - 若表示阅读顺序索引：更名为 `order_start`/`order_end`，类型用 `INT`，语义为元素的 `order` 范围。
   - 若表示元素主键 ID：更名为 `element_id_start`/`element_id_end`，类型用 `BIGINT`。
   - 中英文文档同步修改命名与类型说明。
 
