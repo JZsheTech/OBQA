@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from threading import Lock
@@ -14,6 +16,7 @@ from ..env_setting import DB_CHARSET, VECTOR_DIM, get_oceanbase_settings
 _SCHEMA_FILE = Path(__file__).with_name("sql").joinpath("schema.sql")
 _ENGINE: Engine | None = None
 _ENGINE_LOCK = Lock()
+logger = logging.getLogger(__name__)
 
 
 def _quote_identifier(identifier: str) -> str:
@@ -89,6 +92,7 @@ def initialize_database() -> None:
             connection.execute(text(f"USE {quoted_db}"))
             for statement in statements:
                 connection.execute(text(statement))
+            _ensure_vector_dimension(connection, settings.default_database)
     except SQLAlchemyError as exc:  # pragma: no cover - startup failure path
         raise RuntimeError("Failed to initialize database schema.") from exc
 
@@ -102,6 +106,44 @@ def db_connection() -> Iterator[Connection]:
     with engine.begin() as connection:
         connection.execute(text(f"USE {quoted_db}"))
         yield connection
+
+
+def _ensure_vector_dimension(connection: Connection, schema_name: str) -> None:
+    """Ensure elements.vec_embedding dimension matches VECTOR_DIM."""
+    result = connection.execute(
+        text(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA = :schema AND TABLE_NAME = 'elements' AND COLUMN_NAME = 'vec_embedding'",
+        ),
+        {"schema": schema_name},
+    ).first()
+    if not result:
+        return
+    column_type = result[0] or ""
+    current_dim = _extract_vector_dimension(str(column_type))
+    if current_dim is None:
+        logger.warning("Unable to detect vec_embedding dimension from COLUMN_TYPE=%s", column_type)
+        return
+    if current_dim == VECTOR_DIM:
+        return
+    logger.info(
+        "Altering elements.vec_embedding from VECTOR(%s) to VECTOR(%s) to match configuration.",
+        current_dim,
+        VECTOR_DIM,
+    )
+    connection.execute(
+        text(f"ALTER TABLE elements MODIFY COLUMN vec_embedding VECTOR({VECTOR_DIM}) NULL"),
+    )
+
+
+def _extract_vector_dimension(column_type: str) -> int | None:
+    match = re.search(r"vector\((\d+)\)", column_type, flags=re.IGNORECASE)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
 
 
 __all__ = ["db_connection", "get_engine", "initialize_database"]

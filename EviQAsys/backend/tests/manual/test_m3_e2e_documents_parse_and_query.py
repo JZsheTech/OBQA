@@ -1,3 +1,5 @@
+ #  python EviQAsys/backend/tests/manual/test_m3_e2e_documents_parse_and_query.py --reset-db --clear-uploads
+
 from __future__ import annotations
 
 import argparse

@@ -1,0 +1,43 @@
+python /data2/jproject/OBQA/EviQAsys/backend/tests/manual/test_m3_e2e_documents_parse_and_query.py --reset-db --clear-uploads --query "what is Class-Balanced Loss ? "
+Clearing database tables before ingestion...
+Cleared upload directory: /tmp/obqa_uploads
+[2025-11-13 08:47:23.907112] Target DB: obqa_dev @ 127.0.0.1:2881
+Creating collection for e2e run...
+Collection created: {'id': 1, 'name': 'manual-m3-e2e', 'description': 'Manual M3 e2e ingest + retrieval verification.', 'created_at': datetime.da
+tetime(2025, 11, 13, 8, 47, 23)}                                                                                                                 [2025-11-13 08:47:23.926138] Ingesting PDF: /data2/jproject/OBQA/sample_data/pdf_doc/1-Cui et al. - 2019 - Class-Balanced Loss Based on Effective
+ Number of Samples.pdf                                                                                                                           Stored elements: 139
+  - equation: 13
+  - header: 18
+  - image: 7
+  - table: 3
+  - text: 98
+Sample element preview:
+    elem_type = header
+    header_name = Class-Balanced Loss Based on Effective Number of Samples
+    page_no = 1
+    has_image = no
+Document stored with id=1 (elements=139)
+[2025-11-13 08:47:40.788974] Embedded batch size=16 (sample element id=1, dim=2048)
+[2025-11-13 08:47:42.497079] Embedded batch size=16 (sample element id=17, dim=2048)
+[2025-11-13 08:47:43.858112] Embedded batch size=16 (sample element id=33, dim=2048)
+[2025-11-13 08:47:45.093748] Embedded batch size=16 (sample element id=49, dim=2048)
+[2025-11-13 08:47:47.198106] Embedded batch size=16 (sample element id=65, dim=2048)
+[2025-11-13 08:47:49.457911] Embedded batch size=16 (sample element id=81, dim=2048)
+[2025-11-13 08:47:52.135931] Embedded batch size=16 (sample element id=97, dim=2048)
+[2025-11-13 08:47:54.276309] Embedded batch size=16 (sample element id=113, dim=2048)
+[2025-11-13 08:47:55.809036] Embedded batch size=11 (sample element id=129, dim=2048)
+Embedding completed for 139 elements.
+[2025-11-13 08:47:55.813366] Running retrieval (collection=1, doc_id=1, mode=vector, top_k=5)
+Retrieval finished in 333.9 ms; results=5
+1. element_id=104 doc_id=1 type=text page=6 score=0.5925 bbox=[94, 840, 482, 900]
+   text: [5.2 . implementation] [5.2. Implementation] bWe used Tensorflow [2] to implement and train all the models by stochastic gradient descen
+t with momentum. We trained residual networks with 32 layers (Re                                                                                 2. element_id=102 doc_id=1 type=header page=6 score=0.5855 bbox=[94, 621, 251, 636]
+   text: [5.2 . implementation] [5.2. Implementation] This is because using $b = 0$ with sigmoid function in the last layer induces b = 0huge los
+s at the beginning of the training as the output probability for                                                                                 3. element_id=69 doc_id=1 type=text page=4 score=0.5087 bbox=[93, 873, 482, 898]
+   text: [4.1 . class-balanced softmax cross-entropy loss] [4.1. Class-Balanced Softmax Cross-Entropy Loss] 1For simplicity, we derive the loss f
+unction by assuming there is exactly one ground-truth label for                                                                                  4. element_id=5 doc_id=1 type=text page=1 score=0.5024 bbox=[96, 294, 485, 640]
+   text: [abstract] [Abstract] With the rapid increase of large-scale, real-world datasets, it becomes critical to address the problem of longtai
+led data distribution (i.e., a few classes account for most of t                                                                                 5. element_id=75 doc_id=1 type=header page=5 score=0.4813 bbox=[96, 178, 470, 194]
+   text: [4.2 . class-balanced sigmoid cross-entropy loss] [4.2. Class-Balanced Sigmoid Cross-Entropy Loss] When using sigmoid function, we regar
+d multi-class visual recognition as multiple binary classificati                                                                                 Cleaning up inserted document and collection...
+Cleanup complete.
