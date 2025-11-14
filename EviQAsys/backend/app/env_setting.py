@@ -46,7 +46,7 @@ OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 class MinerUSettings:
     mode: str = _get_env("MINERU_MODE", "http")
     endpoint: str = _get_env("MINERU_ENDPOINT", "http://127.0.0.1:18543/file_parse")
-    backend: str = _get_env("MINERU_BACKEND", "pipeline")
+    backend: str = _get_env("MINERU_BACKEND", "vllm-async-engine") # pdf解析后端，默认使用"vllm-async-engine"更快 # 可选值：""pipeline"",""vllm-async-engine""
     timeout_s: int = _get_int_env("MINERU_TIMEOUT_S", 600)
     lang_list: tuple[str, ...] = tuple(
         entry.strip() for entry in _get_env("MINERU_LANG_LIST", "en").split(",") if entry.strip()
