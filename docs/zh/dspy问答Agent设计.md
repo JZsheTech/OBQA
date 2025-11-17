@@ -370,7 +370,7 @@ answer_text = AnswerComposer(
 
 ## **3.9 持久化与 Evidence 映射（Python）**
 
-职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，并把回答文本中的 `[Elem#id]` 替换为 `[Evidence#no]` 再返回给前端。
+职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，并把回答文本中的 `[Elem#id]` 替换为 `[Evidence#no]`，并将`[Evidence#no]`对应的文档名、page_idx和bbox信息一起返回给前端, 方便高亮展示。
 
 涉及表：
 
