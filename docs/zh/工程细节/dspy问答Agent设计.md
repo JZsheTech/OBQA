@@ -24,7 +24,7 @@
 - 已向量化的元素（`elements.vec_embedding`）；
 - 可选的图像元素 `image_base64`（通过视觉问答集成）；
 
-进行检索、推理，最终返回一个带有 `[Evidence#no]` 锚点的回答文本，并在后端以 `[Elem#<element_id>]` 的形式持久化证据引用（写入 `turn2element` 桥表）。
+进行检索、推理，最终生成一个带有 `[Elem#<element_id>]` 锚点的回答文本；数据库与 API `answer_text` 字段统一保留该形式，并通过 `turn2element` + `element_id → evidence_no` 映射支撑前端渲染 `[Evidence#no]`（详见《Evidence 渲染规范》）。
 
 从模块职责上，问答 Agent 仍然划分为两大类组件：
 
@@ -370,7 +370,7 @@ answer_text = AnswerComposer(
 
 ## **3.9 持久化与 Evidence 映射（Python）**
 
-职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，并把回答文本中的 `[Elem#id]` 替换为 `[Evidence#no]`，并将`[Evidence#no]`对应的文档名、page_idx和bbox信息一起返回给前端, 方便高亮展示。
+职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，在 API 响应中附带 `evidences` 列表（含 `element_id/evidence_no/doc_id/page_index/bbox/elem_type` 等），供前端按《Evidence 渲染规范》解析并渲染 `[Evidence#no]`；`answer_text` 字段本身不做字符串替换，始终保留原始的 `[Elem#id]` 锚点。
 
 涉及表：
 
@@ -386,9 +386,9 @@ answer_text = AnswerComposer(
 
 1. **写入 Turns 与 Turn2Element**
 
-   * 创建一条新的 `turn` 记录（包含 `user_question`、`llm_answer_text`、`used_llm_model` 等）；
-   * 从 `answer_text` 中解析出所有 `[Elem#id]`，或直接使用检索结果中的 `element_id` 集合作为本轮引用集合；
-   * 对于每个 `element_id`，插入一条 `turn2element` 记录（`chat_id, turn_id, element_id, turn_order`）。
+   * 创建一条新的 `turn` 记录（包含 `user_question`、`llm_answer_text`、`used_llm_model` 等，`llm_answer_text` 内部携带 `[Elem#id]`）；
+   * 从 `answer_text` 中解析出所有 `[Elem#id]`，作为“本轮真正被引用到的元素集合”；
+   * 对于每个 `element_id`，插入一条 `turn2element` 记录（`chat_id, turn_id, element_id, turn_order`）。**不为仅参与检索上下文但未在回答文本中出现的元素写入记录**。
 
 2. **按 Chat 维度构建 element_id → evidence_no 映射**
 
@@ -399,17 +399,27 @@ answer_text = AnswerComposer(
      mapping = build_evidence_no_mapping(history_element_ids)
      ```
 
-3. **替换回答中的 `[Elem#id]` 为 `[Evidence#no]`**
+3. **构造 `evidences` 列表用于 API 返回**
 
-   * 对当前轮的 `answer_text` 调用：
+   * 基于上一步得到的映射与 `elements` 元数据，构造本轮响应需要的 `evidences` 数组，每一项形如：
 
      ```python
-     final_answer = replace_elem_tags_with_evidence(answer_text, mapping)
+     evidences = [
+         {
+             "element_id": elem_id,
+             "evidence_no": mapping[elem_id],
+             "document_id": elem.document_id,
+             "page_index": elem.page_no,
+             "bbox": elem.bbox,
+             "elem_type": elem.elem_type,
+         }
+         for elem_id, elem in ...
+     ]
      ```
 
-   * 只在 API 输出中使用 `[Evidence#no]`，数据库中仍保存原始的 `[Elem#id]`。
+   * `answer_text` 字段保留 `[Elem#id]`，前端根据 `answer_text + evidences` 在渲染阶段将锚点转为用户可见的 `[Evidence#no]` 组件。
 
-> 说明：`evidence_no` 不入库存储，而是每次在返回前按「元素在该 chat 中的首次出现顺序」动态计算，满足《开发路线图》中 M4 的约束。
+> 说明：`evidence_no` 不入库存储，而是每次在返回前按「元素在该 chat 中的首次出现顺序」动态计算，并仅通过 API 响应中的 `evidences` 列表暴露给前端。
 
 ---
 
@@ -477,15 +487,15 @@ def run_qa_turn(collection_id: int, chat_id: int, question: str) -> dict:
         used_evidence_element_ids=collect_element_ids(text_evidences, image_evidences),
     )
 
-    # 10. 构建 evidence_no 映射并替换标签
+    # 10. 构建 evidence_no 映射并组装 evidences 列表
     history_element_ids = collect_all_element_ids_from_chat(chat_id)
     mapping = build_evidence_no_mapping(history_element_ids)
-    final_answer = replace_elem_tags_with_evidence(answer_text, mapping)
+    evidences = build_evidences_payload(mapping)  # 含 element_id/evidence_no/doc_id/page_index/bbox/elem_type
 
     return {
         "turn_id": turn_id,
-        "answer": final_answer,  # 文本中带 [Evidence#no]
-        # anchors 可选：前端可用来高亮 PDF
+        "answer_text": answer_text,  # 文本中保留 [Elem#id]
+        "evidences": evidences,      # 供前端按 Evidence 渲染规范高亮 PDF
     }
 ```
 
@@ -514,13 +524,13 @@ def run_qa_turn(collection_id: int, chat_id: int, question: str) -> dict:
 * 调用向量服务与 `Retriever.retrieve_topk`
 * 构造 local context、拆分文本/图像候选
 * 调用视觉问答接口 `vision_vqa_summarize`
-* 写入 `turns / turn2element` 并构建 `evidence_no` 映射
+* 写入 `turns / turn2element` 并构建 `evidence_no` 映射与 `evidences` 响应负载
 
 ## **（3）DSPy 只消费 Python 的结果，不与图片或数据库直接交互。**
 
 * DSPy 侧签名只接受纯文本字段（含 `element_id` 等标识）；
 * 图像内容必须先在 Python 侧通过视觉问答转成文本后再回注；
-* Evidence 展示编号由 Python 侧（`evidence_mapper` + 仓储层）动态生成与替换。
+* Evidence 展示编号由 Python 侧（`evidence_mapper` + 仓储层）动态生成，并通过 API 响应中的 `evidences` 列表暴露给前端，不直接改写 `answer_text`。
 
 ---
 
@@ -529,6 +539,5 @@ def run_qa_turn(collection_id: int, chat_id: int, question: str) -> dict:
 > 「这个文档就是问答 Agent 的模块交互说明。实现时按以下原则：
 > 1）在 `services/qa_flow` 中实现顶层 orchestrator，并通过 `/api/chats/{chat_id}/turns` 对外暴露；
 > 2）所有 LLM/DSPy 逻辑（记忆、判别、重写、回答、图像子问题）都封装为只收/返文本的 Program，统一使用 `[Elem#id]` 做证据锚点；
-> 3）所有 DB 访问、向量检索、视觉问答、`turn2element` 写入与 `[Evidence#no]` 映射全部用 Python 服务完成；
-> 4）API 层只看见 `[Evidence#no]` 和锚点高亮信息列表，内部存储始终以 `element_id` 为主键，满足《数据模型》与《开发路线图》的约束。」
-
+> 3）所有 DB 访问、向量检索、视觉问答、`turn2element` 写入与 `element_id → evidence_no` 映射（含 `evidences` 列表组装）全部用 Python 服务完成；
+> 4）API 层返回的 `answer_text` 始终保留 `[Elem#id]`，同时附带 `evidences` 列表；前端依据该列表将 `[Elem#id]` 渲染为可点击的 `[Evidence#no]`，内部存储始终以 `element_id` 为主键，满足《数据模型》与《开发路线图》与《Evidence 渲染规范》的约束。」
