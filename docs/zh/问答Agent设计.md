@@ -306,10 +306,10 @@ def multimodal_rag_pipeline(question, chat_id):
         # 5. 检索文本/图像元素（Python）
         text_elems, image_elems = search_elements(search_query, elem_types)
 
-        # 6. 对每张图片
+        # 6. 对每张图片 todo：这里应该改成可选的VLM理解，如果不需要的话直接用caption作为image_evidences即可。
         for img in image_elems:
-            local_ctx = build_local_context(img)   # Python
-            img_q = ImageQuestionGenerator(question, memory, local_ctx)  # DSPy
+            image_caption_ctx = get_image_caption(img)   # Python
+            img_q = ImageQuestionGenerator(question, memory, image_caption_ctx)  # DSPy
             img_note = call_vlm(img.image_base64, img_q)                 # Python
             image_evidences.append(img_note)
 
