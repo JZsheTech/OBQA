@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 class ChatBase(BaseModel):
     title: str | None = None
-    max_evidence_no: int = 0
     max_turn_order: int = 0
 
     class Config:

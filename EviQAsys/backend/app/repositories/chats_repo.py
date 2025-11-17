@@ -25,13 +25,11 @@ class ChatsRepository:
         *,
         collection_id: int,
         title: str | None = None,
-        max_evidence_no: int = 0,
         max_turn_order: int = 0,
     ) -> dict[str, Any]:
         payload = {
             "collection_id": collection_id,
             "title": title,
-            "max_evidence_no": max_evidence_no,
             "max_turn_order": max_turn_order,
         }
         sql, params = dict_to_insert(self.table_name, payload)
@@ -65,7 +63,7 @@ class ChatsRepository:
             return rows_to_dicts(result)
 
     def update_chat(self, chat_id: int, **fields: Any) -> RepositoryResult:
-        allowed = {"title", "max_evidence_no", "max_turn_order"}
+        allowed = {"title", "max_turn_order"}
         payload = {key: value for key, value in fields.items() if key in allowed}
         if not payload:
             return RepositoryResult(rows=[], rowcount=0)

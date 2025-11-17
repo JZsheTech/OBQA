@@ -89,7 +89,6 @@ CREATE TABLE IF NOT EXISTS chats (
   id BIGINT NOT NULL AUTO_INCREMENT,
   collection_id BIGINT NOT NULL,
   title VARCHAR(255),
-  max_evidence_no BIGINT DEFAULT 0,
   max_turn_order BIGINT DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -114,21 +113,20 @@ CREATE TABLE IF NOT EXISTS turns (
     ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS turn2evidence (
+CREATE TABLE IF NOT EXISTS turn2element (
   chat_id BIGINT NOT NULL,
   turn_id BIGINT NOT NULL,
   turn_order INT NOT NULL,
-  evidence_no INT NOT NULL,
   element_id BIGINT NOT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (turn_id, evidence_no),
-  CONSTRAINT fk_turn2evidence_chat
+  PRIMARY KEY (chat_id, turn_id, element_id),
+  CONSTRAINT fk_turn2element_chat
     FOREIGN KEY (chat_id) REFERENCES chats(id)
     ON DELETE CASCADE,
-  CONSTRAINT fk_turn2evidence_turn
+  CONSTRAINT fk_turn2element_turn
     FOREIGN KEY (turn_id) REFERENCES turns(id)
     ON DELETE CASCADE,
-  CONSTRAINT fk_turn2evidence_element
+  CONSTRAINT fk_turn2element_element
     FOREIGN KEY (element_id) REFERENCES elements(id)
     ON DELETE CASCADE
 );

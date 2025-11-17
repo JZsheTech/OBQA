@@ -13,7 +13,7 @@ from .db import db_connection
 logger = logging.getLogger(__name__)
 
 DEFAULT_PURGE_ORDER: tuple[str, ...] = (
-    "turn2evidence",
+    "turn2element",
     "turns",
     "chats",
     "elements",

@@ -16,7 +16,7 @@ This repository hosts a sequential Paper Question-Answering demo that ties answe
   - `qa_flow`: sequential orchestration combining rewrite → retrieve → answer.
   - `retrieval`: vector + metadata lookups for candidate elements.
   - `integrations`: HTTP/DB clients for MinerU, OceanBase, and DsPy.
-- **EviQAsys/backend/app/repositories** – Table-specific CRUD helpers for `collections`, `documents`, `elements`, `chats`, `turns`, and `turn2evidence`.
+- **EviQAsys/backend/app/repositories** – Table-specific CRUD helpers for `collections`, `documents`, `elements`, `chats`, `turns`, and `turn2element`.
 - **frontend/src** – React pages, components, and API clients that render upload/index/QA flows with evidence highlighting.
 - **scripts** – Operational utilities (e.g., seeding data, running demo pipeline).
 - **docs/diagrams** – Source files for diagrams referenced in `docs/en`.
@@ -25,8 +25,8 @@ This repository hosts a sequential Paper Question-Answering demo that ties answe
 
 - **Control Agent** orchestrates the overall pipeline inside `services/qa_flow`, coordinating upload, indexing, and question flows.
 - **Retrieval Agent** (services/retrieval) focuses on vector + metadata lookups via OceanBase repositories.
-- **Memory Agent** (services/memory) maintains evidence numbering continuity and caches prior turn context.
-- **Answer Agent** (services/llm + qa_flow) builds multimodal prompts and formats answers with `[Evidence#no]` anchors.
+- **Memory Agent** (services/memory) caches prior turn context.
+- **Answer Agent** (services/llm + qa_flow) cites anchors as `[Elem#<element_id>]`; the API layer later maps these to display `[Evidence#no]` per-chat.
 
 Each agent runs synchronously during request handling; no background workers or asynchronous orchestrators are introduced until later milestones.
 
@@ -92,3 +92,12 @@ python EviQAsys/backend/tests/manual/test_m3_embedding_and_retrieval.py \
 ```
 
 The script embeds any `elements.vec_embedding IS NULL` rows, records the effective vector dimension, and prints TopK retrieval samples via `/services/retrieval`.
+
+## Database Maintenance
+
+- Reset schema (drop all tables and recreate):
+
+```
+conda activate quest
+python scripts/reset_database.py --yes
+```
