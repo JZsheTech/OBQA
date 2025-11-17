@@ -7,9 +7,7 @@ M4采用的整个问答Agent的编排方式请参考文档: "docs/zh/dspy问答A
 
 ## Evidence 锚点与存储策略
 
-- `turns.llm_answer_text` 的存储格式：DB 中保留原始 LLM 输出（含 `[Elem#id]`），API 在返回时临时替换为 `[Evidence#no]`，并附带对应的高亮信息的列表，列表可以以Evidence_no为key，因为在一个Chat之内，Evidence_no是唯一的。
-
-- Evidence 编号的“历史序列”来源: 按照 M4_refactor_doc 的说法，从历史 `llm_answer_text` 中用正则抽取 `[Elem#id]` 再去重。因为前端展示前正则替换这一步是无法避免的。
+具体的前后端锚点通信要求见文档 "docs/zh/工程细节/Evidence 渲染规范.md" 。
 
 - `turn2element` 写入范围：只为“答案文本里真实出现的 `[Elem#id]`”写记录，而不为未被引用但参与上下文的候选元素写入.
 
