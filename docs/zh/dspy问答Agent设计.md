@@ -530,5 +530,5 @@ def run_qa_turn(collection_id: int, chat_id: int, question: str) -> dict:
 > 1）在 `services/qa_flow` 中实现顶层 orchestrator，并通过 `/api/chats/{chat_id}/turns` 对外暴露；
 > 2）所有 LLM/DSPy 逻辑（记忆、判别、重写、回答、图像子问题）都封装为只收/返文本的 Program，统一使用 `[Elem#id]` 做证据锚点；
 > 3）所有 DB 访问、向量检索、视觉问答、`turn2element` 写入与 `[Evidence#no]` 映射全部用 Python 服务完成；
-> 4）API 层只看见 `[Evidence#no]` 和锚点列表，内部存储始终以 `element_id` 为主键，满足《数据模型》与《开发路线图》的约束。」
+> 4）API 层只看见 `[Evidence#no]` 和锚点高亮信息列表，内部存储始终以 `element_id` 为主键，满足《数据模型》与《开发路线图》的约束。」
 
