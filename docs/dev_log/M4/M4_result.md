@@ -8,3 +8,19 @@
 6. **静态校验**：运行 `python -m compileall -q EviQAsys/backend/app` 验证新增 Python 模块可编译通过。
 
 至此，M4 计划中的 DoD 要求（带 `[Elem#id]` 的回答、turn2element 持久化、API 附带 evidence 信息、可选 VQA 路径、统一 schema/配置）均完成落地，后续可以在真实数据库与 MinerU 数据上执行手工联调。
+
+# 动态测试脚本校验：
+
+
+• - Added the manual QA smoke-test EviQAsys/backend/tests/manual/test_m4_qa_flow.py:1, which
+    mirrors the M3 ingestion script: it ingests PDFs from --pdf-dir, embeds their elements,
+    creates a collection + chat, then invokes run_qa_turn with configurable --question, --top-
+    k, and --enable-image-vqa, printing the model answer and each evidence (element/page/
+    snippet). It also supports --reset-db, --clear-uploads, --keep, and configurable embedding
+    batch sizes so you can either clean up or retain data for inspection.
+  - Re-ran python -m compileall -q EviQAsys/backend to ensure the new manual test and
+    supporting modules compile successfully.
+
+  Next step: run `python EviQAsys/backend/tests/manual/test_m4_qa_flow.py --question "<your
+  prompt>"` inside the quest conda env after MinerU + embeddings services are ready, and
+  capture the console output for reviewers.
