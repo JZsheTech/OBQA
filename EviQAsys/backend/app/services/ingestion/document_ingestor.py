@@ -10,10 +10,11 @@ from typing import Any, BinaryIO
 
 from fastapi import UploadFile
 
-from ...env_setting import INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
+from ...env_setting import ELEMENT_CONTEXT_OVERLAP, INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
 from ...repositories import CollectionsRepository, DocumentsRepository, ElementsRepository, db_connection
 from ..integrations import MinerUAdapter
 from ..parser import normalize_element, preprocess_headers, tfidf_summary
+from ..parser.unifier import ROOT_LEVEL_NAV
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class DocumentIngestor:
         collections_repo: CollectionsRepository | None = None,
         mineru_adapter: MinerUAdapter | None = None,
         batch_size: int = INGEST_BATCH_SIZE,
+        element_context_overlap: int | None = None,
     ) -> None:
         self._upload_settings = upload_settings or get_upload_settings()
         self._documents_repo = documents_repo or DocumentsRepository()
@@ -49,6 +51,8 @@ class DocumentIngestor:
         self._collections_repo = collections_repo or CollectionsRepository()
         self._mineru_adapter = mineru_adapter or MinerUAdapter()
         self._batch_size = max(1, batch_size)
+        overlap = element_context_overlap if element_context_overlap is not None else ELEMENT_CONTEXT_OVERLAP
+        self._context_overlap = max(0, overlap)
         self._upload_root = Path(self._upload_settings.root_dir)
         self._upload_root.mkdir(parents=True, exist_ok=True)
 
@@ -140,6 +144,13 @@ class DocumentIngestor:
         try:
             parse_result = self._mineru_adapter.parse(stored.path, file_name=stored.original_name)
             processed_items = preprocess_headers(parse_result.content_list)
+            document_title = self._determine_document_title(
+                default_title=document.get("title"),
+                processed_items=processed_items,
+            )
+            if document_title != document.get("title"):
+                self._documents_repo.update_document(document["id"], title=document_title)
+            document["title"] = document_title
             self._attach_header_summaries(processed_items)
             normalized = [
                 normalize_element(item, images=parse_result.images) for item in processed_items
@@ -147,6 +158,10 @@ class DocumentIngestor:
             for idx, row in enumerate(normalized):
                 row["doc_id"] = document["id"]
                 row["order"] = idx
+            self._inject_contextual_text_content(
+                normalized,
+                document_title=document_title,
+            )
             element_count = len(normalized)
             num_pages = self._calculate_num_pages(normalized)
             self._write_elements_and_finalize(
@@ -235,6 +250,124 @@ class DocumentIngestor:
                 num_pages=num_pages,
                 element_count=element_count,
             )
+
+    def _determine_document_title(
+        self,
+        *,
+        default_title: str | None,
+        processed_items: list[dict[str, Any]],
+    ) -> str:
+        fallback = self._clean_metadata_text(default_title) or "untitled"
+        for item in processed_items:
+            if item.get("elem_type") != "header":
+                continue
+            header_name = self._clean_metadata_text(item.get("header_name"))
+            if header_name and header_name.lower() != "root":
+                return header_name
+        return fallback
+
+    def _inject_contextual_text_content(
+        self,
+        elements: list[dict[str, Any]],
+        *,
+        document_title: str,
+    ) -> None:
+        if not elements:
+            return
+        nav_to_indexes: dict[str, list[int]] = {}
+        for idx, row in enumerate(elements):
+            nav_key = self._clean_metadata_text(row.get("level_nav")) or ROOT_LEVEL_NAV
+            row["level_nav"] = nav_key
+            row["raw_text_content"] = self._clean_body_text(row.get("raw_text_content"))
+            nav_to_indexes.setdefault(nav_key, []).append(idx)
+        index_positions: dict[int, int] = {}
+        for indexes in nav_to_indexes.values():
+            for position, index in enumerate(indexes):
+                index_positions[index] = position
+        overlap = max(0, self._context_overlap)
+        prefix_title = self._clean_metadata_text(document_title) or "untitled"
+        for idx, row in enumerate(elements):
+            nav_key = row["level_nav"]
+            siblings = nav_to_indexes.get(nav_key, [])
+            position = index_positions.get(idx, 0)
+            if overlap:
+                prev_slice = siblings[max(0, position - overlap) : position]
+                next_slice = siblings[position + 1 : position + 1 + overlap]
+            else:
+                prev_slice = []
+                next_slice = []
+            prev_texts = [
+                elements[ref]["raw_text_content"]
+                for ref in prev_slice
+                if elements[ref]["raw_text_content"]
+            ]
+            next_texts = [
+                elements[ref]["raw_text_content"]
+                for ref in next_slice
+                if elements[ref]["raw_text_content"]
+            ]
+            current_text = self._resolve_current_text(row)
+            prefix = self._format_text_prefix(
+                document_title=prefix_title,
+                page_no=row.get("page_no"),
+                level_nav=nav_key,
+            )
+            body = self._compose_context_body(
+                curr=current_text,
+                prev_entries=prev_texts,
+                next_entries=next_texts,
+            )
+            row["text_content"] = f"{prefix} {body}".strip()
+
+    @staticmethod
+    def _clean_metadata_text(value: Any) -> str:
+        if value is None:
+            return ""
+        return " ".join(str(value).split())
+
+    @staticmethod
+    def _clean_body_text(value: Any) -> str:
+        if value is None:
+            return ""
+        return str(value).strip()
+
+    def _format_text_prefix(
+        self,
+        *,
+        document_title: str,
+        page_no: int | None,
+        level_nav: str | None,
+    ) -> str:
+        nav_label = self._clean_metadata_text(level_nav) or ROOT_LEVEL_NAV
+        page_label = str(page_no) if page_no is not None else "unknown"
+        title_label = document_title or "untitled"
+        return f"[doc={title_label}] [page_no={page_label}] [nav={nav_label}]"
+
+    @staticmethod
+    def _compose_context_body(
+        *,
+        curr: str,
+        prev_entries: list[str],
+        next_entries: list[str],
+    ) -> str:
+        blocks: list[str] = []
+        if prev_entries:
+            blocks.append("[PREV_CTX]")
+            blocks.append("\n\n".join(prev_entries))
+        blocks.append("[CURR]")
+        if curr:
+            blocks.append(curr)
+        if next_entries:
+            blocks.append("[NEXT_CTX]")
+            blocks.append("\n\n".join(next_entries))
+        return "\n".join(block for block in blocks if block).strip()
+
+    def _resolve_current_text(self, row: dict[str, Any]) -> str:
+        if row.get("elem_type") == "header":
+            summary = self._clean_body_text(row.get("section_summary"))
+            if summary:
+                return summary
+        return row["raw_text_content"]
 
 
 __all__ = ["DocumentIngestor", "DuplicateDocumentError"]

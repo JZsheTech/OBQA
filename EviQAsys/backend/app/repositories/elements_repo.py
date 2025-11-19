@@ -27,6 +27,7 @@ class ElementsRepository:
         "header_level",
         "level_nav",
         "text_content",
+        "raw_text_content",
         "text_caption",
         "image_base64",
         "bbox_json",
@@ -113,7 +114,7 @@ class ElementsRepository:
         if not normalized:
             return []
         query = text(
-            "SELECT id, doc_id, page_no, bbox_json, elem_type, text_content, text_caption, level_nav "
+            "SELECT id, doc_id, page_no, bbox_json, elem_type, text_content, raw_text_content, text_caption, level_nav "
             "FROM elements WHERE id IN :ids",
         ).bindparams(bindparam("ids", expanding=True))
         with self._connection_provider() as connection:

@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS elements (
   header_level INT,
   level_nav VARCHAR(1024),
   text_content MEDIUMTEXT,
+  raw_text_content MEDIUMTEXT,
   text_caption MEDIUMTEXT,
   image_base64 MEDIUMTEXT,
   bbox_json JSON,
@@ -84,6 +85,15 @@ CREATE TABLE IF NOT EXISTS elements (
     FOREIGN KEY (doc_id) REFERENCES documents(id)
     ON DELETE CASCADE
 );
+
+SET @missing_raw_text_content := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'elements' AND COLUMN_NAME = 'raw_text_content'
+);
+SET @sql := IF(@missing_raw_text_content = 0, 'ALTER TABLE elements ADD COLUMN raw_text_content MEDIUMTEXT AFTER text_content', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS chats (
   id BIGINT NOT NULL AUTO_INCREMENT,

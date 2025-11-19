@@ -45,6 +45,7 @@ class OceanBaseSettings:
 DB_CHARSET: str = _get_env("DB_CHARSET", "utf8mb4")
 VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 2048)
 INGEST_BATCH_SIZE: int = _get_int_env("BATCH_SIZE", 32)
+ELEMENT_CONTEXT_OVERLAP: int = _get_int_env("ELEMENT_CONTEXT_OVERLAP", 1)
 OLLAMA_PROTOCOL: str = _get_env("OLLAMA_PROTOCOL", "http")
 OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
 OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
@@ -139,6 +140,7 @@ __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
     "INGEST_BATCH_SIZE",
+    "ELEMENT_CONTEXT_OVERLAP",
     "OLLAMA_PROTOCOL",
     "OLLAMA_HOST",
     "OLLAMA_PORT",

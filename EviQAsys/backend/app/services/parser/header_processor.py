@@ -6,7 +6,18 @@ from typing import Any, Iterable
 
 ROOT_HEADER = "root"
 ROOT_LEVEL_NAV = "root"
-HEADER_NUMBER_PATTERN = re.compile(r"^\s*((?:\d+\.)*\d+)")
+HEADER_NUMBER_PATTERN = re.compile(
+    r"""
+    ^\s*(
+        (?:(?:Appendix|APPENDIX)\s+[A-Za-z0-9]+(?:\.(?:[A-Za-z0-9]+))*)
+        |
+        (?:\d+(?:\.\d+)*)
+        |
+        (?:[A-Za-z]\.\s*\d+(?:\.\d+)*)
+    )
+    """,
+    re.VERBOSE | re.IGNORECASE,
+)
 
 
 @dataclass(slots=True)
@@ -23,6 +34,8 @@ def preprocess_headers(content_list: Iterable[dict[str, Any]]) -> list[dict[str,
     processed: list[dict[str, Any]] = []
     header_stack: list[HeaderContext] = []
     order_end_map: dict[int, int] = {}
+    last_level_nav: str | None = None
+    seen_header = False
 
     for order, raw in enumerate(items):
         elem_type = (raw.get("type") or "").lower()
@@ -53,7 +66,12 @@ def preprocess_headers(content_list: Iterable[dict[str, Any]]) -> list[dict[str,
         nav_tokens = [ctx.nav_token for ctx in header_stack]
         if enriched["elem_type"] == "header":
             nav_tokens = nav_tokens[:]  # ensure copy
-        level_nav = " > ".join(nav_tokens) if nav_tokens else ROOT_LEVEL_NAV
+        if nav_tokens:
+            level_nav = " > ".join(nav_tokens)
+            last_level_nav = level_nav
+            seen_header = True
+        else:
+            level_nav = last_level_nav if seen_header and last_level_nav else ROOT_LEVEL_NAV
         enriched["level_nav"] = level_nav
         enriched.setdefault("header_name", ROOT_HEADER)
         processed.append(enriched)
@@ -90,10 +108,11 @@ def _infer_level(raw: dict[str, Any]) -> int:
         return text_level
     if isinstance(text_level, str) and text_level.isdigit():
         return int(text_level)
-    text = raw.get("text") or ""
+    text = _clean_text(raw.get("text"))
     number = HEADER_NUMBER_PATTERN.match(text)
     if number:
-        return number.group(1).count(".") + 1
+        token = number.group(1)
+        return token.count(".") + 1
     return 1
 
 
@@ -115,12 +134,21 @@ def _clean_text(value: Any) -> str:
 
 
 def _build_nav_token(text: str) -> str:
-    text = text.strip()
+    text = _clean_text(text)
+    if text == ROOT_HEADER:
+        return ROOT_HEADER
     number_match = HEADER_NUMBER_PATTERN.match(text)
     if number_match:
-        number = number_match.group(1)
-        remainder = text[len(number) :].strip()
+        token = _normalize_nav_number(number_match.group(1))
+        remainder = text[number_match.end(1) :].strip(" .:-")
         if remainder:
-            return f"{number} {remainder.lower()}"
-        return number
-    return text.lower() or ROOT_HEADER
+            return f"{token} {remainder}"
+        return token
+    return text or ROOT_HEADER
+
+
+def _normalize_nav_number(token: str) -> str:
+    token = token.strip()
+    token = re.sub(r"\s+", " ", token)
+    token = re.sub(r"\.\s+", ".", token)
+    return token

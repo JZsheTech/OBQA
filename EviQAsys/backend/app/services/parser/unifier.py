@@ -12,8 +12,8 @@ def normalize_element(item: dict[str, Any], *, images: dict[str, str]) -> dict[s
     elem_type = (item.get("elem_type") or "text").lower()
     header_name = (item.get("header_name") or ROOT_HEADER).strip()
     level_nav = (item.get("level_nav") or ROOT_LEVEL_NAV).strip()
-    prefix = f"[{level_nav}] [{header_name}]"
-    text_content = _build_text_content(elem_type, prefix, item)
+    raw_text_content = _build_raw_text_content(elem_type, item)
+    text_content = raw_text_content
     text_caption = _extract_caption(elem_type, item)
     bbox_json = json.dumps(item.get("bbox") or item.get("bbox_json") or [])
     page_no = _resolve_page_no(item)
@@ -26,6 +26,8 @@ def normalize_element(item: dict[str, Any], *, images: dict[str, str]) -> dict[s
         "header_level": item.get("header_level"),
         "level_nav": level_nav,
         "text_content": text_content,
+        "raw_text_content": raw_text_content,
+        "section_summary": item.get("section_summary"),
         "text_caption": text_caption,
         "image_base64": image_base64,
         "bbox_json": bbox_json,
@@ -44,22 +46,21 @@ def strip_data_uri_prefix(data: str | None) -> str | None:
     return data
 
 
-def _build_text_content(elem_type: str, prefix: str, item: dict[str, Any]) -> str:
-    body = ""
+def _build_raw_text_content(elem_type: str, item: dict[str, Any]) -> str:
+    if elem_type == "header":
+        return _squash_whitespace(item.get("text"))
     if elem_type == "text":
-        body = item.get("text") or ""
-    elif elem_type == "header":
-        body = item.get("section_summary") or ""
-    elif elem_type == "image":
-        body = _extract_caption(elem_type, item) or "[figure]"
-    elif elem_type == "table":
-        caption = _extract_caption(elem_type, item)
-        table_body = item.get("table_body") or ""
-        body = " ".join(filter(None, [caption, table_body]))
-    elif elem_type == "equation":
-        body = item.get("text") or item.get("latex") or ""
-    combined = " ".join(part for part in [prefix.strip(), body.strip()] if part)
-    return combined.strip()
+        return _stringify(item.get("text"))
+    if elem_type == "image":
+        return _stringify(_extract_caption(elem_type, item))
+    if elem_type == "table":
+        caption = _stringify(_extract_caption(elem_type, item))
+        table_body = _stringify(item.get("table_body"))
+        parts = [part for part in [caption, table_body] if part]
+        return "\n".join(parts)
+    if elem_type == "equation":
+        return _stringify(item.get("text") or item.get("latex"))
+    return _stringify(item.get("text"))
 
 
 def _extract_caption(elem_type: str, item: dict[str, Any]) -> str | None:
@@ -108,6 +109,18 @@ def _as_order_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _stringify(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _squash_whitespace(value: Any) -> str:
+    if not value:
+        return ""
+    return " ".join(str(value).split())
 
 
 __all__ = ["normalize_element", "strip_data_uri_prefix"]
