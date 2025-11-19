@@ -95,6 +95,7 @@ def build_evidences_payload(
                 "bbox": element.get("bbox"),
                 "elem_type": element.get("elem_type"),
                 "snippet": snippet,
+                "text_content": (element.get("text_content") or "").strip() or None,
                 "title": element.get("level_nav"),
             },
         )

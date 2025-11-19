@@ -30,7 +30,7 @@ from test_m4_qa_flow import (  # noqa: E402
     embed_document_elements,
     ensure_pdfs,
     ingest_document,
-    print_evidences,
+    print_evidences as print_single_turn_evidences,
     print_rendered_answer,
 )
 
@@ -172,7 +172,7 @@ def main() -> None:
                 enable_image_vqa=args.enable_image_vqa,
             )
             print_rendered_answer(result.answer_text)
-            print_evidences(result.evidences)
+            print_multi_turn_evidences(result.evidences)
             print("=" * 80)
             print(f"Turn #{turn_idx} stored with id={result.turn_id}")
             turn_ids.append(result.turn_id)
@@ -198,6 +198,11 @@ def main() -> None:
                 print("Keep flag enabled; leaving data in place.")
             if turn_ids:
                 print(f"Stored turn ids: {', '.join(str(turn_id) for turn_id in turn_ids)}")
+
+
+def print_multi_turn_evidences(evidences: list[dict[str, object]]) -> None:
+    """Reuse the verbose single-turn evidence logger for clarity in multi-turn runs."""
+    print_single_turn_evidences(evidences)
 
 
 if __name__ == "__main__":

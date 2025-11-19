@@ -262,16 +262,15 @@ def print_evidences(evidences: list[dict[str, object]]) -> None:
         return
     print("\nEvidences:")
     for ev in evidences:
-        snippet = (ev.get("snippet") or "").strip()
-        if snippet and len(snippet) > 200:
-            snippet = f"{snippet[:200]}..."
+        text_content = (ev.get("text_content") or ev.get("snippet") or "").strip()
         print(
             f"  - Evidence#{ev.get('evidence_no')} element_id={ev.get('element_id')} "
             f"doc_id={ev.get('document_id')} page={ev.get('page_index')} "
             f"type={ev.get('elem_type')}",
         )
-        if snippet:
-            print(f"      snippet: {snippet}")
+        if text_content:
+            print("      text_content:")
+            print(textwrap.indent(text_content, "        "))
 
 
 if __name__ == "__main__":

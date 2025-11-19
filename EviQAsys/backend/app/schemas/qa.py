@@ -25,6 +25,7 @@ class EvidenceItem(BaseModel):
     bbox: list[float] | None = None
     elem_type: str
     snippet: str | None = None
+    text_content: str | None = None
     title: str | None = None
 
 
