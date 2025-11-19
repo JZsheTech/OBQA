@@ -105,8 +105,8 @@ Stored turn ids: 5, 6
 
 # 带完整版输出的multi-turn QA
 
-eep flag enabled; collection_id=1 remains available. Re-run with --collection-id 1 to reuse the indexed documents.
-Stored turn ids: 1, 2
+
+
 (quest) shejunzhi@chai03:/data2/jproject/OBQA$ python EviQAsys/backend/tests/manual/test_m4_multi_turn_qa_flow.py --question "What are the three core steps involved in a method for training language models to follow instructions?" --question "Regarding the step in the above method that requires training a separate reward model and optimizing through reinforcement learning, an improved approach proposes directly optimizing the language model using preference data. What is the main advantage claimed by this improved method?"    --collection-id 1   --keep
 [2025-11-19 15:11:58.324415] Target DB: obqa_dev @ 127.0.0.1:2881
 Reusing collection id=1 name=manual-m4-multi-turn-qa-flow; skipping ingestion.
