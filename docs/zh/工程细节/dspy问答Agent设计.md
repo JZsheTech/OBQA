@@ -370,7 +370,7 @@ answer_text = AnswerComposer(
 
 ## **3.9 持久化与 Evidence 映射（Python）**
 
-职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，在 API 响应中附带 `evidences` 列表（含 `element_id/evidence_no/doc_id/page_index/bbox/elem_type` 等），供前端按《Evidence 渲染规范》解析并渲染 `[Evidence#no]`；`answer_text` 字段本身不做字符串替换，始终保留原始的 `[Elem#id]` 锚点。
+职责：将本轮问答写入 `turns` 表，并将本轮使用到的元素写入 `turn2element`；同时按 chat 维度构建 `element_id → evidence_no` 的映射，在 API 响应中附带 `evidences` 列表（至少含 `element_id/evidence_no/doc_id/page_no/elem_type/bbox/level_nav/evidence_title` 等），供前端按《Evidence 渲染规范》解析并渲染 `[Evidence#no]`；`answer_text` 字段本身不做字符串替换，始终保留原始的 `[Elem#id]` 锚点。
 
 涉及表：
 
@@ -408,10 +408,12 @@ answer_text = AnswerComposer(
          {
              "element_id": elem_id,
              "evidence_no": mapping[elem_id],
-             "document_id": elem.document_id,
-             "page_index": elem.page_no,
+             "doc_id": elem.doc_id,
+             "page_no": elem.page_no,
              "bbox": elem.bbox,
              "elem_type": elem.elem_type,
+             "level_nav": elem.level_nav,
+             "evidence_title": build_evidence_title(elem.doc_title, elem.page_no, elem.level_nav),
          }
          for elem_id, elem in ...
      ]
@@ -490,7 +492,7 @@ def run_qa_turn(collection_id: int, chat_id: int, question: str) -> dict:
     # 10. 构建 evidence_no 映射并组装 evidences 列表
     history_element_ids = collect_all_element_ids_from_chat(chat_id)
     mapping = build_evidence_no_mapping(history_element_ids)
-    evidences = build_evidences_payload(mapping)  # 含 element_id/evidence_no/doc_id/page_index/bbox/elem_type
+    evidences = build_evidences_payload(mapping)  # 含 element_id/evidence_no/doc_id/page_no/elem_type/bbox/level_nav/evidence_title
 
     return {
         "turn_id": turn_id,

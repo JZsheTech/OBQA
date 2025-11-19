@@ -24,7 +24,7 @@
 * 用途：
 
   * React 列表渲染时的 `key`；
-  * 高亮 PDF 时定位元素（结合 `doc_id, page_index, bbox`）；
+  * 高亮 PDF 时定位元素（结合 `doc_id, page_no, bbox`）；
   * 作为 evidence_no 的“真正实体”。
 
 ### 1.2 `[Elem#<element_id>]` 原始锚点标签
@@ -115,20 +115,24 @@
     {
       "element_id": 123,
       "evidence_no": 1,
-      "document_id": 5,
-      "page_index": 10,
+      "doc_id": 5,
+      "page_no": 10,
       "bbox": [100, 120, 250, 300],
-      "elem_type": "figure",
-      "title": "Figure 3. Overall architecture"  // 可选
+      "elem_type": "image",
+      "level_nav": "1. Introduction > 1.1 GNN",
+      "evidence_title": "[doc=Paper Title] [page_no=10] [nav=1. Introduction > 1.1 GNN]",
+      "text_snippet": "Figure 3. Overall architecture ..."  // 可选：截断后的 text_content 预览
     },
     {
       "element_id": 45,
       "evidence_no": 2,
-      "document_id": 5,
-      "page_index": 14,
+      "doc_id": 5,
+      "page_no": 14,
       "bbox": [40, 80, 200, 240],
       "elem_type": "table",
-      "title": "Table 2. Main results"         // 可选
+      "level_nav": "3. Experiments > 3.2 Main results",
+      "evidence_title": "[doc=Paper Title] [page_no=14] [nav=3. Experiments > 3.2 Main results]",
+      "text_snippet": "Table 2. Main results ..."          // 可选
     }
   ]
 }
@@ -141,8 +145,9 @@
 
   * `element_id`：用于前端渲染 key + 高亮定位；
   * `evidence_no`：用于前端显示“Evidence #编号”，以及替换文本中的 `[Elem#id]`；
-  * `document_id` / `page_index` / `bbox` / `elem_type`：前端高亮 PDF 所需数据；
-  * 可选字段：`title` 等，对前端 UX 有帮助但非必要。
+  * `doc_id` / `page_no` / `bbox` / `elem_type`：前端高亮 PDF 所需数据；
+  * `level_nav` / `evidence_title`：用于展示“文档标题 + 页码 + 章节路径”的归属信息；
+  * 可选字段：`text_snippet` 等，对前端 UX 有帮助但非必要。
 
 > 注意：
 > 若前端一次性请求整个 chat 的对话列表，后端可在列表级别返回一个合并后的全局 `evidences` 映射（包含整个 chat 的所有元素），具体 API 设计可在 `service_interface_use.md` 中另外定义。
@@ -161,7 +166,7 @@
     key={ev.element_id}       // ✅ 使用 element_id 作为 React key
     evidenceNo={ev.evidence_no}
     elementId={ev.element_id}
-    title={ev.title}
+    title={ev.evidence_title}
     ...
   />
 ))}
@@ -234,8 +239,8 @@ key={ev.evidence_no}
    ```
 3. 取出：
 
-   * `document_id`
-   * `page_index`
+   * `doc_id`
+   * `page_no`
    * `bbox`
 4. 通知 PDF Viewer 跳转到对应文档、页码，并在 `bbox` 框内做高亮。
 
@@ -280,7 +285,7 @@ key={ev.evidence_no}
 
 * `elements` 表：
 
-  * 本规范使用其中的 `id`（即 element_id）、`document_id`、`page_no`、`bbox`、`elem_type` 等字段；
+  * 本规范使用其中的 `id`（即 element_id）、`doc_id`、`page_no`、`bbox_json`、`elem_type`、`level_nav` 等字段；
 * `turns` 表：
 
   * `answer_text` 字段现在**明确要求**存储带 `[Elem#id]` 的原始文本；
@@ -295,7 +300,7 @@ key={ev.evidence_no}
 
   * **内部存储 / LLM 输出**：使用 `[Elem#id]`；
   * **API 返回 answer_text**：仍为 `[Elem#id]`；
-  * **API 附带 evidences 数组**：携带 `element_id` + `evidence_no` + 高亮信息；
+  * **API 附带 evidences 数组**：携带 `element_id` + `evidence_no` + 高亮信息（`doc_id/page_no/elem_type/bbox/level_nav/evidence_title` 等）；
   * **前端负责将 `[Elem#id]` 渲染成可视的 `[Evidence #no]` 组件。
 
 ### 5.3 与《开发路线图.md》的关系
@@ -309,7 +314,7 @@ key={ev.evidence_no}
   * 后端：
 
     * 实现 element_id → evidence_no 的生成逻辑；
-    * 实现返回 evidences 数组；
+    * 实现返回 evidences 数组（至少包含 element_id、evidence_no、doc_id、page_no、elem_type、bbox、level_nav、evidence_title 等字段）；
   * 前端：
 
     * 用 element_id 作为 React key；
@@ -328,9 +333,8 @@ key={ev.evidence_no}
 
    * 统计该 chat 内所有被引用的 `element_id`；
    * 生成 `element_id → evidence_no` 映射；
-   * 在响应体中附带 `evidences` 数组（含 element_id、evidence_no、doc_id、page_index、bbox、elem_type 等）。
+   * 在响应体中附带 `evidences` 数组（含 element_id、evidence_no、doc_id、page_no、elem_type、bbox、level_nav、evidence_title 等）。
 4. **前端所有 React 列表的 key 使用 `element_id`；**
 
    * 将 `answer_text` 中的 `[Elem#id]` 替换为带 `evidence_no + element_id` 的 UI 组件；
-   * 用 `element_id` + `doc_id/page/bbox` 去高亮 PDF。
-
+   * 用 `element_id` + `doc_id/page_no/bbox` 去高亮 PDF。
