@@ -8,6 +8,17 @@
 
 ---
 
+## 0. 应当参考的接口
+不要擅自写一个openai兼容的LLM调用接口，用原始的方式去调用LLM，应该参考我提供的示例代码：
+
+### LLM调用
+项目中的：dependency/chatLLM
+dependency/chatLLM/multimodal_qwen25_vl_72b_ollama.py 是图片理解LLM的调用方式
+dependency/chatLLM/text_llama3_70b_ollama.py 是文本理解LLM的调用方式，注意我们一般要用的是dspy形式的调用。
+
+### 数据库查询
+充分复用M2和M3阶段EviQAsys/backend/app 中已经实现的数据库相关接口，遇到不够的再手动添加。
+
 ## 1. 阶段目标与 DoD 复述
 
 ### 1.1 阶段目标（从用户视角）
