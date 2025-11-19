@@ -22,6 +22,16 @@ def _get_int_env(name: str, default: int) -> int:
         raise ValueError(f"Invalid integer for {name}: {raw_value}") from exc
 
 
+def _get_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value == "":
+        return default
+    try:
+        return float(raw_value)
+    except ValueError as exc:  # pragma: no cover - defensive guard rails
+        raise ValueError(f"Invalid float for {name}: {raw_value}") from exc
+
+
 @dataclass(frozen=True)
 class OceanBaseSettings:
     host: str = _get_env("OB_HOST", "127.0.0.1")
@@ -69,6 +79,26 @@ class EmbeddingSettings:
     api_key_header: str = _get_env("EMBEDDING_API_KEY_HEADER", "Authorization")
 
 
+@dataclass(frozen=True)
+class LLMSettings:
+    model: str = _get_env("LLM_MODEL_NAME", "llama3:70b")
+    api_base: str = _get_env("LLM_API_BASE", OLLAMA_OPENAI_BASE_URL)
+    api_key: str = _get_env("LLM_API_KEY", "EMPTY")
+    api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
+    temperature: float = _get_float_env("LLM_TEMPERATURE", 0.2)
+    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 800)
+
+
+@dataclass(frozen=True)
+class VisionVQASettings:
+    endpoint: str = _get_env("VISION_VQA_ENDPOINT", OLLAMA_OPENAI_BASE_URL)
+    model: str = _get_env("VISION_VQA_MODEL", "qwen2.5-vl-72b")
+    api_key: str = _get_env("VISION_VQA_API_KEY", "EMPTY")
+    api_key_header: str = _get_env("VISION_VQA_API_KEY_HEADER", "Authorization")
+    timeout_s: int = _get_int_env("VISION_VQA_TIMEOUT_S", 120)
+    max_tokens: int = _get_int_env("VISION_VQA_MAX_TOKENS", 400)
+
+
 @lru_cache(maxsize=1)
 def get_oceanbase_settings() -> OceanBaseSettings:
     """Return cached OceanBase connection settings."""
@@ -93,6 +123,18 @@ def get_embedding_settings() -> EmbeddingSettings:
     return EmbeddingSettings()
 
 
+@lru_cache(maxsize=1)
+def get_llm_settings() -> LLMSettings:
+    """Return DSPy/OpenAI LLM configuration."""
+    return LLMSettings()
+
+
+@lru_cache(maxsize=1)
+def get_vision_vqa_settings() -> VisionVQASettings:
+    """Return settings for the optional visual question answering client."""
+    return VisionVQASettings()
+
+
 __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
@@ -106,8 +148,12 @@ __all__ = [
     "MinerUSettings",
     "UploadSettings",
     "EmbeddingSettings",
+    "LLMSettings",
+    "VisionVQASettings",
     "get_oceanbase_settings",
     "get_mineru_settings",
     "get_upload_settings",
     "get_embedding_settings",
+    "get_llm_settings",
+    "get_vision_vqa_settings",
 ]

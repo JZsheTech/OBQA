@@ -2,6 +2,7 @@ from .collection import CollectionBase, CollectionCreate, CollectionRead
 from .document import DocumentBase, DocumentCreate, DocumentListItem, DocumentRead, DocumentUploadResponse
 from .chat import ChatBase, ChatCreate, ChatRead
 from .retrieval import RetrievalCandidate, RetrievalEnvelope
+from .qa import TurnCreateRequest, EvidenceItem, TurnResponse, TurnResponseEnvelope
 
 __all__ = [
     "CollectionBase",
@@ -17,4 +18,8 @@ __all__ = [
     "ChatRead",
     "RetrievalCandidate",
     "RetrievalEnvelope",
+    "TurnCreateRequest",
+    "EvidenceItem",
+    "TurnResponse",
+    "TurnResponseEnvelope",
 ]

@@ -5,7 +5,7 @@ import logging
 import math
 from typing import Any, Callable, ContextManager, Iterable, Mapping, Sequence
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 
 from .base import RepositoryResult, dict_to_insert, dict_to_update, row_to_dict, rows_to_dicts
@@ -107,6 +107,21 @@ class ElementsRepository:
                 {"doc_id": doc_id},
             )
             return rows_to_dicts(result)
+
+    def list_by_ids(self, element_ids: Iterable[int]) -> list[dict[str, Any]]:
+        normalized = [int(elem_id) for elem_id in dict.fromkeys(element_ids) if elem_id is not None]
+        if not normalized:
+            return []
+        query = text(
+            "SELECT id, doc_id, page_no, bbox_json, elem_type, text_content, text_caption, level_nav "
+            "FROM elements WHERE id IN :ids",
+        ).bindparams(bindparam("ids", expanding=True))
+        with self._connection_provider() as connection:
+            result = connection.execute(query, {"ids": normalized})
+            rows = rows_to_dicts(result)
+        for row in rows:
+            row["bbox"] = self._safe_json_loads(row.pop("bbox_json", None))
+        return rows
 
     def update_element(self, element_id: int, **fields: Any) -> RepositoryResult:
         payload = {key: value for key, value in fields.items() if key in self.writable_fields}
