@@ -54,7 +54,7 @@ def ask_with_dspy(question: str) -> str:
         answer: str = dspy.OutputField()
 
     # a very simple demo predictor (no backend)
-    lm = dspy.LM(f"ollama/{MODEL_NAME}", api_key="", api_base=OLLAMA_BASE_URL)
+    lm = dspy.LM(f"openai/{MODEL_NAME}", api_key=OPENAI_API_KEY, api_base=OLLAMA_OPENAI_BASE_URL)
     dspy.configure(lm=lm)    
     predictor = dspy.Predict(QA)
     # manually fill in a fake answer (since no model backend here)
@@ -83,11 +83,11 @@ def ask_with_openai(question: str) -> str:
 def ask_with_litellm(question: str) -> str:
     """Use litellm.completion() unified interface."""
     resp = completion(
-        model= "ollama/" + MODEL_NAME,
+        model= "openai/" + MODEL_NAME,
         messages=[{"role": "user", "content": question}],
         temperature=0.7,
         max_tokens=256,
-        api_base=OLLAMA_BASE_URL,
+        api_base=OLLAMA_OPENAI_BASE_URL,
         api_key=OPENAI_API_KEY,
     )
     return resp["choices"][0]["message"]["content"].strip()
