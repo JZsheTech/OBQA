@@ -24,3 +24,29 @@
   Next step: run `python EviQAsys/backend/tests/manual/test_m4_qa_flow.py --question "<your
   prompt>"` inside the quest conda env after MinerU + embeddings services are ready, and
   capture the console output for reviewers.
+
+# 初步的单轮问答结果检测:
+```
+  Embedding 116 elements...
+Embedded 116 elements for doc_id=10.
+Chat created id=2 for collection 5
+================================================================================
+Running QA turn for question: what is the main idea of the paper?
+
+Assistant Answer:
+The main idea of the paper is not explicitly stated in the provided evidence. However, based on the
+introduction sections [Elem#2371] and [Elem#2381], it appears to be related to the development and
+evaluation of language models, specifically InstructGPT, and their ability to follow instructions
+and provide accurate responses.
+
+Evidences:
+  - Evidence#1 element_id=2371 doc_id=8 page=3 type=text
+      snippet: [1 introduction] [1 Introduction] sizes (1.3B, 6B, and 175B parameters), and all of our models use the GPT-3 architecture. Our main findings are as follows:
+  - Evidence#2 element_id=2381 doc_id=8 page=4 type=text
+      snippet: [1 introduction] [1 Introduction] InstructGPT still makes simple mistakes. For example, InstructGPT can still fail to follow instructions, make up facts, give long hedging answers to simple questions,...
+================================================================================
+Turn stored with id=2
+Cleaning up created chat/collection/documents...
+Cleanup complete.
+
+```
