@@ -59,6 +59,46 @@ Keep flag enabled; collection_id=6 remains available. Re-run with --collection-i
 
 # multiTurn-QA Test
 
+est) shejunzhi@chai03:/data2/jproject/OBQA$ clear
+(quest) shejunzhi@chai03:/data2/jproject/OBQA$ python EviQAsys/backend/tests/manual/test_m4_multi_turn_qa_flow.py --question "What are the three core steps involved in a method for training language models to follow instructions?" --question "Regarding the step in the above method that requires training a separate reward model and optimizing through reinforcement learning, an improved approach proposes directly optimizing the language model using preference data. What is the main advantage claimed by this improved method?"      --keep    --collection-id 6
+[2025-11-19 12:24:43.514922] Target DB: obqa_dev @ 127.0.0.1:2881
+Reusing collection id=6 name=manual-m4-qa-flow; skipping ingestion.
+Skipping ingestion and embedding; existing collection will be used.
+Chat created id=5 for collection 6
+================================================================================
+Running QA turn #1 for question: What are the three core steps involved in a method for training language models to follow instructions?
+
+Assistant Answer:
+The three core steps involved in a method for training language models to follow instructions are
+not explicitly stated in the provided evidence context. However, based on the available textual
+evidences, we can infer that the steps might involve training models with different techniques
+[Elem#3502], collecting and filtering data [Elem#3447], and iterating through comparison data to
+train new policies [Elem#3481].
+
+Evidences:
+  - Evidence#1 element_id=3502 doc_id=11 page=8 type=text
+      snippet: [3.5 models] [3.5 Models] We start with the GPT-3 pretrained language models from Brown et al. (2020). These models are trained on a broad distribution of Internet data and are adaptable to a wide ran...
+  - Evidence#2 element_id=3447 doc_id=11 page=2 type=text
+      snippet: [1 introduction] [1 Introduction] ${}^{3}$  Specifically,we train on prompts submitted to earlier versions of the InstructGPT models on the OpenAI API Playground, which were trained only using demonst...
+  - Evidence#3 element_id=3481 doc_id=11 page=6 type=text
+      snippet: [3.1 high-level methodology] [3.1 High-level methodology] Steps 2 and 3 can be iterated continuously; more comparison data is collected on the current best policy, which is used to train a new RM and ...
+================================================================================
+Turn #1 stored with id=5
+================================================================================
+Running QA turn #2 for question: Regarding the step in the above method that requires training a separate reward model and optimizing through reinforcement learning, an improved approach proposes directly optimizing the language model using preference data. What is the main advantage claimed by this improved method?
+
+Assistant Answer:
+The main advantage claimed by this improved method is that it directly optimizes the language model
+using preference data, eliminating the need to train a separate reward model and optimize through
+reinforcement learning. This approach simplifies the process and makes it more stable [Elem#4101].
+
+Evidences:
+  - Evidence#4 element_id=4101 doc_id=12 page=1 type=text
+      snippet: [abstract] [Abstract] While large-scale unsupervised language models (LMs) learn broad world knowledge and some reasoning skills, achieving precise control of their behavior is difficult due to the co...
+================================================================================
+Turn #2 stored with id=6
+Keep flag enabled; collection_id=6 remains available. Re-run with --collection-id 6 to reuse the indexed documents.
+Stored turn ids: 5, 6
 
 
 
