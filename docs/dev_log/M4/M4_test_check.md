@@ -181,3 +181,93 @@ Turn #2 stored with id=4
 Keep flag enabled; collection_id=1 remains available. Re-run with --collection-id 1 to reuse the indexed documents.
 Stored turn ids: 3, 4
 
+# 端到端多轮问答跑通+标题层级修复
+
+uest) shejunzhi@chai03:/data2/jproject/OBQA$ ^C
+(quest) shejunzhi@chai03:/data2/jproject/OBQA$ python EviQAsys/backend/tests/manual/test_m4_multi_turn_qa_flow.py --question "What are the three core steps involved in a method for training language models to follow instructions?" --question "Regarding the step in the above method that requires training a separate reward model and optimizing through reinforcement learning, an improved approach proposes directly optimizing using preference data. What is the main advantage claimed by this improved method?"   --keep    --reset-db   --clear-uploads
+Clearing database tables before ingestion...
+Cleared upload directory: /tmp/obqa_uploads
+[2025-11-20 02:54:21.448335] Target DB: obqa_dev @ 127.0.0.1:2881
+Preparing to ingest 3 PDFs from /data2/jproject/OBQA/sample_data/pdf_doc/RL_paper_small
+  1. Ouyang et al. - 2022 - Training language models to follow instructions with human feedback.pdf
+  2. Rafailov et al. - 2024 - Direct Preference Optimization Your Language Model is Secretly a Reward Model.pdf
+  3. Zheng et al. - 2024 - LlamaFactory Unified Efficient Fine-Tuning of 100+ Language Models.pdf
+Collection created id=1
+[2025-11-20 02:54:21.457125] Ingesting PDF: Ouyang et al. - 2022 - Training language models to follow instructions with human feedback.pdf
+  Stored elements=666
+    - equation: 2
+    - header: 120
+    - image: 52
+    - table: 30
+    - text: 462
+  Embedding 666 elements...
+Embedded 666 elements for doc_id=1.
+[2025-11-20 02:55:49.328323] Ingesting PDF: Rafailov et al. - 2024 - Direct Preference Optimization Your Language Model is Secretly a Reward Model.pdf
+  Stored elements=299
+    - equation: 33
+    - header: 38
+    - image: 12
+    - table: 10
+    - text: 206
+  Embedding 299 elements...
+Embedded 299 elements for doc_id=2.
+[2025-11-20 02:56:29.056230] Ingesting PDF: Zheng et al. - 2024 - LlamaFactory Unified Efficient Fine-Tuning of 100+ Language Models.pdf
+  Stored elements=116
+    - header: 20
+    - image: 1
+    - table: 6
+    - text: 89
+  Embedding 116 elements...
+Embedded 116 elements for doc_id=3.
+Chat created id=1 for collection 1
+================================================================================
+Running QA turn #1 for question: What are the three core steps involved in a method for training language models to follow instructions?
+
+Assistant Answer:
+The three core steps involved in a method for training language models to follow instructions are
+not explicitly stated in the provided evidence. However, based on the context of training language
+models with human feedback, it can be inferred that the steps might involve training the model using
+reinforcement learning from human feedback (RLHF) [Elem#219], fine-tuning the model on a variety of
+public NLP datasets [Elem#353], and selecting the best checkpoint for evaluation [Elem#365].
+
+Evidences:
+  - Evidence#1 element_id=219 doc_id=1 page=19 type=text
+      text_content:
+        [doc=Training language models to follow instructions with human feedback] [page_no=19] [nav=5 Discussion > 5.4 Open questions] [PREV_CTX]
+        Getting models to do what we want is directly related to the steerability and controllability literature (Dathathri et al., 2019; Krause et al., 2020). A promising future path is combining RLHF with other methods of steerability, for example using control codes (Keskar et al., 2019), or modifying the sampling procedure at inference time using a smaller model (Dathathri et al., 2019).
+        [CURR]
+        While we mainly focus on RLHF, there are many other algorithms that could be used to train policies on our demonstration and comparison data to get even better results. For example, one could explore expert iteration (Anthony et al., 2017; Silver et al., 2017), or simpler behavior cloning methods that use a subset of the comparison data. One could also try constrained optimization approaches (Achiam et al., 2017) that maximize the score from a reward model conditioned on generating a small number of harmful behaviors.
+        [NEXT_CTX]
+        19
+  - Evidence#2 element_id=353 doc_id=1 page=41 type=text
+      text_content:
+        [doc=Training language models to follow instructions with human feedback] [page_no=41] [nav=C Additional model details > C.2 Details of RM training] [PREV_CTX]
+        We trained a single 6B reward model which we used for all PPO models of all sizes. Larger 175B RMs had the potential to achieve lower validation loss, but (1) their training was more unstable which made them less suitable for use as initializations for the PPO value functions, and (2) using a 175B RM and value function greatly increase the compute requirements of PPO. In preliminary experiments, we found that 6B RMs were stable across a wide range of learning rates, and led to equally strong PPO models.
+        [CURR]
+        The final reward model was initialized from a 6B GPT-3 model that was fine-tuned on a variety of public NLP datasets (ARC, BoolQ, CoQA, DROP, MultiNLI, OpenBookQA, QuAC, RACE, and Winogrande). This was mostly for historical reasons; we find similar results when initializing the RM from the GPT-3 or SFT models. We trained for a single epoch over the full reward model training set (see Table 6) at a learning rate of  $1\mathrm{r} = 9\mathrm{e} - 6$ , a cosine learning rate schedule (dropping to  $10\%$  of its initial value by the end of training), and a batch size of 64. Training did not appear to be very sensitive to the learning rate or schedule; changes of up to  $50\%$  in the learning rate resulted in similar performance. Training was quite sensitive to the number of epochs: multiple epochs quickly overfit the model to the training data with obvious deterioration in the validation loss. The batch size here represents the distinct number of prompts per batch. Each prompt had between  $K = 4$  and  $K = 9$
+        [NEXT_CTX]
+        41
+  - Evidence#3 element_id=365 doc_id=1 page=42 type=text
+      text_content:
+        [doc=Training language models to follow instructions with human feedback] [page_no=42] [nav=C Additional model details > C.5 FLAN and T0 models] [PREV_CTX]
+        To choose the best FLAN checkpoint, we use our 6B reward model to score the completions on the validation set of prompts. As shown in Figure 13, the reward saturates after the initial 400k examples of training. This indicates that training for even longer will unlikely improve the human eval performance. We picked the checkpoint with the highest RM score for our human evaluation, which is the one trained with learning rate of 4e-6 and for 896k examples.
+        [CURR]
+        We perform two similar experiments to find the best T0 checkpoint. In one experiment, we used a batch size of 128, a learning rate of 4e-6 and 1.28 million examples. The other experiment used a
+        [NEXT_CTX]
+        42
+================================================================================
+Turn #1 stored with id=1
+================================================================================
+Running QA turn #2 for question: Regarding the step in the above method that requires training a separate reward model and optimizing through reinforcement learning, an improved approach proposes directly optimizing using preference data. What is the main advantage claimed by this improved method?
+
+Assistant Answer:
+The main advantage claimed by this improved method is that it directly optimizes using preference
+data, eliminating the need to train a separate reward model and optimize through reinforcement
+learning. This approach can potentially lead to more efficient and effective training of language
+models.
+No evidences returned.
+================================================================================
+Turn #2 stored with id=2
+Keep flag enabled; collection_id=1 remains available. Re-run with --collection-id 1 to reuse the indexed documents.
+Stored turn ids: 1, 2
+
