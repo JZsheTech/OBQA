@@ -6,6 +6,7 @@ from typing import Iterable, Mapping
 
 from ...repositories import (
     ChatsRepository,
+    DocumentsRepository,
     ElementsRepository,
     Turn2ElementRepository,
     TurnsRepository,
@@ -44,6 +45,7 @@ class QAOrchestrator:
         self,
         *,
         chats_repo: ChatsRepository | None = None,
+        documents_repo: DocumentsRepository | None = None,
         turns_repo: TurnsRepository | None = None,
         turn2element_repo: Turn2ElementRepository | None = None,
         elements_repo: ElementsRepository | None = None,
@@ -57,6 +59,7 @@ class QAOrchestrator:
         config: QAFlowConfig | None = None,
     ) -> None:
         self._chats_repo = chats_repo or ChatsRepository()
+        self._documents_repo = documents_repo or DocumentsRepository()
         self._turns_repo = turns_repo or TurnsRepository()
         self._turn2element_repo = turn2element_repo or Turn2ElementRepository()
         self._elements_repo = elements_repo or ElementsRepository()
@@ -83,7 +86,7 @@ class QAOrchestrator:
         chat = self._chats_repo.get_by_id(chat_id)
         if not chat:
             raise ChatNotFoundError(f"Chat {chat_id} not found.")
-        collection_id = int(chat["collection_id"])
+        collection_id, document_id = self._resolve_chat_scope(chat)
         history_turns = self._turns_repo.list_by_chat(chat_id)
         history_text = format_history_text(history_turns, max_turns=self._config.max_history_turns)
         memory_summary = history_text
@@ -104,6 +107,7 @@ class QAOrchestrator:
             try:
                 results = self._retriever.retrieve_topk(
                     collection_id=collection_id,
+                    doc_id=document_id,
                     query_text=search_query,
                     top_k=max(1, min(top_k, 20)),
                     elem_types=decision.element_types,
@@ -260,6 +264,23 @@ class QAOrchestrator:
         last_turn_order = max([int(turn.get("order") or 0) for turn in turns], default=0)
         chat_order = int(chat_row.get("max_turn_order") or 0)
         return max(last_turn_order, chat_order) + 1
+
+    def _resolve_chat_scope(self, chat: Mapping[str, object]) -> tuple[int, int | None]:
+        chat_type = str(chat.get("type") or "collection").lower()
+        if chat_type == "collection":
+            collection_id = chat.get("collection_id")
+            if collection_id is None:
+                raise QAFlowError("collection_id is required when chat type is 'collection'.")
+            return int(collection_id), None
+        if chat_type == "document":
+            document_id = chat.get("document_id")
+            if document_id is None:
+                raise QAFlowError("document_id is required when chat type is 'document'.")
+            document = self._documents_repo.get_by_id(int(document_id))
+            if not document:
+                raise QAFlowError(f"Document {document_id} not found for chat {chat.get('id')}.")
+            return int(document["collection_id"]), int(document_id)
+        raise QAFlowError(f"Unsupported chat type: {chat_type}")
 
 
 def run_qa_turn(

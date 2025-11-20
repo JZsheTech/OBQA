@@ -23,12 +23,27 @@ class ChatsRepository:
     def create_chat(
         self,
         *,
-        collection_id: int,
+        collection_id: int | None = None,
+        document_id: int | None = None,
+        chat_type: str = "collection",
         title: str | None = None,
         max_turn_order: int = 0,
     ) -> dict[str, Any]:
+        normalized_type = (chat_type or "collection").strip().lower()
+        if normalized_type not in {"collection", "document"}:
+            raise ValueError("chat_type must be either 'collection' or 'document'.")
+        if normalized_type == "collection":
+            if collection_id is None:
+                raise ValueError("collection_id is required when chat type is 'collection'.")
+            document_id = None
+        else:
+            if document_id is None:
+                raise ValueError("document_id is required when chat type is 'document'.")
+            collection_id = None
         payload = {
             "collection_id": collection_id,
+            "document_id": document_id,
+            "type": normalized_type,
             "title": title,
             "max_turn_order": max_turn_order,
         }
@@ -55,7 +70,7 @@ class ChatsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT * FROM chats WHERE collection_id = :collection_id "
+                    "SELECT * FROM chats WHERE collection_id = :collection_id AND `type` = 'collection' "
                     "ORDER BY created_at DESC, id DESC",
                 ),
                 {"collection_id": collection_id},

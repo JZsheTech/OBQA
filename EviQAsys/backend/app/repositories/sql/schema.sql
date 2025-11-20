@@ -117,15 +117,58 @@ DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS chats (
   id BIGINT NOT NULL AUTO_INCREMENT,
-  collection_id BIGINT NOT NULL,
+  collection_id BIGINT,
+  document_id BIGINT,
+  `type` VARCHAR(32) NOT NULL DEFAULT 'collection' CHECK (`type` IN ('collection','document')),
   title VARCHAR(255),
   max_turn_order BIGINT DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   CONSTRAINT fk_chats_collection
     FOREIGN KEY (collection_id) REFERENCES collections(id)
+    ON DELETE CASCADE,
+  CONSTRAINT fk_chats_document
+    FOREIGN KEY (document_id) REFERENCES documents(id)
     ON DELETE CASCADE
 );
+
+SET @missing_chat_document_id := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chats' AND COLUMN_NAME = 'document_id'
+);
+SET @sql := IF(@missing_chat_document_id = 0, 'ALTER TABLE chats ADD COLUMN document_id BIGINT AFTER collection_id', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_chat_type := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chats' AND COLUMN_NAME = 'type'
+);
+SET @sql := IF(@missing_chat_type = 0, "ALTER TABLE chats ADD COLUMN `type` VARCHAR(32) NOT NULL DEFAULT 'collection' AFTER document_id", "SELECT 1");
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @needs_collection_nullability_update := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chats' AND COLUMN_NAME = 'collection_id' AND IS_NULLABLE = 'NO'
+);
+SET @sql := IF(@needs_collection_nullability_update > 0, 'ALTER TABLE chats MODIFY COLUMN collection_id BIGINT NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_chat_document_fk := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chats' AND CONSTRAINT_NAME = 'fk_chats_document'
+);
+SET @sql := IF(@missing_chat_document_fk = 0, 'ALTER TABLE chats ADD CONSTRAINT fk_chats_document FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+UPDATE chats SET `type` = 'collection' WHERE `type` IS NULL OR `type` = '';
 
 CREATE TABLE IF NOT EXISTS turns (
   id BIGINT NOT NULL AUTO_INCREMENT,
