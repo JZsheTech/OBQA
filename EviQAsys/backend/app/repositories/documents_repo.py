@@ -30,6 +30,8 @@ class DocumentsRepository:
         file_sha256: str | None = None,
         file_size_bytes: int | None = None,
         num_pages: int | None = None,
+        abstract: str | None = None,
+        meta_info: dict[str, Any] | None = None,
         md_text: str | None = None,
         element_count: int | None = None,
     ) -> dict[str, Any]:
@@ -41,6 +43,8 @@ class DocumentsRepository:
             "file_sha256": file_sha256,
             "file_size_bytes": file_size_bytes,
             "num_pages": num_pages,
+            "abstract": abstract,
+            "meta_info": meta_info,
             "md_text": md_text,
             "element_count": element_count,
         }
@@ -50,8 +54,8 @@ class DocumentsRepository:
             doc_id = result.lastrowid
             fetched = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, created_at "
+                    "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": doc_id},
@@ -63,8 +67,8 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, created_at "
+                    "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": document_id},
@@ -75,8 +79,8 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, created_at "
+                    "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
                     "FROM documents WHERE collection_id = :collection_id "
                     "ORDER BY created_at DESC, id DESC",
                 ),
@@ -93,6 +97,8 @@ class DocumentsRepository:
             "file_size_bytes",
             "num_pages",
             "element_count",
+            "abstract",
+            "meta_info",
             "md_text",
         }
         payload = {key: value for key, value in fields.items() if key in allowed_fields}
@@ -114,8 +120,8 @@ class DocumentsRepository:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT id, collection_id, title, md_text, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, created_at "
+                    "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
                     "FROM documents "
                     "WHERE collection_id = :collection_id AND file_name = :file_name "
                     "AND file_sha256 = :file_sha256 "

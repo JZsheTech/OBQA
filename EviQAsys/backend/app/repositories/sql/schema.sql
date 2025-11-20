@@ -12,12 +12,14 @@ CREATE TABLE IF NOT EXISTS documents (
   collection_id BIGINT NOT NULL,
   title VARCHAR(512),
   md_text MEDIUMTEXT,
+  abstract TEXT,
   file_name VARCHAR(512),
   file_path VARCHAR(1024),
   file_sha256 VARCHAR(128),
   file_size_bytes BIGINT,
   num_pages INT,
   element_count INT DEFAULT 0,
+  meta_info JSON,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   CONSTRAINT fk_documents_collection
@@ -30,6 +32,15 @@ SET @missing_md_text := (
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'md_text'
 );
 SET @sql := IF(@missing_md_text = 0, 'ALTER TABLE documents ADD COLUMN md_text MEDIUMTEXT AFTER title', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_abstract := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'abstract'
+);
+SET @sql := IF(@missing_abstract = 0, 'ALTER TABLE documents ADD COLUMN abstract TEXT AFTER md_text', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -57,6 +68,15 @@ SET @missing_element_count := (
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'element_count'
 );
 SET @sql := IF(@missing_element_count = 0, 'ALTER TABLE documents ADD COLUMN element_count INT DEFAULT 0 AFTER num_pages', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_meta_info := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'meta_info'
+);
+SET @sql := IF(@missing_meta_info = 0, 'ALTER TABLE documents ADD COLUMN meta_info JSON AFTER element_count', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

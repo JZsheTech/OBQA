@@ -55,6 +55,8 @@ def main() -> None:
             title="Manual Repo Test (updated)",
             num_pages=2,
             element_count=5,
+            abstract="Manual abstract content for repository check.",
+            meta_info={"updated_by": "check_documents_repo", "purpose": "manual verification"},
         )
         refreshed = documents_repo.get_by_id(document["id"])
         print(f"Updated document: {refreshed}")

@@ -158,6 +158,7 @@ class DocumentIngestor:
             for idx, row in enumerate(normalized):
                 row["doc_id"] = document["id"]
                 row["order"] = idx
+            abstract_text = self._extract_abstract_text(normalized)
             self._inject_contextual_text_content(
                 normalized,
                 document_title=document_title,
@@ -167,6 +168,8 @@ class DocumentIngestor:
             self._write_elements_and_finalize(
                 normalized,
                 md_text=parse_result.md_text,
+                abstract=abstract_text,
+                meta_info=None,
                 num_pages=num_pages,
                 element_count=element_count,
                 document_id=document["id"],
@@ -174,6 +177,8 @@ class DocumentIngestor:
             document["md_text"] = parse_result.md_text
             document["num_pages"] = num_pages
             document["element_count"] = element_count
+            document["abstract"] = abstract_text
+            document["meta_info"] = None
             return document
         except Exception:
             logger.exception("Failed to ingest document %s", document.get("id"))
@@ -233,6 +238,8 @@ class DocumentIngestor:
         elements: list[dict[str, Any]],
         *,
         md_text: str | None,
+        abstract: str | None,
+        meta_info: dict[str, Any] | None,
         num_pages: int | None,
         element_count: int,
         document_id: int,
@@ -249,6 +256,8 @@ class DocumentIngestor:
                 md_text=md_text,
                 num_pages=num_pages,
                 element_count=element_count,
+                abstract=abstract,
+                meta_info=meta_info,
             )
 
     def _determine_document_title(
@@ -368,6 +377,26 @@ class DocumentIngestor:
             if summary:
                 return summary
         return row["raw_text_content"]
+
+    def _extract_abstract_text(self, elements: list[dict[str, Any]]) -> str | None:
+        if not elements:
+            return None
+        for idx, row in enumerate(elements):
+            if row.get("elem_type") != "header":
+                continue
+            header_name = self._clean_metadata_text(row.get("header_name"))
+            if header_name.lower() != "abstract":
+                continue
+            for candidate in elements[idx + 1 :]:
+                if candidate.get("elem_type") == "header":
+                    break
+                abstract_text = self._clean_body_text(
+                    candidate.get("raw_text_content") or candidate.get("text_content"),
+                )
+                if abstract_text:
+                    return abstract_text
+            return None
+        return None
 
 
 __all__ = ["DocumentIngestor", "DuplicateDocumentError"]
