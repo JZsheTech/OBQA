@@ -103,16 +103,25 @@ def _close_headers_until(
 
 
 def _infer_level(raw: dict[str, Any]) -> int:
-    text_level = raw.get("text_level")
-    if isinstance(text_level, int):
-        return text_level
-    if isinstance(text_level, str) and text_level.isdigit():
-        return int(text_level)
     text = _clean_text(raw.get("text"))
     number = HEADER_NUMBER_PATTERN.match(text)
+    number_level: int | None = None
     if number:
         token = number.group(1)
-        return token.count(".") + 1
+        number_level = token.count(".") + 1
+
+    text_level = raw.get("text_level")
+    if isinstance(text_level, str) and text_level.isdigit():
+        text_level = int(text_level)
+    elif not isinstance(text_level, int):
+        text_level = None
+
+    if number_level is not None and text_level is not None:
+        return max(number_level, text_level)
+    if number_level is not None:
+        return number_level
+    if text_level is not None:
+        return text_level
     return 1
 
 
