@@ -21,6 +21,7 @@ def create_turn(chat_id: int, payload: TurnCreateRequest) -> TurnResponseEnvelop
             question=payload.question,
             top_k=top_k,
             enable_image_vqa=bool(payload.enable_image_vqa),
+            enable_memory_summarizer=bool(payload.enable_memory_summarizer),
         )
     except ChatNotFoundError as exc:
         raise HTTPException(

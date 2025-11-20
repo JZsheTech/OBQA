@@ -67,6 +67,11 @@ def parse_args() -> argparse.Namespace:
         help="Enable the optional visual question answering path.",
     )
     parser.add_argument(
+        "--enable-memory-summarizer",
+        action="store_true",
+        help="Enable the DSPy MemorySummarizer for chat history (disabled by default).",
+    )
+    parser.add_argument(
         "--collection-name",
         type=str,
         default="manual-m4-multi-turn-qa-flow",
@@ -170,6 +175,7 @@ def main() -> None:
                 question=question,
                 top_k=args.top_k,
                 enable_image_vqa=args.enable_image_vqa,
+                enable_memory_summarizer=args.enable_memory_summarizer,
             )
             print_rendered_answer(result.answer_text)
             print_multi_turn_evidences(result.evidences)

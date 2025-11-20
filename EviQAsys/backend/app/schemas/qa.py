@@ -15,6 +15,10 @@ class TurnCreateRequest(BaseModel):
         default=False,
         description="Enable expensive visual question answering path.",
     )
+    enable_memory_summarizer: bool | None = Field(
+        default=False,
+        description="Enable DSPy MemorySummarizer; default uses raw recent history.",
+    )
 
 
 class EvidenceItem(BaseModel):

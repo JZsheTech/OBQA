@@ -34,6 +34,7 @@ class QAFlowConfig:
     max_history_turns: int = 8
     text_evidence_limit: int = 8
     image_evidence_limit: int = 4
+    enable_memory_summarizer: bool = False
 
 
 class QAOrchestrator:
@@ -85,7 +86,9 @@ class QAOrchestrator:
         collection_id = int(chat["collection_id"])
         history_turns = self._turns_repo.list_by_chat(chat_id)
         history_text = format_history_text(history_turns, max_turns=self._config.max_history_turns)
-        memory_summary = self._memory_service.summarize_history(history_text)
+        memory_summary = history_text
+        if self._config.enable_memory_summarizer and history_text:
+            memory_summary = self._memory_service.summarize_history(history_text)
 
         decision = self._retrieval_decider.decide(question_text, memory_summary)
         logger.info(
@@ -265,9 +268,11 @@ def run_qa_turn(
     question: str,
     top_k: int = 8,
     enable_image_vqa: bool = False,
+    enable_memory_summarizer: bool = False,
 ) -> QATurnResult:
     orchestrator = QAOrchestrator(
         vision_client=VisionVQAClient() if enable_image_vqa else None,
+        config=QAFlowConfig(enable_memory_summarizer=enable_memory_summarizer),
     )
     return orchestrator.run(
         chat_id=chat_id,

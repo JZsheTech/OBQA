@@ -124,7 +124,7 @@ M4 建议拆分为 5 个互相依赖的工作包，按顺序推进：
 
 - 请求体（示例）：
   - `question: str`
-  - 可选字段：`collection_id`（若未从 chat 关联中推导）、`top_k`、`enable_image_vqa` 等；
+- 可选字段：`collection_id`（若未从 chat 关联中推导）、`top_k`、`enable_image_vqa`、`enable_memory_summarizer` 等；
 - 响应体遵循统一 envelope：
 
   ```jsonc
@@ -158,7 +158,7 @@ M4 建议拆分为 5 个互相依赖的工作包，按顺序推进：
 
 - `TurnCreateRequest`：
   - `question: str`
-  - 可选：`top_k: int | None`、`enable_image_vqa: bool | None`；
+  - 可选：`top_k: int | None`、`enable_image_vqa: bool | None`、`enable_memory_summarizer: bool | None`；
 - `EvidenceItem`：
   - `element_id: int`
   - `evidence_no: int`
@@ -186,7 +186,15 @@ M4 建议拆分为 5 个互相依赖的工作包，按顺序推进：
 - `qa_orchestrator.py`（命名可根据现有约定微调）：
 
   ```python
-  def run_qa_turn(collection_id: int, chat_id: int, question: str, *, top_k: int = 10, enable_image_vqa: bool = False) -> dict:
+  def run_qa_turn(
+      collection_id: int,
+      chat_id: int,
+      question: str,
+      *,
+      top_k: int = 10,
+      enable_image_vqa: bool = False,
+      enable_memory_summarizer: bool = False,
+  ) -> dict:
       """顶层控制函数，后续各阶段逐步填充内部逻辑。"""
   ```
 
@@ -266,11 +274,14 @@ M4 建议拆分为 5 个互相依赖的工作包，按顺序推进：
 2. 调用 `summarize_history(history_text)` 获得 `memory_summary`；
 3. 将 `memory_summary` 作为后续检索判别与回答生成的输入之一。
 
+> 实际部署中应提供开关：默认直接拼接最近 N 轮问答作为 `memory_summary`，仅在调用方显式开启 `enable_memory_summarizer` 时才触发额外的 DSPy 调用，以减少每轮对话的 LLM 次数。
+
 验收点：
 
 - 对于有历史对话的 Chat，`history_text` 打印可见；
 - `memory_summary` 内容合理且长度受控；
 - 失败时（例如没有历史对话），能够退化到使用空字符串或简单占位摘要。
+- 在默认关闭记忆摘要的情况下，QA 流程直接基于最近 N 轮历史拼接即可，确保新增开关生效。
 
 ---
 
@@ -619,6 +630,7 @@ def generate_image_question(question: str, memory_summary: str, local_context: s
     - `answer_text`
     - 解析出的 `[Elem#id]` 列表
     - `evidences` 详细信息；
+  - 通过 `--enable-image-vqa` 与 `--enable-memory-summarizer` 可分别验证图像路径与记忆摘要对延迟的影响；
   - 不写入生产数据，仅在测试 Collection/Chat 上运行。
 
 ---
@@ -627,8 +639,8 @@ def generate_image_question(question: str, memory_summary: str, local_context: s
 
 1. **M4-A：路由 + Orchestrator 壳体 + schemas**
    - 目标：`POST /api/chats/{chat_id}/turns` 能返回占位数据；
-2. **M4-B：历史加载 + MemorySummarizer**
-   - 目标：请求日志中可看到 `history_text` 与 `memory_summary`；
+2. **M4-B：历史加载 + MemorySummarizer（可选开关）**
+   - 目标：请求日志中可看到 `history_text`，并在显式开启记忆摘要开关时得到 `memory_summary`；
 3. **M4-C：RetrievalDecider + QueryRewriter + Retriver 集成**
    - 目标：针对典型问题，能看到合理的检索候选与 `text_evidences`；
 4. **M4-D：AnswerComposer + evidence_mapper + turn/turn2element 持久化 + evidences 返回**
@@ -639,4 +651,3 @@ def generate_image_question(question: str, memory_summary: str, local_context: s
    - 目标：完成 1 套完整 Demo 脚本，从上传 PDF→向量化→提问→Evidence 高亮，准备后续 M5 前端联调的基础数据与接口。
 
 以上即为 M4 阶段的详细执行计划，后续实现过程中如遇实际代码结构偏差，可在不改变核心职责边界与对外行为的前提下对模块命名与划分做小幅调整，并同步更新本计划与相关设计文档。 
-
