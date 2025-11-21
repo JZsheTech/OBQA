@@ -1,68 +1,116 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Sans:wght@400;600;700&display=swap");
+
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
+  --font-sans: "Space Grotesk", "IBM Plex Sans", "Segoe UI", "PingFang SC", system-ui, -apple-system, sans-serif;
+  --color-bg-canvas: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f0f2f7;
+  --color-border: #d9deea;
+  --color-ink-strong: #0f172a;
+  --color-ink: #2f3644;
+  --color-ink-subtle: #717c8f;
+  --color-ink-soft: #9aa3b5;
+  --color-brand: #1f5bff;
+  --color-brand-strong: #164fe0;
+  --color-brand-weak: #e4e9ff;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-danger: #dc2626;
+  --color-highlight: #fef9c3;
+  --color-evidence: #fff3a3;
+  --shadow-soft: 0 10px 30px rgba(21, 35, 65, 0.08);
+  --shadow-card: 0 14px 40px rgba(31, 91, 255, 0.06);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
   min-height: 100vh;
+  font-family: var(--font-sans);
+  background: radial-gradient(circle at 20% 20%, rgba(31, 91, 255, 0.05), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(31, 91, 255, 0.06), transparent 22%),
+    var(--color-bg-canvas);
+  color: var(--color-ink);
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+h1,
+h2,
+h3,
+h4 {
+  color: var(--color-ink-strong);
+  margin: 0 0 var(--space-2);
+  letter-spacing: -0.01em;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+p {
+  margin: 0 0 var(--space-3);
+  color: var(--color-ink-subtle);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+a {
+  color: var(--color-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+a:hover {
+  color: var(--color-brand-strong);
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-canvas);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-soft);
+}
+
+.visually-hidden {
+  position: absolute;
+  height: 1px;
+  width: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
