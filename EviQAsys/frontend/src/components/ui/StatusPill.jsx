@@ -7,6 +7,6 @@ const statusMap = {
 export default function StatusPill({ status }) {
     const normalized = String(status || "").toLowerCase()
     const tone = statusMap[normalized]?.tone ?? "muted"
-    const label = statusMap[normalized]?.label ?? normalized || "unknown"
+    const label = statusMap[normalized]?.label ?? (normalized || "unknown")
     return <span className={`pill ${tone}`}>{label}</span>
 }
