@@ -88,6 +88,34 @@ class DocumentsRepository:
             )
             return rows_to_dicts(result)
 
+    def search_in_collection(self, collection_id: int, *, field: str, keyword: str) -> list[dict[str, Any]]:
+        """Search documents within a collection by title/abstract/md_text using case-insensitive LIKE."""
+        normalized_field = (field or "").strip().lower()
+        field_mapping = {
+            "title": "LOWER(COALESCE(title,''))",
+            "abstract": "LOWER(COALESCE(abstract,''))",
+            "md_text": "LOWER(COALESCE(md_text,''))",
+        }
+        if normalized_field not in field_mapping:
+            raise ValueError("Unsupported search field for documents.")
+        trimmed_keyword = (keyword or "").strip()
+        if not trimmed_keyword:
+            return self.list_by_collection(collection_id)
+        like_pattern = f"%{trimmed_keyword.lower()}%"
+        predicate = field_mapping[normalized_field]
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
+                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "FROM documents WHERE collection_id = :collection_id "
+                    f"AND {predicate} LIKE :pattern "
+                    "ORDER BY created_at DESC, id DESC",
+                ),
+                {"collection_id": collection_id, "pattern": like_pattern},
+            )
+            return rows_to_dicts(result)
+
     def update_document(self, document_id: int, **fields: Any) -> RepositoryResult:
         allowed_fields = {
             "title",

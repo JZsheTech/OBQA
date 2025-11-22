@@ -36,7 +36,7 @@ export default function AppLayout() {
                     </span>
                 </Link>
                 <div className="top-actions">
-                    <span className="pill muted">M5b collections</span>
+                    <span className="pill muted">M5c collections-detail</span>
                     <span className="pill muted">API: {formatBaseLabel(apiBase)}</span>
                     <div className="avatar" aria-hidden="true"></div>
                 </div>

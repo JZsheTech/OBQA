@@ -66,13 +66,6 @@ export async function healthCheck() {
     return payload ?? { ok: true }
 }
 
-export async function listDocuments(collectionId) {
-    if (!collectionId) {
-        throw new Error("Collection id is required")
-    }
-    return request(`/collections/${collectionId}/documents`)
-}
-
 export async function listCollections({ searchField, keyword } = {}) {
     const params = new URLSearchParams()
     if (searchField) {
@@ -114,4 +107,65 @@ export async function uploadDocument(collectionId, file) {
         method: "POST",
         body: formData,
     })
+}
+
+export async function getCollectionDetail(collectionId) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    return request(`/collections/${collectionId}`)
+}
+
+export async function listDocuments(collectionId, { searchField, keyword } = {}) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    const params = new URLSearchParams()
+    if (searchField) {
+        params.set("search_field", searchField)
+    }
+    if (keyword) {
+        params.set("keyword", keyword)
+    }
+    const query = params.toString()
+    const path = query ? `/collections/${collectionId}/documents?${query}` : `/collections/${collectionId}/documents`
+    return request(path)
+}
+
+export async function listCollectionChats(collectionId) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    return request(`/collections/${collectionId}/chats`)
+}
+
+export async function runRetrieval({
+    collectionId,
+    query,
+    topK = 5,
+    docId,
+    elemTypes,
+    searchMode = "vector",
+}) {
+    const keyword = (query ?? "").trim()
+    if (!collectionId) {
+        throw new Error("collectionId is required for retrieval")
+    }
+    if (!keyword) {
+        throw new Error("query is required for retrieval")
+    }
+    const params = new URLSearchParams()
+    params.set("collection_id", collectionId)
+    params.set("query", keyword)
+    params.set("top_k", topK)
+    if (docId) {
+        params.set("doc_id", docId)
+    }
+    if (elemTypes && elemTypes.length) {
+        params.set("elem_types", elemTypes.join(","))
+    }
+    if (searchMode) {
+        params.set("search_mode", searchMode)
+    }
+    return request(`/retrieval/test?${params.toString()}`)
 }

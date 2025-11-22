@@ -34,9 +34,12 @@ class DocumentRead(DocumentBase):
 class DocumentListItem(BaseModel):
     id: int
     collection_id: int
+    title: str | None = None
+    abstract: str | None = None
     file_name: str | None = None
     file_size_bytes: int | None = None
     element_count: int | None = None
+    num_pages: int | None = None
     created_at: datetime
     parse_status: str
 
