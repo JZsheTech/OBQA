@@ -5,6 +5,7 @@ import {
     listCollectionChats,
     listDocuments,
     runRetrieval,
+    createCollectionChat,
     uploadDocument,
 } from "../api/client"
 import PageHeader from "../components/layout/PageHeader"
@@ -62,6 +63,7 @@ export default function CollectionDetail() {
 
     const [chats, setChats] = useState([])
     const [loadingChats, setLoadingChats] = useState(false)
+    const [creatingChat, setCreatingChat] = useState(false)
 
     const [ragQuery, setRagQuery] = useState("")
     const [ragMode, setRagMode] = useState("vector")
@@ -118,6 +120,26 @@ export default function CollectionDetail() {
             addToast({ type: "error", title: "加载聊天历史失败", message: error.message })
         } finally {
             setLoadingChats(false)
+        }
+    }
+
+    async function handleCreateChat() {
+        if (!collectionId) return
+        setCreatingChat(true)
+        try {
+            const result = await createCollectionChat(collectionId, { title: "" })
+            const newId = result?.id ?? result?.data?.id
+            await loadChats()
+            if (newId) {
+                navigate(`/collections/${collectionId}/chat/${newId}`)
+                addToast({ type: "success", title: "已创建聊天", message: `Chat #${newId}` })
+            } else {
+                addToast({ type: "info", title: "聊天已创建", message: "请从列表选择" })
+            }
+        } catch (error) {
+            addToast({ type: "error", title: "创建聊天失败", message: error.message })
+        } finally {
+            setCreatingChat(false)
         }
     }
 
@@ -444,9 +466,14 @@ export default function CollectionDetail() {
                                 <h3 className="card__title">Collection 聊天历史</h3>
                                 <p className="caption">来自 /api/collections/{collectionId}/chats，点击跳转聊天页。</p>
                             </div>
-                            <Button variant="ghost" onClick={loadChats} disabled={loadingChats}>
-                                {loadingChats ? "刷新中..." : "刷新"}
-                            </Button>
+                            <div className="segmented-control">
+                                <Button variant="ghost" onClick={loadChats} disabled={loadingChats || creatingChat}>
+                                    {loadingChats ? "刷新中..." : "刷新"}
+                                </Button>
+                                <Button onClick={handleCreateChat} disabled={creatingChat || loadingChats}>
+                                    {creatingChat ? "创建中..." : "新建聊天"}
+                                </Button>
+                            </div>
                         </div>
                         {loadingChats ? (
                             <div className="inline-kv">

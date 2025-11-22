@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -38,6 +40,7 @@ class TurnResponse(BaseModel):
     chat_id: int
     answer_text: str
     evidences: list[EvidenceItem]
+    answer_with_evidence: str | None = None
 
 
 class TurnResponseEnvelope(BaseModel):
@@ -45,4 +48,54 @@ class TurnResponseEnvelope(BaseModel):
     data: TurnResponse
 
 
-__all__ = ["TurnCreateRequest", "EvidenceItem", "TurnResponse", "TurnResponseEnvelope"]
+class TurnWithEvidence(BaseModel):
+    id: int
+    chat_id: int
+    order: int
+    user_question: str | None = None
+    answer_text: str | None = None
+    answer_with_evidence: str | None = None
+    created_at: datetime
+    evidences: list[EvidenceItem]
+
+
+class ChatDetail(BaseModel):
+    id: int
+    collection_id: int | None = None
+    document_id: int | None = None
+    type: str
+    title: str | None = None
+    max_turn_order: int = 0
+    created_at: datetime
+    turns: list[TurnWithEvidence]
+    evidence_no_mapping: dict[int, int]
+
+
+class ChatDetailEnvelope(BaseModel):
+    code: str = "OK"
+    data: ChatDetail
+
+
+class TurnEvidencesResponse(BaseModel):
+    chat_id: int
+    turn_id: int
+    evidence_no_mapping: dict[int, int]
+    evidences: list[EvidenceItem]
+
+
+class TurnEvidencesEnvelope(BaseModel):
+    code: str = "OK"
+    data: TurnEvidencesResponse
+
+
+__all__ = [
+    "TurnCreateRequest",
+    "EvidenceItem",
+    "TurnResponse",
+    "TurnResponseEnvelope",
+    "TurnWithEvidence",
+    "ChatDetail",
+    "ChatDetailEnvelope",
+    "TurnEvidencesResponse",
+    "TurnEvidencesEnvelope",
+]

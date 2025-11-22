@@ -139,6 +139,49 @@ export async function listCollectionChats(collectionId) {
     return request(`/collections/${collectionId}/chats`)
 }
 
+export async function createCollectionChat(collectionId, { title } = {}) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    return request(`/collections/${collectionId}/chats`, {
+        method: "POST",
+        body: { title: title?.trim() || null },
+    })
+}
+
+export async function getChatDetail(chatId) {
+    if (!chatId) {
+        throw new Error("Chat id is required")
+    }
+    return request(`/chats/${chatId}`)
+}
+
+export async function createTurn(chatId, { question, topK, enableImageVqa = false, enableMemorySummarizer = false } = {}) {
+    const trimmedQuestion = (question ?? "").trim()
+    if (!chatId) {
+        throw new Error("Chat id is required")
+    }
+    if (!trimmedQuestion) {
+        throw new Error("Question is required")
+    }
+    return request(`/chats/${chatId}/turns`, {
+        method: "POST",
+        body: {
+            question: trimmedQuestion,
+            top_k: topK,
+            enable_image_vqa: enableImageVqa,
+            enable_memory_summarizer: enableMemorySummarizer,
+        },
+    })
+}
+
+export async function getTurnEvidences(turnId) {
+    if (!turnId) {
+        throw new Error("Turn id is required")
+    }
+    return request(`/turns/${turnId}/evidences`)
+}
+
 export async function getDocumentDetail(documentId) {
     if (!documentId) {
         throw new Error("Document id is required")

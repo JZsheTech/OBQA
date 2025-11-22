@@ -24,6 +24,7 @@ function formatBaseLabel(base) {
 export default function AppLayout() {
     const apiBase = (import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:9075/api").replace(/\/+$/, "")
     const location = useLocation()
+    const isChatPage = location.pathname.includes("/chat/")
 
     return (
         <div className="app-shell">
@@ -36,7 +37,7 @@ export default function AppLayout() {
                     </span>
                 </Link>
                 <div className="top-actions">
-                    <span className="pill muted">M5d document-detail</span>
+                    <span className="pill muted">M5e collection-chat</span>
                     <span className="pill muted">API: {formatBaseLabel(apiBase)}</span>
                     <div className="avatar" aria-hidden="true"></div>
                 </div>
@@ -56,7 +57,7 @@ export default function AppLayout() {
             </nav>
 
             <main className="app-shell__body">
-                <div className="content-container">
+                <div className={`content-container${isChatPage ? " content-container--fluid" : ""}`}>
                     <Outlet context={{ currentPath: location.pathname }} />
                 </div>
             </main>

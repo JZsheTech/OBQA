@@ -82,7 +82,7 @@ class EmbeddingSettings:
 
 @dataclass(frozen=True)
 class LLMSettings:
-    model: str = _get_env("LLM_MODEL_NAME", "llama3:70b")
+    model: str = _get_env("LLM_MODEL_NAME", "qwen3:235b")
     api_base: str = _get_env("LLM_API_BASE", OLLAMA_OPENAI_BASE_URL)
     api_key: str = _get_env("LLM_API_KEY", "EMPTY")
     api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
