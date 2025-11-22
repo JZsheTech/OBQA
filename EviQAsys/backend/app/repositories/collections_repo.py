@@ -57,6 +57,26 @@ class CollectionsRepository:
             )
             return rows_to_dicts(result)
 
+    def search_collections(self, *, field: str, keyword: str) -> list[dict[str, Any]]:
+        """Search collections by the given field using a case-insensitive LIKE."""
+        normalized_field = field.lower()
+        if normalized_field not in {"name", "description"}:
+            raise ValueError("Unsupported search field.")
+        trimmed_keyword = (keyword or "").strip()
+        if not trimmed_keyword:
+            return self.list_collections()
+        like_pattern = f"%{trimmed_keyword.lower()}%"
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT id, name, description, created_at "
+                    f"FROM collections WHERE LOWER({normalized_field}) LIKE :pattern "
+                    "ORDER BY created_at DESC, id DESC",
+                ),
+                {"pattern": like_pattern},
+            )
+            return rows_to_dicts(result)
+
     def update_collection(self, collection_id: int, *, name: str | None = None, description: str | None = None) -> RepositoryResult:
         payload: dict[str, Any] = {}
         if name is not None:

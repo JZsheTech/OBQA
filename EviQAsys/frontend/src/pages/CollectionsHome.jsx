@@ -1,36 +1,55 @@
 import { useEffect, useMemo, useState } from "react"
-import { healthCheck, listDocuments, uploadDocument } from "../api/client"
-import UploadForm from "../components/UploadForm"
-import DocumentList from "../components/DocumentList"
+import { useNavigate } from "react-router-dom"
+import { createCollection, healthCheck, listCollections } from "../api/client"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
-import Drawer from "../components/ui/Drawer"
 import Modal from "../components/ui/Modal"
 import SearchBar from "../components/ui/SearchBar"
 import { useToast } from "../components/ui/Toast"
 
-const skeletonRoutes = [
-    { label: "Collection 管理页", path: "/collections/:collectionId" },
-    { label: "Document 管理页", path: "/collections/:collectionId/documents/:documentId" },
-    { label: "Collection Chat", path: "/collections/:collectionId/chat/:chatId" },
-    { label: "Document Chat", path: "/documents/:documentId/chat/:chatId" },
-    { label: "Chat 历史", path: "/chat-history" },
+const searchOptions = [
+    { label: "按 name 搜索", value: "name" },
+    { label: "按 description 搜索", value: "description" },
 ]
 
+function formatDateTime(value) {
+    if (!value) return "--"
+    try {
+        return new Date(value).toLocaleString()
+    } catch (error) {
+        console.warn("Failed to format date", error)
+        return value
+    }
+}
+
+function formatBaseLabel(base) {
+    if (!base) return "API 未配置"
+    try {
+        const url = new URL(base)
+        return url.host ?? base
+    } catch (error) {
+        return base
+    }
+}
+
 export default function CollectionsHome() {
-    const [healthStatus, setHealthStatus] = useState({ state: "idle", message: "" })
-    const [collectionId, setCollectionId] = useState("")
-    const [documents, setDocuments] = useState([])
-    const [isLoadingDocs, setIsLoadingDocs] = useState(false)
-    const [isUploading, setIsUploading] = useState(false)
-    const [searchText, setSearchText] = useState("")
-    const [searchFilter, setSearchFilter] = useState("name")
-    const [showModal, setShowModal] = useState(false)
-    const [showDrawer, setShowDrawer] = useState(false)
-    const [newCollectionForm, setNewCollectionForm] = useState({ name: "", description: "" })
+    const navigate = useNavigate()
     const { addToast } = useToast()
 
-    const quickStatusTone = useMemo(() => {
+    const [collections, setCollections] = useState([])
+    const [loadingCollections, setLoadingCollections] = useState(false)
+    const [searchText, setSearchText] = useState("")
+    const [searchField, setSearchField] = useState("name")
+    const [activeQuery, setActiveQuery] = useState(null)
+
+    const [showModal, setShowModal] = useState(false)
+    const [createForm, setCreateForm] = useState({ name: "", description: "" })
+    const [creating, setCreating] = useState(false)
+
+    const [healthStatus, setHealthStatus] = useState({ state: "idle", message: "等待检查" })
+    const apiBase = (import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:9075/api").replace(/\/+$/, "")
+
+    const healthTone = useMemo(() => {
         if (healthStatus.state === "ok") return "success"
         if (healthStatus.state === "error") return "danger"
         if (healthStatus.state === "checking") return "warn"
@@ -38,8 +57,27 @@ export default function CollectionsHome() {
     }, [healthStatus.state])
 
     useEffect(() => {
+        loadCollections()
         runHealthCheck()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    async function loadCollections(params = {}) {
+        setLoadingCollections(true)
+        try {
+            const data = await listCollections(params)
+            setCollections(Array.isArray(data) ? data : [])
+            if (params.keyword) {
+                setActiveQuery({ field: params.searchField || "name", keyword: params.keyword })
+            } else {
+                setActiveQuery(null)
+            }
+        } catch (error) {
+            addToast({ type: "error", title: "加载 Collection 失败", message: error.message })
+        } finally {
+            setLoadingCollections(false)
+        }
+    }
 
     async function runHealthCheck() {
         setHealthStatus({ state: "checking", message: "检查中..." })
@@ -57,77 +95,55 @@ export default function CollectionsHome() {
         }
     }
 
-    async function refreshDocuments() {
-        if (!collectionId) {
-            addToast({ type: "error", title: "缺少 Collection ID", message: "请输入 Collection ID 后重试" })
+    async function handleSearch() {
+        const keyword = searchText.trim()
+        if (!keyword) {
+            addToast({ type: "info", title: "请输入关键字", message: "搜索前请输入 name/description 关键字" })
+            setActiveQuery(null)
+            await loadCollections()
             return
         }
-        setIsLoadingDocs(true)
-        try {
-            const data = await listDocuments(collectionId)
-            setDocuments(data ?? [])
-            if (!data || data.length === 0) {
-                addToast({ type: "info", title: "暂无文档", message: "列表为空，尝试上传一个 PDF" })
-            }
-        } catch (error) {
-            addToast({ type: "error", title: "加载文档失败", message: error.message })
-        } finally {
-            setIsLoadingDocs(false)
-        }
+        await loadCollections({ searchField, keyword })
     }
 
-    async function handleUpload(file) {
-        if (!collectionId) {
-            addToast({ type: "error", title: "缺少 Collection ID", message: "上传前请先输入 Collection ID" })
-            return
-        }
-        setIsUploading(true)
+    async function handleReset() {
+        setSearchText("")
+        setActiveQuery(null)
+        await loadCollections()
+    }
+
+    async function handleCreateCollection() {
+        setCreating(true)
         try {
-            const result = await uploadDocument(collectionId, file)
+            const result = await createCollection(createForm)
             addToast({
                 type: "success",
-                title: "上传完成",
-                message: `已上传 ${result?.file_name ?? file.name}`,
+                title: "创建成功",
+                message: `已创建 Collection ${result?.name ?? createForm.name}`,
             })
-            await refreshDocuments()
+            setShowModal(false)
+            setCreateForm({ name: "", description: "" })
+            const query = activeQuery ? { searchField: activeQuery.field, keyword: activeQuery.keyword } : {}
+            await loadCollections(query)
         } catch (error) {
-            addToast({ type: "error", title: "上传失败", message: error.message })
+            addToast({ type: "error", title: "创建失败", message: error.message })
         } finally {
-            setIsUploading(false)
+            setCreating(false)
         }
     }
 
-    function handlePlanSearch() {
-        addToast({
-            type: "info",
-            title: "规划中的功能",
-            message: `将在 M5b 对接 ${searchFilter} 搜索，当前输入：${searchText || "空"}`,
-        })
-    }
-
-    function handleCreateCollection() {
-        setShowModal(false)
-        addToast({
-            type: "info",
-            title: "占位提交",
-            message: "创建 Collection 的后端接口将在 M5b 对接",
-        })
-        setNewCollectionForm({ name: "", description: "" })
-    }
+    const isEmpty = !loadingCollections && (collections?.length ?? 0) === 0
 
     return (
         <>
             <PageHeader
                 breadcrumbs={[{ label: "Home" }]}
                 title="知识库主页"
-                subtitle="统一 AppShell、主题与请求封装的落地版本，后续页面将在此基础上扩展。"
+                subtitle="按 name/description 搜索或创建 Collection，真实数据来源于后端 /api/collections。"
                 actions={
-                    <div className="page-actions">
-                        <Button variant="tonal" onClick={() => setShowDrawer(true)}>
-                            查看页面骨架
-                        </Button>
-                        <Button onClick={() => setShowModal(true)}>新建 Collection</Button>
-                    </div>
+                    <Button onClick={() => setShowModal(true)}>
+                        + 新建 Collection
+                    </Button>
                 }
             />
 
@@ -136,93 +152,87 @@ export default function CollectionsHome() {
                     <div className="card splash">
                         <div className="card__header">
                             <div>
-                                <h3 className="card__title">设计系统与主题</h3>
-                                <p className="caption">
-                                    色板、字体、间距、按钮、搜索条、卡片、面包屑均已根据 Figma 导出样式重新命名与微调。
-                                </p>
+                                <h3 className="card__title">查找 Collection</h3>
+                                <p className="caption">支持按 name/description 模糊搜索，结果与后端保持一致。</p>
                             </div>
-                            <span className="tag">8px grid</span>
+                            <span className="tag">M5b DoD</span>
                         </div>
-                        <p className="page-subtitle">
-                            AppShell 顶栏 + 标签栏 + 面包屑覆盖全部路由；全局 fetch 封装处理 envelope
-                            <code style={{ marginLeft: 6, background: "var(--color-brand-weak)", padding: "2px 6px", borderRadius: "8px" }}>
-                                {"{code:\"OK\"}"}
-                            </code>{" "}
-                            ，异常统一 toast。
-                        </p>
                         <SearchBar
                             value={searchText}
                             onChange={setSearchText}
-                            filterValue={searchFilter}
-                            onFilterChange={setSearchFilter}
-                            onSubmit={handlePlanSearch}
-                            onReset={() => setSearchText("")}
-                            placeholder="按 name / description 搜索 Collection（M5b 对接 API）"
-                            filterOptions={[
-                                { label: "按 name 搜索", value: "name" },
-                                { label: "按 description 搜索", value: "description" },
-                            ]}
-                            loading={false}
+                            filterValue={searchField}
+                            onFilterChange={setSearchField}
+                            filterOptions={searchOptions}
+                            onSubmit={handleSearch}
+                            onReset={handleReset}
+                            placeholder="按 name / description 搜索 Collection"
+                            loading={loadingCollections}
                         />
-                        <div className="divider"></div>
-                        <div className="list">
-                            <div className="list-item">
-                                <div>
-                                    <strong>全局样式 token</strong>
-                                    <p className="caption">色板 / 字体 / 间距 / 圆角 / 阴影 / 滚动条</p>
-                                </div>
-                                <span className="pill success">已落地</span>
+                        {activeQuery && (
+                            <div className="search-meta">
+                                <span className="tag">Searched result</span>
+                                <span className="caption">
+                                    按 {activeQuery.field} 搜索 “{activeQuery.keyword}”，共 {collections.length} 条
+                                </span>
                             </div>
-                            <div className="list-item">
-                                <div>
-                                    <strong>基础组件</strong>
-                                    <p className="caption">按钮、搜索条、Modal、Drawer、Toast、卡片</p>
-                                </div>
-                                <span className="pill success">可复用</span>
-                            </div>
-                            <div className="list-item">
-                                <div>
-                                    <strong>路由骨架</strong>
-                                    <p className="caption">6 个页面路径已预留，Chat 历史同标签栏联动</p>
-                                </div>
-                                <span className="pill success">已搭建</span>
-                            </div>
-                        </div>
+                        )}
                     </div>
 
-                    <div className="card">
-                        <div className="card__header">
-                            <div>
-                                <h3 className="card__title">页面骨架</h3>
-                                <p className="caption">按照《前端页面组织逻辑设计》预置的路由与面包屑提示</p>
+                    {loadingCollections && (
+                        <div className="card">
+                            <div className="inline-kv">
+                                <span className="status-dot" style={{ background: "var(--color-brand)" }}></span>
+                                <strong>加载中...</strong>
+                                <span className="caption">正在读取最新的 collections 列表</span>
                             </div>
-                            <Button variant="ghost" onClick={() => setShowDrawer(true)}>
-                                查看
-                            </Button>
                         </div>
-                        <ul className="list">
-                            {skeletonRoutes.map((route) => (
-                                <li key={route.path} className="list-item">
-                                    <div>
-                                        <div className="inline-kv">
-                                            <span className="status-dot" style={{ background: "var(--color-brand)" }}></span>
-                                            <strong>{route.label}</strong>
+                    )}
+
+                    {isEmpty && (
+                        <div className="card">
+                            <div className="empty-state">
+                                <p>暂无 Collection，可点击右上角“新建 Collection”完成首次创建。</p>
+                                <Button onClick={() => setShowModal(true)}>去创建</Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!loadingCollections && collections.length > 0 && (
+                        <div className="collection-grid">
+                            {collections.map((item) => (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    className="collection-card"
+                                    onClick={() => navigate(`/collections/${item.id}`)}
+                                >
+                                    <div className="collection-card__meta">
+                                        <div className="collection-card__name" title={item.name}>
+                                            {item.name}
                                         </div>
-                                        <p className="caption">{route.path}</p>
+                                        <div className="caption" title={item.created_at}>
+                                            {formatDateTime(item.created_at)}
+                                        </div>
                                     </div>
-                                    <span className="pill muted">骨架就绪</span>
-                                </li>
+                                    <p className="collection-card__desc" title={item.description || "暂无描述"}>
+                                        {item.description || "暂无描述"}
+                                    </p>
+                                    <div className="collection-card__footer">
+                                        <span className="status-dot" style={{ background: "var(--color-brand)" }}></span>
+                                        <span className="caption">点击进入 Collection 管理页</span>
+                                    </div>
+                                </button>
                             ))}
-                        </ul>
-                    </div>
+                        </div>
+                    )}
                 </div>
 
                 <div className="stack">
                     <div className="card">
                         <div className="card__header">
                             <div>
-                                <h3 className="card__title">健康检查</h3>
-                                <p className="caption">调用 /healthz 验证后端可用性</p>
+                                <h3 className="card__title">系统状态</h3>
+                                <p className="caption">健康检查旁路 /healthz，显示当前 API 基址。</p>
                             </div>
                             <Button variant="ghost" onClick={runHealthCheck}>
                                 重新检查
@@ -233,11 +243,11 @@ export default function CollectionsHome() {
                                 className="status-dot"
                                 style={{
                                     background:
-                                        quickStatusTone === "success"
+                                        healthTone === "success"
                                             ? "var(--color-success)"
-                                            : quickStatusTone === "danger"
+                                            : healthTone === "danger"
                                             ? "var(--color-danger)"
-                                            : quickStatusTone === "warn"
+                                            : healthTone === "warn"
                                             ? "var(--color-warning)"
                                             : "var(--color-ink-soft)",
                                 }}
@@ -245,57 +255,64 @@ export default function CollectionsHome() {
                             <strong>{healthStatus.state === "ok" ? "Backend OK" : "Backend"}</strong>
                             <span className="caption">{healthStatus.message || "等待检查"}</span>
                         </div>
-                        <p className="caption">错误与 envelope 解析错误会在全局 toast 中弹出。</p>
+                        <div className="stack">
+                            <div className="inline-kv">
+                                <strong>API Base</strong>
+                                <span className="caption">{formatBaseLabel(apiBase)}</span>
+                            </div>
+                            <div className="inline-kv">
+                                <strong>搜索提示</strong>
+                                <span className="caption">支持 name / description 模糊匹配，Reset 恢复全量列表。</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div className="card">
                         <div className="card__header">
                             <div>
-                                <h3 className="card__title">快速文档台</h3>
-                                <p className="caption">使用 collectionId 查询/上传文档，验证 MinerU 入库链路</p>
-                            </div>
-                            <span className="pill muted">同步调用</span>
-                        </div>
-                        <div className="stack">
-                            <label className="caption" htmlFor="collectionIdInput">
-                                Collection ID
-                            </label>
-                            <input
-                                id="collectionIdInput"
-                                className="input"
-                                type="number"
-                                value={collectionId}
-                                onChange={(event) => setCollectionId(event.target.value)}
-                                placeholder="输入 Collection ID"
-                            />
-                            <div className="search-bar__actions">
-                                <Button variant="tonal" onClick={refreshDocuments} disabled={!collectionId || isLoadingDocs}>
-                                    {isLoadingDocs ? "加载中..." : "加载文档"}
-                                </Button>
-                                <Button type="button" variant="ghost" onClick={() => setShowDrawer(true)}>
-                                    查看路由
-                                </Button>
+                                <h3 className="card__title">设计稿对齐</h3>
+                                <p className="caption">依照 dependency/frontUI_design 的信息架构与色板落地。</p>
                             </div>
                         </div>
+                        <ul className="list">
+                            <li className="list-item">
+                                <div>
+                                    <strong>列表真实读取</strong>
+                                    <p className="caption">从 /api/collections 获取最新数据，含 created_at/description 截断展示。</p>
+                                </div>
+                                <span className="pill success">已完成</span>
+                            </li>
+                            <li className="list-item">
+                                <div>
+                                    <strong>搜索 + Reset</strong>
+                                    <p className="caption">显示 “Searched result” 标签，Reset 清除过滤并重新请求。</p>
+                                </div>
+                                <span className="pill success">可用</span>
+                            </li>
+                            <li className="list-item">
+                                <div>
+                                    <strong>新建 Collection</strong>
+                                    <p className="caption">Modal 校验必填，提交后 toast 提示并刷新列表。</p>
+                                </div>
+                                <span className="pill success">联通</span>
+                            </li>
+                        </ul>
                     </div>
-
-                    <UploadForm onUpload={handleUpload} isUploading={isUploading} />
-                    <DocumentList documents={documents} isLoading={isLoadingDocs} onRefresh={refreshDocuments} />
                 </div>
             </div>
 
             <Modal
                 open={showModal}
                 title="新建 Collection"
-                description="对接 API 将在 M5b 实装，当前仅展示组件与表单样式。"
-                onClose={() => setShowModal(false)}
+                description="填写名称与描述后提交，后端将返回新的 collection 记录。"
+                onClose={() => !creating && setShowModal(false)}
                 footer={
                     <>
-                        <Button type="button" variant="ghost" onClick={() => setShowModal(false)}>
+                        <Button type="button" variant="ghost" onClick={() => setShowModal(false)} disabled={creating}>
                             取消
                         </Button>
-                        <Button type="button" onClick={handleCreateCollection} disabled={!newCollectionForm.name}>
-                            占位提交
+                        <Button type="button" onClick={handleCreateCollection} disabled={creating || !createForm.name.trim()}>
+                            {creating ? "创建中..." : "创建"}
                         </Button>
                     </>
                 }
@@ -307,9 +324,10 @@ export default function CollectionsHome() {
                     <input
                         id="newCollectionName"
                         className="input"
-                        value={newCollectionForm.name}
-                        onChange={(event) => setNewCollectionForm((prev) => ({ ...prev, name: event.target.value }))}
+                        value={createForm.name}
+                        onChange={(event) => setCreateForm((prev) => ({ ...prev, name: event.target.value }))}
                         placeholder="必填"
+                        required
                     />
                     <label className="caption" htmlFor="newCollectionDesc">
                         Description
@@ -318,29 +336,14 @@ export default function CollectionsHome() {
                         id="newCollectionDesc"
                         className="input"
                         rows={3}
-                        value={newCollectionForm.description}
+                        value={createForm.description}
                         onChange={(event) =>
-                            setNewCollectionForm((prev) => ({ ...prev, description: event.target.value }))
+                            setCreateForm((prev) => ({ ...prev, description: event.target.value }))
                         }
                         placeholder="用于展示与搜索的摘要"
                     ></textarea>
                 </div>
             </Modal>
-
-            <Drawer open={showDrawer} onClose={() => setShowDrawer(false)} title="页面路由与面包屑">
-                <p className="caption">AppShell 顶部标签栏在下列路由间保持高亮与面包屑一致性。</p>
-                <div className="list">
-                    {skeletonRoutes.map((route) => (
-                        <div key={route.path} className="list-item">
-                            <div>
-                                <strong>{route.label}</strong>
-                                <p className="caption">{route.path}</p>
-                            </div>
-                            <span className="pill muted">占位</span>
-                        </div>
-                    ))}
-                </div>
-            </Drawer>
         </>
     )
 }

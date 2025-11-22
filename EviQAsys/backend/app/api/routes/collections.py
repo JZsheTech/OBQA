@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from typing import Literal
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
 from ...repositories import CollectionsRepository, DocumentsRepository
-from ...schemas import CollectionRead, DocumentListItem, DocumentUploadResponse
+from ...schemas import CollectionCreate, CollectionRead, DocumentListItem, DocumentUploadResponse
 from ...services.ingestion import DocumentIngestor, DuplicateDocumentError
 
 router = APIRouter(tags=["collections"])
@@ -21,6 +23,11 @@ class CollectionsEnvelope(BaseModel):
 class DocumentsEnvelope(BaseModel):
     code: str = "OK"
     data: list[DocumentListItem]
+
+
+class CollectionEnvelope(BaseModel):
+    code: str = "OK"
+    data: CollectionRead
 
 
 class DocumentUploadEnvelope(BaseModel):
@@ -41,9 +48,49 @@ def get_document_ingestor() -> DocumentIngestor:
 
 
 @router.get("/collections", response_model=CollectionsEnvelope)
-def list_collections(repo: CollectionsRepository = Depends(get_collections_repo)) -> CollectionsEnvelope:
-    collections = repo.list_collections()
+def list_collections(
+    repo: CollectionsRepository = Depends(get_collections_repo),
+    search_field: Literal["name", "description"] | None = Query(
+        default=None, description="Search field to filter collections.",
+    ),
+    keyword: str | None = Query(default=None, description="Keyword for fuzzy search."),
+) -> CollectionsEnvelope:
+    keyword_value = (keyword or "").strip()
+    try:
+        if keyword_value:
+            field = search_field or "name"
+            collections = repo.search_collections(field=field, keyword=keyword_value)
+        elif search_field:
+            collections = repo.list_collections()
+        else:
+            collections = repo.list_collections()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
     return CollectionsEnvelope(code="OK", data=collections)
+
+
+@router.post("/collections", response_model=CollectionEnvelope, status_code=status.HTTP_201_CREATED)
+def create_collection(
+    payload: CollectionCreate,
+    repo: CollectionsRepository = Depends(get_collections_repo),
+) -> CollectionEnvelope:
+    name = (payload.name or "").strip()
+    if not name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection name is required.",
+        )
+    description = (payload.description or "").strip() or None
+    collection = repo.create_collection(name=name, description=description)
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create collection.",
+        )
+    return CollectionEnvelope(code="OK", data=CollectionRead(**collection))
 
 
 @router.get(

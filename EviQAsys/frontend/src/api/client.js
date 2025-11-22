@@ -73,6 +73,33 @@ export async function listDocuments(collectionId) {
     return request(`/collections/${collectionId}/documents`)
 }
 
+export async function listCollections({ searchField, keyword } = {}) {
+    const params = new URLSearchParams()
+    if (searchField) {
+        params.set("search_field", searchField)
+    }
+    if (keyword) {
+        params.set("keyword", keyword)
+    }
+    const query = params.toString()
+    const path = query ? `/collections?${query}` : "/collections"
+    return request(path)
+}
+
+export async function createCollection({ name, description }) {
+    const trimmedName = (name ?? "").trim()
+    if (!trimmedName) {
+        throw new Error("Collection name is required")
+    }
+    return request("/collections", {
+        method: "POST",
+        body: {
+            name: trimmedName,
+            description: (description ?? "").trim() || null,
+        },
+    })
+}
+
 export async function uploadDocument(collectionId, file) {
     if (!collectionId) {
         throw new Error("Collection id is required")
