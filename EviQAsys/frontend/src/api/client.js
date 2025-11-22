@@ -139,6 +139,27 @@ export async function listCollectionChats(collectionId) {
     return request(`/collections/${collectionId}/chats`)
 }
 
+export async function getDocumentDetail(documentId) {
+    if (!documentId) {
+        throw new Error("Document id is required")
+    }
+    return request(`/documents/${documentId}`)
+}
+
+export async function listDocumentChats(documentId) {
+    if (!documentId) {
+        throw new Error("Document id is required")
+    }
+    return request(`/documents/${documentId}/chats`)
+}
+
+export function buildDocumentFileUrl(documentId) {
+    if (!documentId) {
+        throw new Error("Document id is required")
+    }
+    return `${API_BASE}/documents/${documentId}/file`
+}
+
 export async function runRetrieval({
     collectionId,
     query,

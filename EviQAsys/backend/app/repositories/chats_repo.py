@@ -77,6 +77,17 @@ class ChatsRepository:
             )
             return rows_to_dicts(result)
 
+    def list_by_document(self, document_id: int) -> list[dict[str, Any]]:
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT * FROM chats WHERE document_id = :document_id AND `type` = 'document' "
+                    "ORDER BY created_at DESC, id DESC",
+                ),
+                {"document_id": document_id},
+            )
+            return rows_to_dicts(result)
+
     def update_chat(self, chat_id: int, **fields: Any) -> RepositoryResult:
         allowed = {"title", "max_turn_order"}
         payload = {key: value for key, value in fields.items() if key in allowed}
