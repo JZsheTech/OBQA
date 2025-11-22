@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
 from ...repositories import ChatsRepository, CollectionsRepository, DocumentsRepository
 from ...schemas import ChatRead, CollectionCreate, CollectionRead, DocumentListItem, DocumentUploadResponse
+from ...services.index import DocumentIndexer
 from ...services.ingestion import DocumentIngestor, DuplicateDocumentError
 
 router = APIRouter(tags=["collections"])
+logger = logging.getLogger(__name__)
 
 
 class CollectionsEnvelope(BaseModel):
@@ -54,6 +58,10 @@ def get_chats_repo() -> ChatsRepository:
 
 def get_document_ingestor() -> DocumentIngestor:
     return DocumentIngestor()
+
+
+def get_document_indexer() -> DocumentIndexer:
+    return DocumentIndexer()
 
 
 @router.get("/collections", response_model=CollectionsEnvelope)
@@ -163,8 +171,10 @@ def list_collection_documents(
 )
 def upload_document(
     collection_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     ingestor: DocumentIngestor = Depends(get_document_ingestor),
+    indexer: DocumentIndexer = Depends(get_document_indexer),
 ) -> DocumentUploadEnvelope:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
@@ -183,11 +193,17 @@ def upload_document(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    _enqueue_embedding_task(
+        background_tasks,
+        indexer,
+        collection_id=document["collection_id"],
+        doc_id=document["id"],
+    )
     response = DocumentUploadResponse(
         doc_id=document["id"],
         file_name=document.get("file_name") or file.filename,
         file_size_bytes=int(document.get("file_size_bytes") or 0),
-        status="stored",
+        status="embedding_queued",
     )
     return DocumentUploadEnvelope(code="OK", data=response)
 
@@ -242,3 +258,20 @@ def _safe_int(value: Any) -> int | None:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _enqueue_embedding_task(
+    background_tasks: BackgroundTasks,
+    indexer: DocumentIndexer,
+    *,
+    collection_id: int,
+    doc_id: int,
+) -> None:
+    def _run() -> None:
+        try:
+            embedded = indexer.embed_document(collection_id=collection_id, doc_id=doc_id)
+            logger.info("Background embedding complete doc_id=%s collection_id=%s count=%s", doc_id, collection_id, embedded)
+        except Exception:
+            logger.exception("Background embedding failed for doc_id=%s collection_id=%s", doc_id, collection_id)
+
+    background_tasks.add_task(_run)
