@@ -286,6 +286,7 @@ def _format_evidence_prompt(
         return "No external evidences. Answer using only prior knowledge."
     lines: list[str] = [
         "For each statement that references evidence you must cite `[Elem#<element_id>]`.",
+        "If multiple evidences support the same statement, cite them together like `[Elem#<element_id1>, Elem#<element_id2>]`.",
         "Available textual evidences:",
     ]
     if not text_evidences:
@@ -335,11 +336,15 @@ if dspy is not None:
         evidence_context = dspy.InputField(
             desc=(
                 "List of evidences. Every claim that uses an evidence MUST cite it as [Elem#<element_id>]. "
+                "If multiple evidences support one claim, cite them together like [Elem#1046, Elem#1346]. "
                 "Never invent new identifiers."
             ),
         )
         answer_text = dspy.OutputField(
-            desc="Well-structured answer. Cite sources inline via [Elem#<element_id>].",
+            desc=(
+                "Well-structured answer. Cite sources inline via [Elem#<element_id>] "
+                "or combined like [Elem#1046, Elem#1346] when multiple apply."
+            ),
         )
 
     class _ImageQuestionSignature(dspy.Signature):  # type: ignore[misc]
