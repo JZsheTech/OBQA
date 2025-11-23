@@ -277,6 +277,13 @@ key={ev.evidence_no}
   * 一律在前端渲染阶段通过 `[Elem#id]` + 统一映射完成；
   * 后端无需对历史文本做字符串替换。
 
+### 并列/多个引用锚点
+```
+For instance, both frameworks demonstrate structured workflows where optimized prompts are validated through task-specific execution (e.g., HotpotQA, HoVer) [Elem#1046, Elem#1346].
+```
+
+LLM可能会给出 `[Elem#1046, Elem#1346]` 形式的并列引用， 也可能是`[Elem#1046]` 形式的单独引用，当前系统已经能正确解析这2种形式的引用到前端。
+
 ---
 
 ## 5. 与现有文档的对齐与迁移说明

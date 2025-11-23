@@ -4,7 +4,8 @@ import re
 from typing import Iterable, Mapping, Sequence
 
 
-_ELEM_TAG_RE = re.compile(r"\[Elem#(?P<id>\d+)\]")
+# Matches Elem#<id> tokens even when multiple are inside one [...] block.
+_ELEM_TAG_RE = re.compile(r"Elem#(?P<id>\d+)")
 
 
 def build_evidence_no_mapping(history_elements: Iterable[int]) -> dict[int, int]:
@@ -23,21 +24,23 @@ def build_evidence_no_mapping(history_elements: Iterable[int]) -> dict[int, int]
 
 
 def replace_elem_tags_with_evidence(answer_text: str, mapping: Mapping[int, int]) -> str:
-    """Replace [Elem#<id>] tags with [Evidence#<no>] according to mapping.
+    """Replace Elem#<id> tokens with Evidence#<no> according to mapping.
 
-    Unmapped element_ids are left as-is, to aid debugging.
+    Works when multiple element ids are inside the same bracket block, e.g.
+    `[Elem#1, Elem#2]` becomes `[Evidence#1, Evidence#2]`. Unmapped element_ids
+    are left as-is to aid debugging.
     """
 
     def _sub(m: re.Match[str]) -> str:
         elem_id = int(m.group("id"))
         evidence_no = mapping.get(elem_id)
-        return f"[Evidence#{evidence_no}]" if evidence_no is not None else m.group(0)
+        return f"Evidence#{evidence_no}" if evidence_no is not None else m.group(0)
 
     return _ELEM_TAG_RE.sub(_sub, answer_text)
 
 
 def extract_element_ids_from_answer(answer_text: str) -> list[int]:
-    """Return ordered element ids based on [Elem#<id>] tags in the answer."""
+    """Return ordered element ids based on Elem#<id> tags in the answer."""
     ids: list[int] = []
     seen: set[int] = set()
     for match in _ELEM_TAG_RE.finditer(answer_text or ""):

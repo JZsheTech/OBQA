@@ -125,35 +125,100 @@ function HighlightedPage({ renderPageProps, highlights }) {
     )
 }
 
-function EvidenceText({ text, onSelectEvidence }) {
+function EvidenceText({ text, evidences, onSelectEvidence }) {
+    const evidenceNoByElement = useMemo(() => {
+        const mapping = new Map()
+        ;(evidences ?? []).forEach((ev) => {
+            if (ev.element_id != null && ev.evidence_no != null) {
+                mapping.set(Number(ev.element_id), Number(ev.evidence_no))
+            }
+        })
+        return mapping
+    }, [evidences])
+
     if (!text) {
         return <p className="caption muted">暂无回答</p>
     }
+
     const nodes = []
-    const regex = /\[Evidence#(\d+)\]/g
+    const bracketRegex = /\[([^\]]+)\]/g
+
+    const resolveEvidenceNo = (tokenType, rawNo) => {
+        const numeric = Number(rawNo)
+        if (!Number.isFinite(numeric)) return null
+        if (tokenType.toLowerCase() === "elem") {
+            return evidenceNoByElement.get(numeric) ?? null
+        }
+        return numeric
+    }
+
+    const renderEvidenceButton = (evNo, key) => (
+        <button
+            key={key}
+            type="button"
+            className="evidence-tag"
+            onClick={() => onSelectEvidence(evNo)}
+        >
+            Evidence #{evNo}
+        </button>
+    )
+
+    const pushTextWithTokens = (chunk, keyPrefix) => {
+        const tokenRegex = /(Evidence|Elem)#(\d+)/gi
+        let cursor = 0
+        let tokenMatch
+        while ((tokenMatch = tokenRegex.exec(chunk)) !== null) {
+            if (tokenMatch.index > cursor) {
+                nodes.push(
+                    <span key={`${keyPrefix}-text-${cursor}`}>
+                        {chunk.slice(cursor, tokenMatch.index)}
+                    </span>,
+                )
+            }
+            const evNo = resolveEvidenceNo(tokenMatch[1], tokenMatch[2])
+            if (evNo !== null) {
+                nodes.push(renderEvidenceButton(evNo, `${keyPrefix}-ev-${tokenMatch.index}`))
+            } else {
+                nodes.push(<span key={`${keyPrefix}-raw-${tokenMatch.index}`}>{tokenMatch[0]}</span>)
+            }
+            cursor = tokenRegex.lastIndex
+        }
+        if (cursor < chunk.length) {
+            nodes.push(<span key={`${keyPrefix}-tail-${cursor}`}>{chunk.slice(cursor)}</span>)
+        }
+    }
+
+    const extractBracketEvidenceNos = (content) => {
+        const tokenRegex = /(Evidence|Elem)#(\d+)/gi
+        const ids = []
+        let tokenMatch
+        while ((tokenMatch = tokenRegex.exec(content)) !== null) {
+            const evNo = resolveEvidenceNo(tokenMatch[1], tokenMatch[2])
+            if (evNo !== null) {
+                ids.push(evNo)
+            }
+        }
+        return ids
+    }
+
     let lastIndex = 0
     let match
-    while ((match = regex.exec(text)) !== null) {
+    while ((match = bracketRegex.exec(text)) !== null) {
         if (match.index > lastIndex) {
-            nodes.push(
-                <span key={`text-${match.index}`}>{text.slice(lastIndex, match.index)}</span>,
-            )
+            pushTextWithTokens(text.slice(lastIndex, match.index), `text-${lastIndex}`)
         }
-        const evNo = Number(match[1])
-        nodes.push(
-            <button
-                key={`evidence-${match.index}`}
-                type="button"
-                className="evidence-tag"
-                onClick={() => onSelectEvidence(evNo)}
-            >
-                Evidence #{evNo}
-            </button>,
-        )
-        lastIndex = regex.lastIndex
+        const evidenceNos = extractBracketEvidenceNos(match[1])
+        if (evidenceNos.length === 0) {
+            nodes.push(<span key={`raw-${match.index}`}>{match[0]}</span>)
+        } else {
+            evidenceNos.forEach((evNo, idx) => {
+                nodes.push(renderEvidenceButton(evNo, `ev-${match.index}-${idx}`))
+            })
+        }
+        lastIndex = match.index + match[0].length
     }
     if (lastIndex < text.length) {
-        nodes.push(<span key={`tail-${lastIndex}`}>{text.slice(lastIndex)}</span>)
+        pushTextWithTokens(text.slice(lastIndex), `tail-${lastIndex}`)
     }
     return <p className="answer-text">{nodes}</p>
 }
@@ -435,6 +500,7 @@ export default function CollectionChat() {
                                         <div className="message__bubble">
                                             <EvidenceText
                                                 text={turn.answer_with_evidence || turn.answer_text}
+                                                evidences={turn.evidences}
                                                 onSelectEvidence={(evNo) => handleEvidenceSelect(evNo, turn)}
                                             />
                                             <div className="evidence-chip-row">
