@@ -683,9 +683,24 @@ export default function CollectionChat() {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="code-block">
-                                    {selectedEvidence.snippet || selectedEvidence.text_content || "无 snippet"}
-                                </div>
+                                {selectedEvidence.snippet || selectedEvidence.text_content ? (
+                                    <div className="stack">
+                                        {selectedEvidence.snippet && (
+                                            <div className="stack">
+                                                <div className="caption muted">Snippet</div>
+                                                <div className="code-block">{selectedEvidence.snippet}</div>
+                                            </div>
+                                        )}
+                                        {selectedEvidence.text_content && (
+                                            <div className="stack">
+                                                <div className="caption muted">Text Content</div>
+                                                <div className="code-block">{selectedEvidence.text_content}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="code-block">无 snippet</div>
+                                )}
                                 {!selectedEvidence.bbox && (
                                     <p className="caption muted">该证据缺少 bbox，高亮不可用。</p>
                                 )}
