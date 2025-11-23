@@ -35,42 +35,66 @@ function normalizeBBoxes(rawBBox) {
     if (!Array.isArray(rawBBox)) return []
     const entries = Array.isArray(rawBBox[0]) ? rawBBox : [rawBBox]
     return entries
-        .map((coords) => (Array.isArray(coords) ? coords.map((value) => Number(value)) : []))
-        .filter((coords) => coords.length === 4 && coords.every((value) => Number.isFinite(value)))
+        .map((coords) => {
+            if (!Array.isArray(coords)) return null
+            const numeric = coords.map((value) => Number(value))
+            if (numeric.length !== 4 || numeric.some((value) => !Number.isFinite(value))) return null
+            const [x0, y0, x1, y1] = numeric
+            return [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)]
+        })
+        .filter(Boolean)
 }
 
-function mapBBoxToRect(bbox, pageWidth, pageHeight, rotation, scale) {
+function getPageOriginalSize(page, width, height, scale) {
+    const view = page?.view
+    const [, , rawWidth, rawHeight] = Array.isArray(view) ? view : []
+    const originalWidth = Number(rawWidth)
+    const originalHeight = Number(rawHeight)
+    if (Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0) {
+        return { originalWidth, originalHeight }
+    }
+    const fallbackWidth = Number.isFinite(width) && Number.isFinite(scale) && scale !== 0 ? width / scale : null
+    const fallbackHeight = Number.isFinite(height) && Number.isFinite(scale) && scale !== 0 ? height / scale : null
+    if (
+        Number.isFinite(fallbackWidth) &&
+        Number.isFinite(fallbackHeight) &&
+        fallbackWidth > 0 &&
+        fallbackHeight > 0
+    ) {
+        return { originalWidth: fallbackWidth, originalHeight: fallbackHeight }
+    }
+    return { originalWidth: null, originalHeight: null }
+}
+
+function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     if (!bbox || bbox.length !== 4) return null
     let [x0, y0, x1, y1] = bbox
-    let rectW = Math.abs(x1 - x0)
-    let rectH = Math.abs(y1 - y0)
-    let actualWidth = pageWidth
-    let actualHeight = pageHeight
-    const normalizedRotation = Math.abs(Math.round(rotation)) % 360
+    const hasPageSize =
+        Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0
+    if (!hasPageSize) return null
 
-    if (normalizedRotation === 90 || normalizedRotation === 270) {
-        ;[actualWidth, actualHeight] = [actualHeight, actualWidth]
+    const isNormalized = [x0, y0, x1, y1].every((value) => value >= 0 && value <= 1)
+
+    if (isNormalized) {
+        console.debug("Normalized bbox detected; converting to PDF points", {
+            bbox,
+            originalWidth,
+            originalHeight,
+        })
+        x0 *= originalWidth
+        x1 *= originalWidth
+        y0 *= originalHeight
+        y1 *= originalHeight
     }
 
-    if (normalizedRotation === 270) {
-        ;[rectW, rectH] = [rectH, rectW]
-        x0 = actualHeight - y1
-        y0 = actualWidth - x1
-    } else if (normalizedRotation === 180) {
-        x0 = pageWidth - x1
-    } else if (normalizedRotation === 90) {
-        ;[rectW, rectH] = [rectH, rectW]
-        ;[x0, y0] = [y0, x0]
-    } else {
-        y0 = pageHeight - y1
-    }
+    const left = Math.min(x0, x1)
+    const top = Math.min(y0, y1)
+    const width = Math.abs(x1 - x0)
+    const height = Math.abs(y1 - y0)
 
-    return {
-        x: x0 * scale,
-        y: y0 * scale,
-        width: rectW * scale,
-        height: rectH * scale,
-    }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width === 0 || height === 0) return null
+
+    return { x: left, y: top, width, height, isNormalized }
 }
 
 function HighlightedPage({ renderPageProps, highlights }) {
@@ -82,14 +106,13 @@ function HighlightedPage({ renderPageProps, highlights }) {
         textLayerRendered,
         markRendered,
         pageIndex,
-        rotation,
         scale,
         width,
         height,
+        page,
     } = renderPageProps
 
-    const pageWidth = width / scale
-    const pageHeight = height / scale
+    const { originalWidth, originalHeight } = getPageOriginalSize(page, width, height, scale)
     const activeHighlights = highlights?.[pageIndex] ?? []
 
     useEffect(() => {
@@ -98,29 +121,49 @@ function HighlightedPage({ renderPageProps, highlights }) {
         }
     }, [canvasLayerRendered, textLayerRendered, markRendered, pageIndex])
 
+    const pageRects = useMemo(() => {
+        if (!originalWidth || !originalHeight) return []
+        return activeHighlights
+            .map((bbox, index) => {
+                const rect = resolveBBoxToRect(bbox, originalWidth, originalHeight)
+                if (!rect) return null
+                return { rect, key: `${pageIndex}-${index}` }
+            })
+            .filter(Boolean)
+    }, [activeHighlights, originalHeight, originalWidth, pageIndex])
+
     return (
         <>
             {canvasLayer.children}
-            <div className="pdf-highlight-layer" aria-hidden="true">
-                {activeHighlights.map((bbox, index) => {
-                    const rect = mapBBoxToRect(bbox, pageWidth, pageHeight, rotation, scale)
-                    if (!rect) return null
-                    return (
-                        <div
-                            key={`${pageIndex}-${index}`}
-                            className="pdf-highlight-box"
-                            style={{
-                                left: rect.x,
-                                top: rect.y,
-                                width: rect.width,
-                                height: rect.height,
-                            }}
-                        ></div>
-                    )
-                })}
-            </div>
             {textLayer.children}
             {annotationLayer.children}
+            {pageRects.length > 0 && originalWidth && originalHeight ? (
+                <svg
+                    className="pdf-highlight-layer"
+                    aria-hidden="true"
+                    viewBox={`0 0 ${originalWidth} ${originalHeight}`}
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        pointerEvents: "none",
+                        zIndex: 10,
+                    }}
+                >
+                    {pageRects.map(({ rect, key }) => (
+                        <rect
+                            key={key}
+                            x={rect.x}
+                            y={rect.y}
+                            width={rect.width}
+                            height={rect.height}
+                            className="evidence-highlight-rect"
+                            vectorEffect="non-scaling-stroke"
+                        />
+                    ))}
+                </svg>
+            ) : null}
         </>
     )
 }

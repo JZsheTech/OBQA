@@ -11,16 +11,16 @@
 - 头部工具栏允许在 `documents` 下拉中切换文档，变更时清空 `pageForHighlight`，保持跳转状态与所选 PDF 一致。
 - PDF 文本层被 CSS 设为透明（`.pdf-viewer .rpv-core__text-layer`），仅保留画布层与自定义高亮层，避免与自绘 bbox 叠色。
 
-当前 PDF 渲染技术：前端使用 @react-pdf-viewer/core 搭配 pdfjs-dist worker（pdf.worker.min.js）加载和绘制页面。Viewer 组件内部默认用 canvas 绘制页面（canvasLayer），文本层 (textLayer) 被 CSS 置为透明，仅保留命中区域的自绘高亮。
-高亮框实现：自定义 HighlightedPage 用 renderPage 覆写，保留 canvasLayer 与 annotationLayer，并叠加一个绝对定位的 div 容器 .pdf-highlight-layer。对后端返回的 bbox（基于 PDF 坐标）做旋转与缩放换算，然后把每个框渲染为一个 div.pdf-highlight-box（橙色半透明背景 + 实线描边）。
-是否使用 SVG：否。高亮是 HTML div 叠加在 canvas 之上（绝对定位），没有用 SVG。
+当前 PDF 渲染技术：前端使用 @react-pdf-viewer/core 搭配 pdfjs-dist worker（pdf.worker.min.js）加载和绘制页面。Viewer 组件内部默认用 canvas 绘制页面（canvasLayer），文本层 (textLayer) 被 CSS 置为透明，自定义高亮层采用 SVG。
+高亮框实现：自定义 HighlightedPage 用 renderPage 覆写，保留 canvasLayer 与 annotationLayer，并叠加 SVG 覆盖层 `.pdf-highlight-layer`。SVG 的 `viewBox` 与 `page.view` 的原始宽高一致，`<rect>` 直接使用后端 bbox（必要时在前端检测 0-1 归一化坐标并乘以原始宽高），通过 `vector-effect="non-scaling-stroke"` 保持描边在缩放时不变粗。
+是否使用 SVG：是。高亮使用 SVG viewBox 自动映射缩放，无需手动乘以 scale。
 
 ## 自定义高亮实现
-- `renderPage` 被重写为 `HighlightedPage`，在默认 `canvasLayer`/`textLayer` 之上叠加 `pdf-highlight-layer`。
-- `normalizeBBoxes` 确保后端返回的 bbox 转为二维 `[x0,y0,x1,y1]` 数组；`mapBBoxToRect` 结合 `renderPageProps` 的 `pageWidth/pageHeight/rotation/scale` 做坐标换算，兼容 0/90/180/270 度旋转与放缩。
+- `renderPage` 被重写为 `HighlightedPage`，在默认 `canvasLayer`/`textLayer`/`annotationLayer` 之上叠加 SVG `.pdf-highlight-layer`。
+- `normalizeBBoxes` 负责将后端 bbox 转为 `[x0,y0,x1,y1]` 数组并保证左右上下顺序；`resolveBBoxToRect` 若检测到 0-1 归一化坐标，则根据 `page.view` 的原始宽高转换为 PDF 点数，不再参与页面缩放计算。
 - `pageHighlights` 只在 `selectedDocId` 与 evidence 的 `document_id` 一致时填充 `{ [pageIndex]: [bbox, ...] }`，避免跨文档误高亮。
 - `initialPage` 取自 `pageForHighlight`（点击证据时写入），否则默认 0；同时调用 `pageNavigationPlugin.jumpToPage` 确保 UI 跟随。
-- 样式：`.pdf-highlight-box` 使用半透明橙框，`.pdf-viewer` 设置相对定位与滚动，高亮层绝对覆盖。
+- 样式：`.evidence-highlight-rect` 使用 SVG 填充与描边，viewBox 自动适配缩放，边框使用 `vector-effect: non-scaling-stroke`。
 
 ## Evidence 文本渲染与交互
 - 数据源：`getChatDetail(chatId)` 返回 `turns`，每个 turn 携带 `answer_with_evidence`（优先）或 `answer_text` 以及 `evidences`；若本地缺失，点击时会通过 `getTurnEvidences` 补全。
