@@ -7,6 +7,7 @@ import CollectionsHome from "./pages/CollectionsHome"
 import DocumentChat from "./pages/DocumentChat"
 import DocumentDetail from "./pages/DocumentDetail"
 import NotFound from "./pages/NotFound"
+import PdfHighlightDemo from "./pages/PdfHighlightDemo"
 import "./App.css"
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
                     <Route path="collections/:collectionId/chat/:chatId" element={<CollectionChat />} />
                     <Route path="documents/:documentId/chat/:chatId" element={<DocumentChat />} />
                     <Route path="chat-history" element={<ChatHistory />} />
+                    <Route path="pdf-highlight-demo" element={<PdfHighlightDemo />} />
                     <Route path="*" element={<NotFound />} />
                 </Route>
             </Routes>

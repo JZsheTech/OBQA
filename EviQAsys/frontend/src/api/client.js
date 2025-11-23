@@ -203,6 +203,10 @@ export function buildDocumentFileUrl(documentId) {
     return `${API_BASE}/documents/${documentId}/file`
 }
 
+export function buildDemoPdfUrl() {
+    return `${API_BASE}/debug/pdf-evidence-demo`
+}
+
 export async function runRetrieval({
     collectionId,
     query,

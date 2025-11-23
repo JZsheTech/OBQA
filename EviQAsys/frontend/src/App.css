@@ -895,6 +895,30 @@
   overflow: auto;
 }
 
+.pdf-viewer .rpv-core__inner,
+.pdf-viewer .rpv-core__viewer {
+  width: 100%;
+}
+
+.pdf-viewer .rpv-core__page-layer {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pdf-demo-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+
+.pdf-demo-controls .rpv-core__button {
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+}
+
 .pdf-viewer .rpv-core__text-layer {
   opacity: 0;
   pointer-events: none;

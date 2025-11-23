@@ -1,13 +1,28 @@
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom"
 
 const tabs = [
-    { label: "知识库主页", to: "/" },
-    { label: "Chat 历史", to: "/chat-history" },
+    {
+        label: "知识库主页",
+        to: "/",
+        match: (pathname) =>
+            pathname === "/" ||
+            pathname.startsWith("/collections") ||
+            pathname.startsWith("/documents"),
+    },
+    {
+        label: "Chat 历史",
+        to: "/chat-history",
+        match: (pathname) => pathname.startsWith("/chat-history"),
+    },
+    {
+        label: "PDF 高亮测试",
+        to: "/pdf-highlight-demo",
+        match: (pathname) => pathname.startsWith("/pdf-highlight-demo"),
+    },
 ]
 
-function tabClassName(pathname, target) {
-    const isHistoryTab = target === "/chat-history"
-    const active = isHistoryTab ? pathname.startsWith("/chat-history") : !pathname.startsWith("/chat-history")
+function tabClassName(pathname, tab) {
+    const active = tab.match ? tab.match(pathname) : pathname.startsWith(tab.to)
     return `top-tab${active ? " top-tab--active" : ""}`
 }
 
@@ -48,7 +63,7 @@ export default function AppLayout() {
                     <NavLink
                         key={tab.to}
                         to={tab.to}
-                        className={() => tabClassName(location.pathname, tab.to)}
+                        className={() => tabClassName(location.pathname, tab)}
                         end={false}
                     >
                         {tab.label}
