@@ -87,7 +87,7 @@ class LLMSettings:
     api_key: str = _get_env("LLM_API_KEY", "EMPTY")
     api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
     temperature: float = _get_float_env("LLM_TEMPERATURE", 0.2)
-    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 800)
+    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 16000)
 
 
 @dataclass(frozen=True)

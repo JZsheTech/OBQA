@@ -23,30 +23,39 @@ class RetrievalDecision:
 
 
 class DSPyPredictorFactory:
-    """Configures a shared DSPy LM instance for lightweight programs."""
+    """Creates DSPy Predict modules without mutating global settings."""
 
     def __init__(self, settings: LLMSettings | None = None) -> None:
         self._settings = settings or get_llm_settings()
         self._lm = None
+        self._lm_params = {
+            "model": f"openai/{self._settings.model}",
+            "api_key": self._settings.api_key,
+            "api_base": self._settings.api_base,
+            "temperature": self._settings.temperature,
+            "max_tokens": self._settings.max_output_tokens,
+        }
         if dspy is not None:
-            try:
-                model_name = f"openai/{self._settings.model}"
-                self._lm = dspy.LM(
-                    model_name,
-                    api_key=self._settings.api_key,
-                    api_base=self._settings.api_base,
-                    temperature=self._settings.temperature,
-                    max_tokens=self._settings.max_output_tokens,
-                )
-                dspy.configure(lm=self._lm)
-            except Exception as exc:  # pragma: no cover - initialization guard
-                logger.warning("Failed to initialize DSPy LM: %s", exc)
-                self._lm = None
+            self._lm = self._init_lm()
+
+    def _init_lm(self) -> object | None:
+        try:
+            lm_kwargs = {key: value for key, value in self._lm_params.items() if key != "model"}
+            return dspy.LM(self._lm_params["model"], **lm_kwargs)
+        except Exception as exc:  # pragma: no cover - initialization guard
+            logger.warning("Failed to initialize DSPy LM: %s", exc)
+            return None
 
     def create_predictor(self, signature_cls: type) -> object | None:
         if self._lm is None or dspy is None:
             return None
-        return dspy.Predict(signature_cls)
+        try:
+            predictor = dspy.Predict(signature_cls)
+            predictor.set_lm(self._lm)
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("Failed to build DSPy predictor: %s", exc)
+            return None
+        return predictor
 
 
 class MemorySummarizer:
