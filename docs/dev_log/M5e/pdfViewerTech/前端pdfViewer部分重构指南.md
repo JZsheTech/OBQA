@@ -146,12 +146,6 @@ const PDFOverlayLayer = ({ pageData, pdfPageOriginalWidth, pdfPageOriginalHeight
 
 -----
 
-### 下一步建议
-
-既然你在做 **Evidence** 相关的溯源，如果修复好这个 bug，建议你让 AI Coder 再加一个功能：
-**“Auto Scroll & Zoom”**：点击 Evidence \#2 时，不仅画框，还要自动计算这个框的宽度，如果框太小，自动放大 PDF (Set Scale) 并滚动到屏幕中央。这对于阅读论文中的图表细节体验极佳。
-
-
 
 这是一个非常有价值的信息补充。你的本地 AI Coder 提供的技术路线非常详细，这让我们能够精确地定位问题所在。
 
