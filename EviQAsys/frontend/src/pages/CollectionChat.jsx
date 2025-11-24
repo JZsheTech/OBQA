@@ -114,7 +114,7 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     return { x, y, width, height, isNormalized: inUnitRange || inThousandRange }
 }
 
-function HighlightedPage({ renderPageProps, highlights }) {
+function HighlightedPage({ renderPageProps, highlights, onHighlightClick }) {
     const {
         annotationLayer,
         canvasLayer,
@@ -157,14 +157,13 @@ function HighlightedPage({ renderPageProps, highlights }) {
             {pageRects.length > 0 && originalWidth && originalHeight ? (
                 <svg
                     className="pdf-highlight-layer"
-                    aria-hidden="true"
                     viewBox={`0 0 ${originalWidth} ${originalHeight}`}
                     style={{
                         position: "absolute",
                         inset: 0,
                         width: "100%",
                         height: "100%",
-                        pointerEvents: "none",
+                        pointerEvents: "auto",
                         zIndex: 10,
                     }}
                 >
@@ -176,6 +175,24 @@ function HighlightedPage({ renderPageProps, highlights }) {
                             width={rect.width}
                             height={rect.height}
                             className="evidence-highlight-rect"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Evidence highlight on page ${pageIndex + 1}`}
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                if (onHighlightClick) {
+                                    onHighlightClick({ pageIndex, rect })
+                                }
+                            }}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault()
+                                    if (onHighlightClick) {
+                                        onHighlightClick({ pageIndex, rect })
+                                    }
+                                }
+                            }}
+                            style={{ pointerEvents: "auto" }}
                             vectorEffect="non-scaling-stroke"
                         />
                     ))}
@@ -304,6 +321,7 @@ export default function CollectionChat() {
     const [newChatTitle, setNewChatTitle] = useState("")
     const [showChatDrawer, setShowChatDrawer] = useState(false)
     const [showMetaPanel, setShowMetaPanel] = useState(false)
+    const [showEvidencePopover, setShowEvidencePopover] = useState(false)
 
     const navigationPlugin = pageNavigationPlugin()
     const { jumpToPage } = navigationPlugin
@@ -315,6 +333,7 @@ export default function CollectionChat() {
         setSelectedEvidence(null)
         setPageForHighlight(null)
         setDraftQuestion("")
+        setShowEvidencePopover(false)
     }, [chatId, collectionId])
 
     useEffect(() => {
@@ -344,6 +363,14 @@ export default function CollectionChat() {
         () => normalizeBBoxes(selectedEvidence?.bbox),
         [selectedEvidence?.bbox],
     )
+
+    useEffect(() => {
+        setShowEvidencePopover(false)
+    }, [selectedEvidence])
+
+    useEffect(() => {
+        setShowEvidencePopover(false)
+    }, [selectedDocId])
 
     const pageHighlights = useMemo(() => {
         if (evidenceDocId && selectedDocId && evidenceDocId !== Number(selectedDocId)) return {}
@@ -466,6 +493,7 @@ export default function CollectionChat() {
         } else {
             setPageForHighlight(null)
         }
+        setShowEvidencePopover(false)
     }
 
     const chatTitle = useMemo(() => {
@@ -487,6 +515,29 @@ export default function CollectionChat() {
         { label: `Collection ${collectionId}`, href: `/collections/${collectionId}` },
         { label: chatTitle },
     ]
+
+    const handleHighlightClick = () => {
+        if (!selectedEvidence) return
+        setShowEvidencePopover(true)
+    }
+
+    const handleCopyEvidenceText = async () => {
+        if (!selectedEvidence) return
+        const text = selectedEvidence.text_content || selectedEvidence.snippet || ""
+        if (!text) {
+            addToast({ type: "info", title: "暂无可复制内容", message: "该证据缺少 text_content/snippet" })
+            return
+        }
+        try {
+            if (!navigator?.clipboard?.writeText) {
+                throw new Error("浏览器不支持一键复制")
+            }
+            await navigator.clipboard.writeText(text)
+            addToast({ type: "success", title: "已复制到剪贴板", message: "证据文本已可粘贴" })
+        } catch (error) {
+            addToast({ type: "error", title: "复制失败", message: error.message || "请检查浏览器权限" })
+        }
+    }
 
     return (
         <>
@@ -615,7 +666,7 @@ export default function CollectionChat() {
                             <div>
                                 <h3 className="card__title">PDF Viewer</h3>
                                 <p className="caption">
-                                    文档下拉 + bbox 高亮；点击 Evidence 自动跳转对应页。
+                                    文档下拉 + bbox 高亮；点击 Evidence 跳页后再点高亮框可查看详情。
                                 </p>
                             </div>
                             <div className="pdf-header__actions">
@@ -669,12 +720,67 @@ export default function CollectionChat() {
                                         key={viewerKey}
                                         fileUrl={selectedDocUrl}
                                         renderPage={(props) => (
-                                            <HighlightedPage renderPageProps={props} highlights={pageHighlights} />
+                                            <HighlightedPage
+                                                renderPageProps={props}
+                                                highlights={pageHighlights}
+                                                onHighlightClick={handleHighlightClick}
+                                            />
                                         )}
                                         initialPage={pageForHighlight ?? 0}
                                         plugins={[navigationPlugin]}
                                     />
                                 </Worker>
+                                {showEvidencePopover && selectedEvidence && (
+                                    <div className="evidence-popover" role="dialog" aria-label="选中证据信息">
+                                        <div className="evidence-popover__header">
+                                            <div className="stack" style={{ gap: "4px" }}>
+                                                <div className="inline-kv">
+                                                    <strong>Evidence #{selectedEvidence.evidence_no ?? "-"}</strong>
+                                                    <span className="caption">
+                                                        Elem #{selectedEvidence.element_id ?? "-"}
+                                                    </span>
+                                                </div>
+                                                <div className="caption muted">
+                                                    Doc {selectedEvidence.document_id ?? "-"} · Page{" "}
+                                                    {selectedEvidence.page_index ?? "-"} · Type{" "}
+                                                    {selectedEvidence.elem_type ?? "-"}
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" onClick={() => setShowEvidencePopover(false)}>
+                                                关闭
+                                            </Button>
+                                        </div>
+                                        <div className="stack evidence-popover__body">
+                                            {selectedEvidence.snippet && (
+                                                <div className="stack">
+                                                    <div className="caption muted">Snippet</div>
+                                                    <div className="code-block code-block--compact">
+                                                        {selectedEvidence.snippet}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {selectedEvidence.text_content && (
+                                                <div className="stack">
+                                                    <div className="caption muted">Text Content</div>
+                                                    <div className="code-block code-block--compact">
+                                                        {selectedEvidence.text_content}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {!selectedEvidence.snippet && !selectedEvidence.text_content && (
+                                                <div className="code-block code-block--compact">无 snippet</div>
+                                            )}
+                                        </div>
+                                        <div className="evidence-popover__actions">
+                                            <Button variant="tonal" onClick={handleCopyEvidenceText}>
+                                                复制文本内容
+                                            </Button>
+                                            <span className="caption muted">
+                                                点击高亮框后弹出，优先复制 text_content。
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -683,7 +789,7 @@ export default function CollectionChat() {
                         <div className="card__header">
                             <div>
                                 <h4 className="card__title">选中证据信息</h4>
-                                <p className="caption">点击回答中的 Evidence 标签后显示。</p>
+                                <p className="caption">点击 Evidence 标签跳转后，再点 PDF 高亮框可弹出详情。</p>
                             </div>
                         </div>
                         {selectedEvidence ? (
