@@ -39,9 +39,13 @@ function normalizeBBoxes(rawBBox) {
             if (!Array.isArray(coords)) return null
             const numeric = coords.map((value) => Number(value))
             if (numeric.length !== 4 || numeric.some((value) => !Number.isFinite(value))) return null
-            const [x, y, width, height] = numeric
-            if (width <= 0 || height <= 0) return null
-            return [x, y, width, height]
+            const [x1, y1, x2, y2] = numeric
+            const left = Math.min(x1, x2)
+            const top = Math.min(y1, y2)
+            const right = Math.max(x1, x2)
+            const bottom = Math.max(y1, y2)
+            if (right <= left || bottom <= top) return null
+            return [left, top, right, bottom]
         })
         .filter(Boolean)
 }
@@ -71,33 +75,39 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     if (!Array.isArray(bbox) || bbox.length !== 4) return null
     const numeric = bbox.map((value) => Number(value))
     if (numeric.some((value) => !Number.isFinite(value))) return null
-    const [rawX, rawY, rawWidth, rawHeight] = numeric
+    const [rawX1, rawY1, rawX2, rawY2] = numeric
     const hasPageSize =
         Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0
     if (!hasPageSize) return null
 
-    if (rawWidth <= 0 || rawHeight <= 0) return null
+    const left = Math.min(rawX1, rawX2)
+    const top = Math.min(rawY1, rawY2)
+    const right = Math.max(rawX1, rawX2)
+    const bottom = Math.max(rawY1, rawY2)
 
-    const inUnitRange = numeric.every((value) => value >= 0 && value <= 1)
-    const inThousandRange = !inUnitRange && numeric.every((value) => value >= 0 && value <= 1000)
+    if (right <= left || bottom <= top) return null
+
+    const ordered = [left, top, right, bottom]
+    const inUnitRange = ordered.every((value) => value >= 0 && value <= 1)
+    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= 1000)
 
     if (inUnitRange || inThousandRange) {
         console.debug("Scaling bbox to PDF points", {
-            bbox,
+            bbox: ordered,
             mode: inUnitRange ? "unit" : "thousand",
             originalWidth,
             originalHeight,
         })
     }
 
-    // MinerU bbox 使用 0~1000 的基准，需要按实际页面宽高缩放。
+    // MinerU bbox 使用 0~1000 的基准，坐标为左上 / 右下点，需要按实际页面宽高缩放。
     const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
     const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
 
-    const x = rawX * scaleX
-    const y = rawY * scaleY
-    const width = rawWidth * scaleX
-    const height = rawHeight * scaleY
+    const x = left * scaleX
+    const y = top * scaleY
+    const width = (right - left) * scaleX
+    const height = (bottom - top) * scaleY
 
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
 

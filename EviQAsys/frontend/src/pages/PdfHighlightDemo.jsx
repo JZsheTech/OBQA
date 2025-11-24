@@ -10,7 +10,7 @@ import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 
 const DEMO_HIGHLIGHTS = {
-    // MinerU bbox: [x, y, width, height] on a 0~1000 grid.
+    // MinerU bbox: [x1, y1, x2, y2] on a 0~1000 grid.
     0: [[96, 294, 485, 640]],
 }
 
@@ -39,24 +39,30 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     if (!Array.isArray(bbox) || bbox.length !== 4) return null
     const numeric = bbox.map((value) => Number(value))
     if (numeric.some((value) => !Number.isFinite(value))) return null
-    const [rawX, rawY, rawWidth, rawHeight] = numeric
+    const [rawX1, rawY1, rawX2, rawY2] = numeric
     const hasPageSize =
         Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0
     if (!hasPageSize) return null
 
-    if (rawWidth <= 0 || rawHeight <= 0) return null
+    const left = Math.min(rawX1, rawX2)
+    const top = Math.min(rawY1, rawY2)
+    const right = Math.max(rawX1, rawX2)
+    const bottom = Math.max(rawY1, rawY2)
 
-    const inUnitRange = numeric.every((value) => value >= 0 && value <= 1)
-    const inThousandRange = !inUnitRange && numeric.every((value) => value >= 0 && value <= 1000)
+    if (right <= left || bottom <= top) return null
+
+    const ordered = [left, top, right, bottom]
+    const inUnitRange = ordered.every((value) => value >= 0 && value <= 1)
+    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= 1000)
 
     // MinerU bbox 使用 0~1000 的基准，需要按实际页面宽高缩放。
     const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
     const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
 
-    const x = rawX * scaleX
-    const y = rawY * scaleY
-    const width = rawWidth * scaleX
-    const height = rawHeight * scaleY
+    const x = left * scaleX
+    const y = top * scaleY
+    const width = (right - left) * scaleX
+    const height = (bottom - top) * scaleY
 
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
     return { x, y, width, height, isNormalized: inUnitRange || inThousandRange }
@@ -187,7 +193,7 @@ export default function PdfHighlightDemo() {
                             <p className="caption">由后端 /api/debug/pdf-evidence-demo 透传</p>
                         </div>
                         <div className="info-item">
-                            <div className="caption">BBox (0~1000 基准)</div>
+                            <div className="caption">BBox (左上/右下，0~1000 基准)</div>
                             <strong>[96, 294, 485, 640]</strong>
                             <p className="caption">page_index = 0 · 渲染时按页面尺寸等比缩放</p>
                         </div>
