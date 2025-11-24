@@ -10,6 +10,7 @@ import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 
 const DEMO_HIGHLIGHTS = {
+    // MinerU bbox: [x, y, width, height] on a 0~1000 grid.
     0: [[96, 294, 485, 640]],
 }
 
@@ -35,27 +36,30 @@ function getPageOriginalSize(page, width, height, scale) {
 }
 
 function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
-    if (!bbox || bbox.length !== 4) return null
-    let [x0, y0, x1, y1] = bbox
+    if (!Array.isArray(bbox) || bbox.length !== 4) return null
+    const numeric = bbox.map((value) => Number(value))
+    if (numeric.some((value) => !Number.isFinite(value))) return null
+    const [rawX, rawY, rawWidth, rawHeight] = numeric
     const hasPageSize =
         Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0
     if (!hasPageSize) return null
 
-    const isNormalized = [x0, y0, x1, y1].every((value) => value >= 0 && value <= 1)
-    if (isNormalized) {
-        x0 *= originalWidth
-        x1 *= originalWidth
-        y0 *= originalHeight
-        y1 *= originalHeight
-    }
+    if (rawWidth <= 0 || rawHeight <= 0) return null
 
-    const left = Math.min(x0, x1)
-    const top = Math.min(y0, y1)
-    const width = Math.abs(x1 - x0)
-    const height = Math.abs(y1 - y0)
+    const inUnitRange = numeric.every((value) => value >= 0 && value <= 1)
+    const inThousandRange = !inUnitRange && numeric.every((value) => value >= 0 && value <= 1000)
 
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width === 0 || height === 0) return null
-    return { x: left, y: top, width, height, isNormalized }
+    // MinerU bbox 使用 0~1000 的基准，需要按实际页面宽高缩放。
+    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
+    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
+
+    const x = rawX * scaleX
+    const y = rawY * scaleY
+    const width = rawWidth * scaleX
+    const height = rawHeight * scaleY
+
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
+    return { x, y, width, height, isNormalized: inUnitRange || inThousandRange }
 }
 
 function HighlightedPage({ renderPageProps, highlights, onMetrics }) {
@@ -183,9 +187,9 @@ export default function PdfHighlightDemo() {
                             <p className="caption">由后端 /api/debug/pdf-evidence-demo 透传</p>
                         </div>
                         <div className="info-item">
-                            <div className="caption">BBox (原始)</div>
+                            <div className="caption">BBox (0~1000 基准)</div>
                             <strong>[96, 294, 485, 640]</strong>
-                            <p className="caption">page_index = 0</p>
+                            <p className="caption">page_index = 0 · 渲染时按页面尺寸等比缩放</p>
                         </div>
                         <div className="info-item">
                             <div className="caption">页面尺寸</div>

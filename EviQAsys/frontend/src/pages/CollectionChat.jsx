@@ -39,8 +39,9 @@ function normalizeBBoxes(rawBBox) {
             if (!Array.isArray(coords)) return null
             const numeric = coords.map((value) => Number(value))
             if (numeric.length !== 4 || numeric.some((value) => !Number.isFinite(value))) return null
-            const [x0, y0, x1, y1] = numeric
-            return [Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1)]
+            const [x, y, width, height] = numeric
+            if (width <= 0 || height <= 0) return null
+            return [x, y, width, height]
         })
         .filter(Boolean)
 }
@@ -67,34 +68,40 @@ function getPageOriginalSize(page, width, height, scale) {
 }
 
 function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
-    if (!bbox || bbox.length !== 4) return null
-    let [x0, y0, x1, y1] = bbox
+    if (!Array.isArray(bbox) || bbox.length !== 4) return null
+    const numeric = bbox.map((value) => Number(value))
+    if (numeric.some((value) => !Number.isFinite(value))) return null
+    const [rawX, rawY, rawWidth, rawHeight] = numeric
     const hasPageSize =
         Number.isFinite(originalWidth) && Number.isFinite(originalHeight) && originalWidth > 0 && originalHeight > 0
     if (!hasPageSize) return null
 
-    const isNormalized = [x0, y0, x1, y1].every((value) => value >= 0 && value <= 1)
+    if (rawWidth <= 0 || rawHeight <= 0) return null
 
-    if (isNormalized) {
-        console.debug("Normalized bbox detected; converting to PDF points", {
+    const inUnitRange = numeric.every((value) => value >= 0 && value <= 1)
+    const inThousandRange = !inUnitRange && numeric.every((value) => value >= 0 && value <= 1000)
+
+    if (inUnitRange || inThousandRange) {
+        console.debug("Scaling bbox to PDF points", {
             bbox,
+            mode: inUnitRange ? "unit" : "thousand",
             originalWidth,
             originalHeight,
         })
-        x0 *= originalWidth
-        x1 *= originalWidth
-        y0 *= originalHeight
-        y1 *= originalHeight
     }
 
-    const left = Math.min(x0, x1)
-    const top = Math.min(y0, y1)
-    const width = Math.abs(x1 - x0)
-    const height = Math.abs(y1 - y0)
+    // MinerU bbox 使用 0~1000 的基准，需要按实际页面宽高缩放。
+    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
+    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
 
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width === 0 || height === 0) return null
+    const x = rawX * scaleX
+    const y = rawY * scaleY
+    const width = rawWidth * scaleX
+    const height = rawHeight * scaleY
 
-    return { x: left, y: top, width, height, isNormalized }
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
+
+    return { x, y, width, height, isNormalized: inUnitRange || inThousandRange }
 }
 
 function HighlightedPage({ renderPageProps, highlights }) {
