@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from ...env_setting import EVIDENCE_PROMPT_CHAR_LIMIT
+
 
 @dataclass(slots=True)
 class EvidenceText:
@@ -15,8 +17,8 @@ class EvidenceText:
 
     def as_prompt_entry(self) -> str:
         snippet = (self.text_content or "").strip()
-        if len(snippet) > 800:
-            snippet = f"{snippet[:800]}..."
+        if len(snippet) > EVIDENCE_PROMPT_CHAR_LIMIT:
+            snippet = f"{snippet[:EVIDENCE_PROMPT_CHAR_LIMIT]}..."
         score_hint = f" score={self.score:.4f}" if self.score is not None else ""
         return f"id={self.element_id} type={self.elem_type}{score_hint}\n{snippet}"
 
