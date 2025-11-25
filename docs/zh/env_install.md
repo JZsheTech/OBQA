@@ -35,6 +35,17 @@ cd sample_data/minerUtemp
 mineru-api --host 0.0.0.0 --port 18543
 ```
 
+# 混合检索数据库支持-seekdb-docker部署
+
+```
+sudo docker run -d \
+  --name seekdb \
+  -p 2893:2881 \
+  -v /data2/jproject/seekdbData:/var/lib/oceanbase/store \
+  oceanbase/seekdb:latest
+```
+
+
 # 用docker部署oceanbase
 
 OceanBase持久化存储路径：

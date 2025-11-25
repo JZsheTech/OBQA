@@ -4,10 +4,10 @@ from pathlib import Path
 
 # === 环境变量定义（示例，可从os.getenv中加载）===
 OB_HOST = "127.0.0.1"
-OB_PORT = 2881
-OB_USER = "paperQA@test"
-OB_PASSWORD = "12345678"
-OB_DATABASE = "obqademo"
+OB_PORT = 2893
+OB_USER = "root"
+OB_PASSWORD = ""
+OB_DATABASE = "test"
 OB_TIMEOUT = 30  # seconds
 
 # === Engine 初始化 ===
