@@ -316,7 +316,9 @@ class DocumentIngestor:
             nav_key = row["level_nav"]
             siblings = nav_to_indexes.get(nav_key, [])
             position = index_positions.get(idx, 0)
-            if overlap:
+            elem_type = row.get("elem_type")
+            use_overlap = overlap and elem_type not in {"image", "table"}
+            if use_overlap:
                 prev_slice = siblings[max(0, position - overlap) : position]
                 next_slice = siblings[position + 1 : position + 1 + overlap]
             else:
