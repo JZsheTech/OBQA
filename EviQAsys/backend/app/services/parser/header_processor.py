@@ -30,7 +30,11 @@ class HeaderContext:
 
 def preprocess_headers(content_list: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Augment MinerU content list entries with header hierarchy metadata."""
-    items = list(content_list)
+    items = [
+        entry
+        for entry in list(content_list)
+        if not (isinstance(entry, dict) and (entry.get("type") or "").lower() == "discarded")
+    ]
     processed: list[dict[str, Any]] = []
     header_stack: list[HeaderContext] = []
     order_end_map: dict[int, int] = {}
