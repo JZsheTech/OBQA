@@ -143,7 +143,8 @@ class DocumentIngestor:
         )
         try:
             parse_result = self._mineru_adapter.parse(stored.path, file_name=stored.original_name)
-            processed_items = preprocess_headers(parse_result.content_list)
+            content_list = self._filter_noise_entries(parse_result.content_list)
+            processed_items = preprocess_headers(content_list)
             document_title = self._determine_document_title(
                 default_title=document.get("title"),
                 processed_items=processed_items,
@@ -226,6 +227,22 @@ class DocumentIngestor:
                 elif isinstance(captions, str):
                     chunks.append(captions)
         return "\n".join(part for part in chunks if part)
+
+    def _filter_noise_entries(self, content_list: Any) -> list[dict[str, Any]]:
+        """Drop MinerU items that contain only '#' and whitespace."""
+        cleaned: list[dict[str, Any]] = []
+        skipped = 0
+        for entry in list(content_list or []):
+            if not isinstance(entry, dict):
+                cleaned.append(entry)
+                continue
+            if self._is_hash_placeholder(entry.get("text")):
+                skipped += 1
+                continue
+            cleaned.append(entry)
+        if skipped:
+            logger.info("Filtered %d MinerU items consisting of hash-only text.", skipped)
+        return cleaned
 
     def _calculate_num_pages(self, elements: list[dict[str, Any]]) -> int | None:
         pages = [row.get("page_no") for row in elements if row.get("page_no") is not None]
@@ -339,6 +356,17 @@ class DocumentIngestor:
         if value is None:
             return ""
         return str(value).strip()
+
+    @staticmethod
+    def _is_hash_placeholder(text: Any) -> bool:
+        if text is None:
+            return False
+        text_str = str(text)
+        if not text_str:
+            return False
+        if "#" not in text_str:
+            return False
+        return text_str.replace("#", "").strip() == ""
 
     def _format_text_prefix(
         self,

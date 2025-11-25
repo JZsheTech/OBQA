@@ -196,6 +196,7 @@ def ingest_pdf(pdf_path: str, doc_id: int):
 | **章节范围**         | 原文的 `order_start`、`order_end` 保留；类型改为 `VARCHAR`（与新结构保持一致）。                |
 | **header_level** | 新增字段，源自标题层级计算。                                                            |
 | **索引与性能**        | 不启用向量索引；后续检索模块按需在应用层实现。                                                   |
+| **解析清洗**        | MinerU 返回的文本若仅由 `#` 与空白组成（常见于代码注释占位行），入库前会被丢弃，避免污染 elements。          |
 
 ---
 
@@ -219,4 +220,3 @@ docs/dev_log/M2/ref_code
 
 # 参考的mineru解析出的数据格式：
 docs/dev_log/M2/ref_data_format
-
