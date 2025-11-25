@@ -63,21 +63,26 @@ Retriever
 
 ```
 
-## 简化与加速建议（兼顾用户可自定义）
-- **显式检索开关**：在 `TurnCreateRequest` 增加 `retrieval_mode`（`auto`|`force`|`skip`）或 `need_retrieve` 布尔，允许用户直接跳过 embedding+DB 检索（仅用历史/提示）或强制检索以避免 DSPy 决策误判。
-- **自定义检索范围**：开放 `elem_types`、`search_mode`（vector/fulltext）和 `text_evidence_limit/image_evidence_limit` 作为请求级参数，避免无关图片/表格进入 pipeline，减少 embedding/排序开销。
-- **历史窗口可调**：将 `max_history_turns` 暴露为参数或在 chat 级配置，便于用户选择“零上下文”快速模式或“长记忆”模式；关闭 `enable_memory_summarizer` 时可直接截断到 N 轮以省一次 DSPy 调用。
-- **视觉路径懒加载**：目前 `enable_image_vqa` 全局开启即对所有图片候选调用视觉接口。可改为：先用文本 evidence 判断是否已足够，否则再按优先级对少量图片触发 VQA；或提供 `image_strategy`（`none`|`caption_only`|`vqa_if_needed`|`vqa_all`）让用户控制延迟和成本。
-- **快速回答通道**：当 `decision.need_retrieve=False` 或检索命中为空时，可在 `AnswerComposer` 中提供轻量 prompt 模板，直接基于问题与历史返回“无证据回答/澄清问题”，避免重复 embedding 或长 prompt 构造。
-- **缓存与复用**：对相同 chat 的最近一次 embedding 结果与 evidence 列表做短期缓存（按 question hash + collection/doc id），复用在短时间的追问中；同时缓存 `image_base64` 加载结果，减少对 OceanBase 的重复读取。
-- **响应裁剪**：限制传给 DSPy 的 evidence 文本长度（现有 800 字符截断可在配置中暴露）并对 `answer_text` 进行简短化选项，提供“简洁模式”以减少模型推理时间与前端渲染负担。
+
 
 # 改进要求:
 
-Agent问答过程：
-- 在EviQAsys/backend/app/env_setting.py 中为开发者提供全面的开关选项，以默认值和环境变量的形式出现
-- 在后端提供 **显式检索开关**：在 `TurnCreateRequest` 增加 `retrieval_mode`（`auto`|`force`|`skip`），并且在前端增加一个组件来控制这个开关。
-- 在后端提供 **历史记忆调整配置**：后端给出 `max_history_turns` 和 `enable_memory_summarizer` 2个可配置参数，在env_setting.py中给出默认值和环境变量，并在前端添加小组件，允许开关这2个参数； `max_history_turns`决定问答时使用的历史记录的轮数，如果设置为0则不使用历史记录来问答，否则使用最近 `max_history_turns` 轮的记忆； 而`enable_memory_summarizer` 决定是否用LLM对记忆进行摘要和压缩。
-- 在后端提供 **视觉问答开关**： `enable_image_vqa` 作为可配置参数，默认值在env_setting.py中可配置。但在具体的chat中，可以允许前端通过用户指定当前turn是否使用视觉问答，从而临时改变这个值，在某个问题的回答中激活图像路径。
-- 在后端提供 **模态检索范围开关** : 开放可配置参数 `elem_types`、`search_mode`（vector/fulltext），并给出默认参数，前端提供组件允许用户在某一轮配置这些参数。
+目标：让问答链路的检索/记忆/视觉开关具备“系统默认（env_setting.py）+ 单轮覆盖（前端传参）”的双层控制，并保持与现有接口的向后兼容。
 
+- 后端默认配置（EviQAsys/backend/app/env_setting.py）
+  - 增加 `QAFlowSettings`（或同名结构）与 `get_qa_flow_settings()`，集中声明 QA 相关默认值并允许环境变量覆盖：`QA_MAX_HISTORY_TURNS`（默认 8）、`QA_TEXT_EVIDENCE_LIMIT`（8）、`QA_IMAGE_EVIDENCE_LIMIT`（4）、`QA_ENABLE_MEMORY_SUMMARIZER`（False）、`QA_ENABLE_IMAGE_VQA`（False）、`QA_DEFAULT_RETRIEVAL_MODE`（auto|force|skip，默认 auto）、`QA_DEFAULT_SEARCH_MODE`（vector|fulltext，默认 vector）、`QA_DEFAULT_ELEM_TYPES`（逗号分隔，默认 text,header,table,image）。`QAFlowConfig` 的默认值需与这里保持一致。
+
+- 请求/响应契约（EviQAsys/backend/app/schemas/qa.py + api/routes/chats.py）
+  - 在 `TurnCreateRequest` 增加可选字段：`retrieval_mode`（Literal["auto","force","skip"]）、`elem_types`（list[str]）、`search_mode`（Literal["vector","fulltext"]）、`max_history_turns`（int >=0）、`enable_image_vqa`、`enable_memory_summarizer`。旧字段默认行为不变，未提供时走 env 默认。
+  - 在 `create_turn` 路由中读取上述字段，传入 `run_qa_turn`。保持 top_k 处理逻辑不变（1~30 取整，默认 8）。
+  - `run_qa_turn` / `QAOrchestrator` 构造时注入 `QAFlowSettings`，并接受每次请求的临时覆盖值。
+
+- QAOrchestrator 执行逻辑（EviQAsys/backend/app/services/qa_flow/qa_orchestrator.py）
+  - 引入 per-turn 配置来源（请求字段优先，其次 env 默认），覆盖 `max_history_turns`、`enable_memory_summarizer`、`enable_image_vqa`、`text_evidence_limit`、`image_evidence_limit`。
+  - 新增 `retrieval_mode` 分支：`skip` 直接跳过 `RetrievalDecider` 与检索，使用历史/记忆直接回答；`force` 固定 `need_retrieve=True`，`elem_types` 优先用请求字段，否则用 `RetrievalDecider` 结果；`auto` 维持现有决策流程。
+  - 将 `elem_types`/`search_mode` 透传到 `Retriever.retrieve_topk`（当前 retriever 已支持 search_mode 参数），并在日志中记录最终采用的模式与类型。
+  - VQA 路径默认值取自 env，可被请求字段覆盖；仅在最终 enable_image_vqa=True 时实例化 `VisionVQAClient`。
+
+- 前端控制面板（EviQAsys/frontend）
+  - 在 `src/api/client.js` 的 `createTurn` 请求中增加 `retrieval_mode`、`elem_types`、`search_mode`、`max_history_turns`、`enable_image_vqa`、`enable_memory_summarizer` 参数（保持 snake_case 与后端一致，未填写不传）。
+  - 在聊天页面（`src/pages/CollectionChat.jsx` / `DocumentChat.jsx` 或共享组件）新增交互控件：检索模式选择器（auto/force/skip）、搜索模式（vector/fulltext）、模态多选（text/header/table/image/equation）、历史轮数输入、记忆摘要开关、视觉问答开关。默认值与 env_setting 中保持一致，提交时组装到 `createTurn` 请求体。
