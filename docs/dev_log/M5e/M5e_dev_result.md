@@ -1,6 +1,6 @@
 ## M5e 开发结果
 
-- 后端接口：新增 `POST /api/collections/{collection_id}/chats` 创建 collection 级聊天；`GET /api/chats/{chat_id}` 返回 chat 元信息、turns（包含 evidences、`answer_with_evidence` 与 `evidence_no_mapping`）；`GET /api/turns/{turn_id}/evidences` 便于按 turn 补充锚点信息；`TurnResponse` 增加 `answer_with_evidence` 字段；默认 LLM 模型改为 `qwen3:235b`。
+- 后端接口：新增 `POST /api/collections/{collection_id}/chats` 创建 collection 级聊天；`GET /api/chats/{chat_id}` 返回 chat 元信息、turns（包含 evidences、`answer_with_evidence` 与 `evidence_no_mapping`）；`GET /api/turns/{turn_id}/evidences` 便于按 turn 补充锚点信息；`TurnResponse` 增加 `answer_with_evidence` 字段；默认 LLM 模型改为 `x-ai/grok-4.1-fast`（OpenRouter，仍可通过环境变量切回 Ollama）。
 - Chat 详情解析：基于历史 turn 的 `[Elem#id]` 构建 evidence 编号映射，批量加载元素信息（doc_id/page_no/bbox/level_nav/text_content），每条 turn 返回 evidences 与映射后的答案文本，方便前端直接渲染 `[Evidence#no]`。
 - 前端 API 客户端：新增 `createCollectionChat`、`getChatDetail`、`createTurn`、`getTurnEvidences`，沿用 envelope 解析。
 - Collection Chat 页面：三栏布局落地，聊天流渲染可点击的 Evidence 标签，发送问题后刷新历史；中栏用 `react-pdf-viewer` + `renderPage` 自定义高亮层，支持文档切换与“打开原始 PDF”；右侧 Sidebar 展示聊天列表、当前 chat 高亮及选中证据元信息联动。

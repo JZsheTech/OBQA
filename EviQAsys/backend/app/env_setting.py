@@ -51,7 +51,9 @@ OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
 OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
 OLLAMA_BASE_URL: str = f"{OLLAMA_PROTOCOL}://{OLLAMA_HOST}:{OLLAMA_PORT}"
 OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
-
+OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
+DEFAULT_TEXT_LLM_MODEL: str = "x-ai/grok-4.1-fast"
+OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY", "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")
 
 @dataclass(frozen=True)
 class MinerUSettings:
@@ -82,9 +84,9 @@ class EmbeddingSettings:
 
 @dataclass(frozen=True)
 class LLMSettings:
-    model: str = _get_env("LLM_MODEL_NAME", "qwen3:235b")
-    api_base: str = _get_env("LLM_API_BASE", OLLAMA_OPENAI_BASE_URL)
-    api_key: str = _get_env("LLM_API_KEY", "EMPTY")
+    model: str = _get_env("LLM_MODEL_NAME", DEFAULT_TEXT_LLM_MODEL)
+    api_base: str = _get_env("LLM_API_BASE", OPENROUTER_API_BASE_URL)
+    api_key: str = _get_env("LLM_API_KEY", OPENROUTER_API_KEY)
     api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
     temperature: float = _get_float_env("LLM_TEMPERATURE", 0.2)
     max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 16000)
@@ -126,7 +128,7 @@ def get_embedding_settings() -> EmbeddingSettings:
 
 @lru_cache(maxsize=1)
 def get_llm_settings() -> LLMSettings:
-    """Return DSPy/OpenAI LLM configuration."""
+    """Return DSPy/OpenAI LLM configuration (OpenRouter grok-4.1-fast by default)."""
     return LLMSettings()
 
 
@@ -146,6 +148,8 @@ __all__ = [
     "OLLAMA_PORT",
     "OLLAMA_BASE_URL",
     "OLLAMA_OPENAI_BASE_URL",
+    "OPENROUTER_API_BASE_URL",
+    "DEFAULT_TEXT_LLM_MODEL",
     "OceanBaseSettings",
     "MinerUSettings",
     "UploadSettings",
