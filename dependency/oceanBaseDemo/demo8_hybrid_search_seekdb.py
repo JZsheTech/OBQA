@@ -2,6 +2,32 @@ import json
 from sqlalchemy import text
 from ob_vector_utils import engine_conn
 
+# 注意：当前混合检索的api不支持投影操作，也就是返回的row里面包含表中的所有属性的值,需要手动做投影操作。
+# 混合检索时 knn的topK只是其中一部分，还有full-text那边的结果也会一起加进来，所以总的结果数可能会超过topK
+        # row = conn.execute(sql, {"parm": json_str}).fetchone()
+        # print(row[0], "\n") # row[0]中包含了所有结果，格式是 list[dict]
+# 示例的输出格式:
+"""
+
+[
+  {
+    "c1": 3,
+    "query": "hello world, how are you",
+    "_score": 0.7006369426751594,
+    "vector": "[1,1,1]",
+    "content": "oceanbase oracle database",
+    "test_id": 14
+  },
+  {
+    "c1": 6,
+    "query": "hello world, where are you from",
+    "_score": 0.7006369426751594,
+    "vector": "[2,1,1]",
+    "content": "starrocks oceanbase database",
+    "test_id": 17
+  }
+] 
+"""
 
 # ================================
 # 1. 初始化表结构 + 插入数据
@@ -14,6 +40,7 @@ def setup_doc_table():
 
         CREATE TABLE doc_table(
             c1 INT,
+            test_id INT,
             vector VECTOR(3),
             query VARCHAR(255),
             content VARCHAR(255),
@@ -25,12 +52,12 @@ def setup_doc_table():
 
     insert_sql = text("""
         INSERT INTO doc_table VALUES
-            (1, '[1,2,3]', "hello world", "oceanbase Elasticsearch database"),
-            (2, '[1,2,1]', "hello world, what is your name", "oceanbase mysql database"),
-            (3, '[1,1,1]', "hello world, how are you", "oceanbase oracle database"),
-            (4, '[1,3,1]', "real world, where are you from", "postgres oracle database"),
-            (5, '[1,3,2]', "real world, how old are you", "redis oracle database"),
-            (6, '[2,1,1]', "hello world, where are you from", "starrocks oceanbase database");
+            (1, 12, '[1,2,3]', "hello world", "oceanbase Elasticsearch database"),
+            (2, 13, '[1,2,1]', "hello world, what is your name", "oceanbase mysql database"),
+            (3, 14, '[1,1,1]', "hello world, how are you", "oceanbase oracle database"),
+            (4, 15, '[1,3,1]', "real world, where are you from", "postgres oracle database"),
+            (5, 16, '[1,3,2]', "real world, how old are you", "redis oracle database"),
+            (6, 17, '[2,1,1]', "hello world, where are you from", "starrocks oceanbase database");
     """)
 
     with engine_conn() as conn:
@@ -52,7 +79,7 @@ def hybrid_search_method2_with_boost():
         },
         "knn": {
             "field": "vector",
-            "k": 5,
+            "k": 1,
             "query_vector": [1, 2, 3],
             "boost": 1.0        # 向量检索权重
         }
@@ -70,7 +97,7 @@ def hybrid_search_method2_with_boost():
 
     with engine_conn() as conn:
         row = conn.execute(sql, {"parm": json_str}).fetchone()
-        print(row[0], "\n")
+        print(row[0], "\n") # row[0]中包含了所有结果，格式是 list[dict]
 
 
 # ================================
@@ -148,6 +175,6 @@ def hybrid_search_method3_with_boost():
 # ================================
 if __name__ == "__main__":
     setup_doc_table()
-    hybrid_search_method2_no_boost()
+    # hybrid_search_method2_no_boost()
     hybrid_search_method2_with_boost()
-    hybrid_search_method3_with_boost()
+    # hybrid_search_method3_with_boost()
