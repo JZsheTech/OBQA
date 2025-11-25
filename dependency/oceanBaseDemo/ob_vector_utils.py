@@ -8,7 +8,7 @@ from pyobvector import ObVecClient
 DSN = "mysql+pymysql://root:@127.0.0.1:2893/test?charset=utf8mb4"
 OB_HOST = "127.0.0.1:2893"
 OB_USER = "root"
-OB_DB   =  "test" # "default1"
+OB_DB   =  "test"
 OB_PASS = ""
 
 # 固定用于 Demo 的表名（避免随机表名造成脏数据）
