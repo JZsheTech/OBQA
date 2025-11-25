@@ -49,8 +49,8 @@ def test_pass_json_as_param():
         }
     }
 
-    # Test 1: Python dict (必然失败)
-    print("=== 测试 #1：直接传 Python dict（预期失败）===")
+    # 方法 1: Python dict (会失败)
+    print("=== 测试 #1：直接传 Python dict（失败）===")
     try:
         with engine_conn() as conn:
             result = conn.execute(
@@ -61,8 +61,8 @@ def test_pass_json_as_param():
     except Exception as e:
         print("ERROR:", e)
 
-    # Test 2: json.dumps 字符串（DBMS_HYBRID_SEARCH 解析失败）
-    print("\n=== 测试 #2：使用 json.dumps 后作为参数（预期 SEEKDB 解析失败）===")
+    # 方法 2: json.dumps 字符串（DBMS_HYBRID_SEARCH 执行成功）
+    print("\n=== 测试 #2：使用 json.dumps 后作为参数")
     try:
         json_str = json.dumps(param_dict)
         with engine_conn() as conn:
@@ -74,8 +74,8 @@ def test_pass_json_as_param():
     except Exception as e:
         print("ERROR:", e)
 
-    # Test 3: 直接拼 SQL literal（唯一成功方式）
-    print("\n=== 测试 #3：拼 SQL literal（预期唯一成功方式）===")
+    # 方法 3: 直接拼 SQL literal（成功）
+    print("\n=== 测试 #3：拼 SQL literal（成功）===")
     try:
         json_literal = json.dumps(param_dict).replace("'", "\\'")
         sql = text(f"""
