@@ -35,10 +35,10 @@ def _get_float_env(name: str, default: float) -> float:
 @dataclass(frozen=True)
 class OceanBaseSettings:
     host: str = _get_env("OB_HOST", "127.0.0.1")
-    port: int = _get_int_env("OB_PORT", 2881)
-    user: str = _get_env("OB_USER", "paperQA@test")
-    password: str = _get_env("OB_PASSWORD", "12345678")
-    default_database: str = _get_env("OB_DEFAULT_DATABASE", "obqa_dev")
+    port: int = _get_int_env("OB_PORT", 2893)
+    user: str = _get_env("OB_USER", "root")
+    password: str = _get_env("OB_PASSWORD", "")
+    default_database: str = _get_env("OB_DEFAULT_DATABASE", "test")
     connect_timeout: int = _get_int_env("DATABASE_CONNECT_TIMEOUT", 10)
 
 
