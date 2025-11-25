@@ -74,4 +74,10 @@ Retriever
 
 # 改进要求:
 
+Agent问答过程：
+- 在EviQAsys/backend/app/env_setting.py 中为开发者提供全面的开关选项，以默认值和环境变量的形式出现
+- 在后端提供 **显式检索开关**：在 `TurnCreateRequest` 增加 `retrieval_mode`（`auto`|`force`|`skip`），并且在前端增加一个组件来控制这个开关。
+- 在后端提供 **历史记忆调整配置**：后端给出 `max_history_turns` 和 `enable_memory_summarizer` 2个可配置参数，在env_setting.py中给出默认值和环境变量，并在前端添加小组件，允许开关这2个参数； `max_history_turns`决定问答时使用的历史记录的轮数，如果设置为0则不使用历史记录来问答，否则使用最近 `max_history_turns` 轮的记忆； 而`enable_memory_summarizer` 决定是否用LLM对记忆进行摘要和压缩。
+- 在后端提供 **视觉问答开关**： `enable_image_vqa` 作为可配置参数，默认值在env_setting.py中可配置。但在具体的chat中，可以允许前端通过用户指定当前turn是否使用视觉问答，从而临时改变这个值，在某个问题的回答中激活图像路径。
+- 在后端提供 **模态检索范围开关** : 开放可配置参数 `elem_types`、`search_mode`（vector/fulltext），并给出默认参数，前端提供组件允许用户在某一轮配置这些参数。
 
