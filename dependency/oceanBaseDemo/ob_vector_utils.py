@@ -5,11 +5,11 @@ from contextlib import contextmanager
 from pyobvector import ObVecClient
 
 # ---------- 连接参数 ----------
-DSN = "mysql+pymysql://paperQA%40test:12345678@127.0.0.1:2881/default1?charset=utf8mb4"
-OB_HOST = "127.0.0.1:2881"
-OB_USER = "paperQA@test"
-OB_DB   =  "ob_demo" # "default1"
-OB_PASS = "12345678"
+DSN = "mysql+pymysql://root:@127.0.0.1:2893/test?charset=utf8mb4"
+OB_HOST = "127.0.0.1:2893"
+OB_USER = "root"
+OB_DB   =  "test" # "default1"
+OB_PASS = ""
 
 # 固定用于 Demo 的表名（避免随机表名造成脏数据）
 OB_DEMO_TABLE = "obqa_demo_vector"
