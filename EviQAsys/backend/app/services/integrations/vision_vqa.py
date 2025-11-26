@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import requests
+from openai import OpenAI
 
 from ...env_setting import VisionVQASettings, get_vision_vqa_settings
 from ...repositories import ElementsRepository
@@ -28,6 +29,7 @@ class VisionVQAClient:
         self._elements_repo = elements_repo or ElementsRepository()
         self._settings = settings or get_vision_vqa_settings()
         self._session = session or requests.Session()
+        self._client = self._init_client()
 
     def summarize(
         self,
@@ -67,24 +69,34 @@ class VisionVQAClient:
             ],
             "max_tokens": self._settings.max_tokens,
         }
-        headers = {"Content-Type": "application/json"}
-        if self._settings.api_key:
-            headers[self._settings.api_key_header] = self._settings.api_key
         try:
-            response = self._session.post(
-                self._settings.endpoint,
-                json=payload,
-                headers=headers,
+            completion = self._client.chat.completions.create(
+                model=self._settings.model,
+                messages=payload["messages"],
+                max_tokens=self._settings.max_tokens,
                 timeout=self._settings.timeout_s,
             )
-            response.raise_for_status()
-            data = response.json()
         except Exception as exc:
             raise VisionVQAError("Vision VQA request failed.") from exc
-        summary = self._extract_text(data)
+        summary = self._extract_text(completion)
         if not summary:
             raise VisionVQAError("Vision VQA returned empty response.")
         return summary.strip()
+
+    def _init_client(self) -> OpenAI:
+        client_kwargs: dict[str, Any] = {"base_url": self._settings.endpoint}
+        if self._settings.api_key:
+            client_kwargs["api_key"] = self._settings.api_key
+        extra_headers = self._build_extra_headers()
+        if extra_headers:
+            client_kwargs["default_headers"] = extra_headers
+        return OpenAI(**client_kwargs)
+
+    def _build_extra_headers(self) -> dict[str, str]:
+        headers: dict[str, str] = {}
+        if self._settings.api_key and self._settings.api_key_header.lower() != "authorization":
+            headers[self._settings.api_key_header] = self._settings.api_key
+        return headers
 
     @staticmethod
     def _build_prompt(question: str, caption: str, context: str) -> str:
@@ -104,6 +116,11 @@ class VisionVQAClient:
 
     @staticmethod
     def _extract_text(payload: Any) -> str:
+        if hasattr(payload, "model_dump"):
+            try:
+                payload = payload.model_dump()
+            except Exception:  # pragma: no cover - defensive logging only
+                logger.debug("Vision VQA payload model_dump failed: %s", payload)
         if isinstance(payload, dict):
             choices = payload.get("choices")
             if isinstance(choices, list) and choices:
