@@ -55,6 +55,7 @@ OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
 DEFAULT_TEXT_LLM_MODEL: str = "x-ai/grok-4.1-fast"
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY", "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")
+DEFAULT_VLSION_MODEL = "x-ai/grok-4-fast"
 
 @dataclass(frozen=True)
 class MinerUSettings:
@@ -95,9 +96,9 @@ class LLMSettings:
 
 @dataclass(frozen=True)
 class VisionVQASettings:
-    endpoint: str = _get_env("VISION_VQA_ENDPOINT", OLLAMA_OPENAI_BASE_URL)
-    model: str = _get_env("VISION_VQA_MODEL", "qwen2.5-vl-72b")
-    api_key: str = _get_env("VISION_VQA_API_KEY", "EMPTY")
+    endpoint: str = _get_env("VISION_VQA_ENDPOINT", OPENROUTER_API_BASE_URL)
+    model: str = _get_env("VISION_VQA_MODEL",DEFAULT_VLSION_MODEL ) #  "x-ai/grok-4-fast"
+    api_key: str = _get_env("VISION_VQA_API_KEY", OPENROUTER_API_KEY)
     api_key_header: str = _get_env("VISION_VQA_API_KEY_HEADER", "Authorization")
     timeout_s: int = _get_int_env("VISION_VQA_TIMEOUT_S", 120)
     max_tokens: int = _get_int_env("VISION_VQA_MAX_TOKENS", 400)
