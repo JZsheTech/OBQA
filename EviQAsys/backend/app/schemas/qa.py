@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -13,12 +14,29 @@ class TurnCreateRequest(BaseModel):
         le=30,
         description="Optional override for retrieval TopK.",
     )
+    retrieval_mode: Literal["auto", "force", "skip"] | None = Field(
+        default=None,
+        description="Per-turn retrieval mode (auto uses decider; force/skip override).",
+    )
+    elem_types: list[str] | None = Field(
+        default=None,
+        description="Optional element type filters (e.g., text/header/table/image/equation).",
+    )
+    search_mode: Literal["vector", "fulltext"] | None = Field(
+        default=None,
+        description="Search backend selection for this turn.",
+    )
+    max_history_turns: int | None = Field(
+        default=None,
+        ge=0,
+        description="Override how many previous turns participate in memory/history.",
+    )
     enable_image_vqa: bool | None = Field(
-        default=False,
+        default=None,
         description="Enable expensive visual question answering path.",
     )
     enable_memory_summarizer: bool | None = Field(
-        default=False,
+        default=None,
         description="Enable DSPy MemorySummarizer; default uses raw recent history.",
     )
 

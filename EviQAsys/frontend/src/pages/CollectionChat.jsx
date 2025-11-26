@@ -20,6 +20,18 @@ import Drawer from "../components/ui/Drawer"
 import Modal from "../components/ui/Modal"
 import { useToast } from "../components/ui/Toast"
 
+const DEFAULT_RETRIEVAL_MODE = "auto"
+const DEFAULT_SEARCH_MODE = "vector"
+const DEFAULT_MAX_HISTORY_TURNS = "8"
+const DEFAULT_ELEM_TYPES = ["text", "header", "table", "image"]
+const ELEMENT_TYPE_OPTIONS = [
+    { value: "text", label: "Text" },
+    { value: "header", label: "Header" },
+    { value: "table", label: "Table" },
+    { value: "image", label: "Image" },
+    { value: "equation", label: "Equation" },
+]
+
 function formatDateTime(value) {
     if (!value) return "--"
     try {
@@ -322,6 +334,12 @@ export default function CollectionChat() {
     const [showChatDrawer, setShowChatDrawer] = useState(false)
     const [showMetaPanel, setShowMetaPanel] = useState(false)
     const [showEvidencePopover, setShowEvidencePopover] = useState(false)
+    const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
+    const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
+    const [elemTypes, setElemTypes] = useState(DEFAULT_ELEM_TYPES)
+    const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
+    const [enableImageVqa, setEnableImageVqa] = useState(false)
+    const [enableMemorySummarizer, setEnableMemorySummarizer] = useState(false)
 
     const navigationPlugin = pageNavigationPlugin()
     const { jumpToPage } = navigationPlugin
@@ -371,6 +389,33 @@ export default function CollectionChat() {
     useEffect(() => {
         setShowEvidencePopover(false)
     }, [selectedDocId])
+
+    const elemTypeSet = useMemo(
+        () => new Set(elemTypes.map((item) => (item || "").toLowerCase())),
+        [elemTypes],
+    )
+
+    function toggleElemType(value) {
+        const normalized = (value || "").toLowerCase()
+        setElemTypes((prev) => {
+            const next = new Set(prev.map((item) => (item || "").toLowerCase()))
+            if (next.has(normalized)) {
+                next.delete(normalized)
+            } else {
+                next.add(normalized)
+            }
+            return ELEMENT_TYPE_OPTIONS.map((option) => option.value).filter((option) => next.has(option))
+        })
+    }
+
+    function resetQaControls() {
+        setRetrievalMode(DEFAULT_RETRIEVAL_MODE)
+        setSearchMode(DEFAULT_SEARCH_MODE)
+        setElemTypes([...DEFAULT_ELEM_TYPES])
+        setMaxHistoryTurns(DEFAULT_MAX_HISTORY_TURNS)
+        setEnableImageVqa(false)
+        setEnableMemorySummarizer(false)
+    }
 
     const pageHighlights = useMemo(() => {
         if (evidenceDocId && selectedDocId && evidenceDocId !== Number(selectedDocId)) return {}
@@ -451,9 +496,22 @@ export default function CollectionChat() {
             addToast({ type: "error", title: "缺少 chatId", message: "请先创建或选择聊天" })
             return
         }
+        const parsedHistory = maxHistoryTurns === "" ? undefined : Number(maxHistoryTurns)
+        const normalizedHistory =
+            parsedHistory === undefined || Number.isNaN(parsedHistory)
+                ? undefined
+                : Math.max(0, Math.floor(parsedHistory))
         setSending(true)
         try {
-            await createTurn(chatId, { question })
+            await createTurn(chatId, {
+                question,
+                retrievalMode,
+                searchMode,
+                elemTypes,
+                maxHistoryTurns: normalizedHistory,
+                enableImageVqa,
+                enableMemorySummarizer,
+            })
             setDraftQuestion("")
             await loadChatDetail()
         } catch (error) {
@@ -582,6 +640,147 @@ export default function CollectionChat() {
                             <p className="caption">展示用户问题、回答与 `[Evidence#no]` 标签。</p>
                         </div>
                         <span className="pill muted">{loadingChat ? "加载中..." : "M5e ready"}</span>
+                    </div>
+
+                    <div
+                        className="qa-control-panel"
+                        style={{
+                            margin: "0 0 12px",
+                            padding: "12px",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "12px",
+                            background: "#f8fafc",
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: "12px",
+                                marginBottom: "8px",
+                            }}
+                        >
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <strong>QA 控制面板</strong>
+                                <span className="caption muted">
+                                    默认遵循 env_setting，可按需强制检索/跳过检索、切换向量/全文与元素类型。
+                                </span>
+                            </div>
+                            <Button variant="ghost" onClick={resetQaControls} type="button">
+                                重置为默认
+                            </Button>
+                        </div>
+
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                gap: "12px",
+                            }}
+                        >
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="retrieval-mode-select">
+                                    检索模式
+                                </label>
+                                <select
+                                    id="retrieval-mode-select"
+                                    className="search-bar__select"
+                                    value={retrievalMode}
+                                    onChange={(event) => setRetrievalMode(event.target.value)}
+                                >
+                                    <option value="auto">Auto · 决策模式</option>
+                                    <option value="force">Force · 强制检索</option>
+                                    <option value="skip">Skip · 直接回答</option>
+                                </select>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="search-mode-select">
+                                    搜索模式
+                                </label>
+                                <select
+                                    id="search-mode-select"
+                                    className="search-bar__select"
+                                    value={searchMode}
+                                    onChange={(event) => setSearchMode(event.target.value)}
+                                >
+                                    <option value="vector">向量</option>
+                                    <option value="fulltext">全文</option>
+                                </select>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="history-turns-input">
+                                    历史轮数
+                                </label>
+                                <input
+                                    id="history-turns-input"
+                                    className="input"
+                                    type="number"
+                                    min="0"
+                                    value={maxHistoryTurns}
+                                    onChange={(event) => setMaxHistoryTurns(event.target.value)}
+                                    placeholder="默认为 8"
+                                />
+                                <span className="caption muted">设为 0 表示不带入历史轮次。</span>
+                            </div>
+                        </div>
+
+                        <div className="stack" style={{ gap: "6px", marginTop: "10px" }}>
+                            <span className="caption">元素类型过滤</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                                {ELEMENT_TYPE_OPTIONS.map((option) => (
+                                    <label
+                                        key={option.value}
+                                        className="pill"
+                                        style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: "6px",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={elemTypeSet.has(option.value)}
+                                            onChange={() => toggleElemType(option.value)}
+                                        />
+                                        <span>{option.label}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "16px",
+                                flexWrap: "wrap",
+                                marginTop: "10px",
+                            }}
+                        >
+                            <label
+                                className="inline-kv"
+                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={enableMemorySummarizer}
+                                    onChange={(event) => setEnableMemorySummarizer(event.target.checked)}
+                                />
+                                <span className="caption">记忆摘要开关</span>
+                            </label>
+                            <label
+                                className="inline-kv"
+                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={enableImageVqa}
+                                    onChange={(event) => setEnableImageVqa(event.target.checked)}
+                                />
+                                <span className="caption">视觉问答（VQA）</span>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="chat-messages">

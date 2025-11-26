@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
+from ...env_setting import QAFlowSettings, get_qa_flow_settings
 from ...repositories import (
     ChatsRepository,
     DocumentsRepository,
@@ -36,6 +37,103 @@ class QAFlowConfig:
     text_evidence_limit: int = 8
     image_evidence_limit: int = 4
     enable_memory_summarizer: bool = False
+    enable_image_vqa: bool = False
+    retrieval_mode: str = "auto"
+    search_mode: str = "vector"
+    elem_types: tuple[str, ...] | None = ("text", "header", "table", "image")
+
+    def __post_init__(self) -> None:
+        self.max_history_turns = max(0, int(self.max_history_turns))
+        self.text_evidence_limit = max(0, int(self.text_evidence_limit))
+        self.image_evidence_limit = max(0, int(self.image_evidence_limit))
+        self.enable_memory_summarizer = bool(self.enable_memory_summarizer)
+        self.enable_image_vqa = bool(self.enable_image_vqa)
+        self.retrieval_mode = self._normalize_retrieval_mode(self.retrieval_mode) or "auto"
+        self.search_mode = self._normalize_search_mode(self.search_mode) or "vector"
+        self.elem_types = self._normalize_elem_types(self.elem_types) or None
+
+    @classmethod
+    def from_settings(cls, settings: QAFlowSettings | None = None) -> "QAFlowConfig":
+        settings = settings or get_qa_flow_settings()
+        return cls(
+            max_history_turns=settings.max_history_turns,
+            text_evidence_limit=settings.text_evidence_limit,
+            image_evidence_limit=settings.image_evidence_limit,
+            enable_memory_summarizer=settings.enable_memory_summarizer,
+            enable_image_vqa=settings.enable_image_vqa,
+            retrieval_mode=settings.default_retrieval_mode,
+            search_mode=settings.default_search_mode,
+            elem_types=settings.default_elem_types,
+        )
+
+    def with_overrides(
+        self,
+        *,
+        max_history_turns: int | None = None,
+        text_evidence_limit: int | None = None,
+        image_evidence_limit: int | None = None,
+        enable_memory_summarizer: bool | None = None,
+        enable_image_vqa: bool | None = None,
+        retrieval_mode: str | None = None,
+        search_mode: str | None = None,
+        elem_types: Iterable[str] | None = None,
+    ) -> "QAFlowConfig":
+        return QAFlowConfig(
+            max_history_turns=self._normalize_int(max_history_turns, fallback=self.max_history_turns),
+            text_evidence_limit=self._normalize_int(text_evidence_limit, fallback=self.text_evidence_limit),
+            image_evidence_limit=self._normalize_int(image_evidence_limit, fallback=self.image_evidence_limit),
+            enable_memory_summarizer=self._normalize_bool(enable_memory_summarizer, fallback=self.enable_memory_summarizer),
+            enable_image_vqa=self._normalize_bool(enable_image_vqa, fallback=self.enable_image_vqa),
+            retrieval_mode=self._normalize_retrieval_mode(retrieval_mode) or self.retrieval_mode,
+            search_mode=self._normalize_search_mode(search_mode) or self.search_mode,
+            elem_types=self._normalize_elem_types(elem_types) if elem_types is not None else self.elem_types,
+        )
+
+    @staticmethod
+    def _normalize_int(value: int | None, *, fallback: int, min_value: int = 0) -> int:
+        if value is None:
+            return max(min_value, fallback)
+        try:
+            numeric = int(value)
+        except (TypeError, ValueError):
+            return max(min_value, fallback)
+        return max(min_value, numeric)
+
+    @staticmethod
+    def _normalize_bool(value: bool | None, *, fallback: bool) -> bool:
+        if value is None:
+            return bool(fallback)
+        return bool(value)
+
+    @staticmethod
+    def _normalize_retrieval_mode(value: str | None) -> str | None:
+        if not value:
+            return None
+        lowered = str(value).lower()
+        if lowered in {"auto", "force", "skip"}:
+            return lowered
+        return None
+
+    @staticmethod
+    def _normalize_search_mode(value: str | None) -> str | None:
+        if not value:
+            return None
+        lowered = str(value).lower()
+        if lowered in {"vector", "fulltext"}:
+            return lowered
+        return None
+
+    @staticmethod
+    def _normalize_elem_types(elem_types: Iterable[str] | None) -> tuple[str, ...] | None:
+        if not elem_types:
+            return None
+        normalized: list[str] = []
+        for entry in elem_types:
+            cleaned = str(entry or "").strip().lower()
+            if not cleaned or cleaned in normalized:
+                continue
+            normalized.append(cleaned)
+        return tuple(normalized) or None
 
 
 class QAOrchestrator:
@@ -57,7 +155,9 @@ class QAOrchestrator:
         image_question_generator: ImageQuestionGenerator | None = None,
         vision_client: VisionVQAClient | None = None,
         config: QAFlowConfig | None = None,
+        qa_settings: QAFlowSettings | None = None,
     ) -> None:
+        self._qa_settings = qa_settings or get_qa_flow_settings()
         self._chats_repo = chats_repo or ChatsRepository()
         self._documents_repo = documents_repo or DocumentsRepository()
         self._turns_repo = turns_repo or TurnsRepository()
@@ -65,12 +165,13 @@ class QAOrchestrator:
         self._elements_repo = elements_repo or ElementsRepository()
         self._retriever = retriever or Retriever()
         self._memory_service = memory_service or MemoryService()
-        self._retrieval_decider = retrieval_decider or RetrievalDecider()
+        base_config = config or QAFlowConfig.from_settings(self._qa_settings)
+        self._retrieval_decider = retrieval_decider or RetrievalDecider(default_types=base_config.elem_types)
         self._query_rewriter = query_rewriter or QueryRewriter()
         self._answer_composer = answer_composer or AnswerComposer()
         self._image_question_generator = image_question_generator or ImageQuestionGenerator()
         self._vision_client = vision_client
-        self._config = config or QAFlowConfig()
+        self._config = base_config
 
     def run(
         self,
@@ -78,7 +179,14 @@ class QAOrchestrator:
         chat_id: int,
         question: str,
         top_k: int = 8,
-        enable_image_vqa: bool = False,
+        retrieval_mode: str | None = None,
+        elem_types: Iterable[str] | None = None,
+        search_mode: str | None = None,
+        max_history_turns: int | None = None,
+        enable_image_vqa: bool | None = None,
+        enable_memory_summarizer: bool | None = None,
+        text_evidence_limit: int | None = None,
+        image_evidence_limit: int | None = None,
     ) -> QATurnResult:
         question_text = (question or "").strip()
         if not question_text:
@@ -88,21 +196,55 @@ class QAOrchestrator:
             raise ChatNotFoundError(f"Chat {chat_id} not found.")
         collection_id, document_id = self._resolve_chat_scope(chat)
         history_turns = self._turns_repo.list_by_chat(chat_id)
-        history_text = format_history_text(history_turns, max_turns=self._config.max_history_turns)
+        requested_elem_types = QAFlowConfig._normalize_elem_types(elem_types) if elem_types is not None else None
+        config = self._config.with_overrides(
+            max_history_turns=max_history_turns,
+            text_evidence_limit=text_evidence_limit,
+            image_evidence_limit=image_evidence_limit,
+            enable_memory_summarizer=enable_memory_summarizer,
+            enable_image_vqa=enable_image_vqa,
+            retrieval_mode=retrieval_mode,
+            search_mode=search_mode,
+            elem_types=requested_elem_types if elem_types is not None else None,
+        )
+        history_text = format_history_text(history_turns, max_turns=config.max_history_turns)
         memory_summary = history_text
-        if self._config.enable_memory_summarizer and history_text:
+        if config.enable_memory_summarizer and history_text:
             memory_summary = self._memory_service.summarize_history(history_text)
 
-        decision = self._retrieval_decider.decide(question_text, memory_summary)
+        decision = None
+        need_retrieve = False
+        elem_types_for_retrieval = requested_elem_types or config.elem_types
+        if config.retrieval_mode != "skip":
+            decision = self._retrieval_decider.decide(question_text, memory_summary)
+            if config.retrieval_mode == "force":
+                need_retrieve = True
+            else:
+                need_retrieve = bool(decision.need_retrieve) if decision else False
+            elem_types_for_retrieval = (
+                requested_elem_types
+                or (decision.element_types if decision else None)
+                or config.elem_types
+            )
         logger.info(
-            "QAFlow: chat=%s need_retrieve=%s elem_types=%s",
+            "QAFlow: chat=%s mode=%s need_retrieve=%s search_mode=%s elem_types=%s",
             chat_id,
-            decision.need_retrieve,
-            decision.element_types,
+            config.retrieval_mode,
+            need_retrieve,
+            config.search_mode,
+            elem_types_for_retrieval,
+        )
+        logger.info(
+            "QAFlow limits: max_history=%s text_limit=%s image_limit=%s memory=%s vqa=%s",
+            config.max_history_turns,
+            config.text_evidence_limit,
+            config.image_evidence_limit,
+            config.enable_memory_summarizer,
+            config.enable_image_vqa,
         )
         text_evidences: list[EvidenceText] = []
         image_candidates: list[dict[str, object]] = []
-        if decision.need_retrieve:
+        if need_retrieve:
             search_query = self._query_rewriter.rewrite(question_text, memory_summary) or question_text
             try:
                 results = self._retriever.retrieve_topk(
@@ -110,7 +252,8 @@ class QAOrchestrator:
                     doc_id=document_id,
                     query_text=search_query,
                     top_k=max(1, min(top_k, 20)),
-                    elem_types=decision.element_types,
+                    elem_types=elem_types_for_retrieval,
+                    search_mode=config.search_mode,
                 )
             except Exception as exc:  # pragma: no cover - runtime guard
                 logger.warning("Retriever failed for chat %s: %s", chat_id, exc)
@@ -124,7 +267,7 @@ class QAOrchestrator:
                     continue
                 if not text_content:
                     continue
-                if len(text_evidences) >= self._config.text_evidence_limit:
+                if len(text_evidences) >= config.text_evidence_limit:
                     continue
                 text_evidences.append(
                     EvidenceText(
@@ -135,11 +278,18 @@ class QAOrchestrator:
                     ),
                 )
 
+        vision_client = self._vision_client if config.enable_image_vqa else None
+        if config.enable_image_vqa and vision_client is None:
+            vision_client = VisionVQAClient()
+            self._vision_client = vision_client
+
         image_evidences = self._build_image_evidences(
             candidates=image_candidates,
             question=question_text,
             memory_summary=memory_summary,
-            enable_image_vqa=enable_image_vqa,
+            enable_image_vqa=config.enable_image_vqa,
+            image_evidence_limit=config.image_evidence_limit,
+            vision_client=vision_client,
         )
 
         answer_text = self._answer_composer.compose(
@@ -201,17 +351,19 @@ class QAOrchestrator:
         question: str,
         memory_summary: str,
         enable_image_vqa: bool,
+        image_evidence_limit: int,
+        vision_client: VisionVQAClient | None,
     ) -> list[EvidenceText]:
         evidences: list[EvidenceText] = []
-        if not candidates:
+        if not candidates or image_evidence_limit <= 0:
             return evidences
         for row in candidates:
-            if len(evidences) >= self._config.image_evidence_limit:
+            if len(evidences) >= image_evidence_limit:
                 break
             elem_id = int(row["element_id"])
             base_text = (row.get("text_content") or "").strip()
             merged_text = base_text
-            if enable_image_vqa and self._vision_client is not None:
+            if enable_image_vqa and vision_client is not None:
                 local_context = base_text
                 derived_question = self._image_question_generator.generate(
                     question=question,
@@ -219,7 +371,7 @@ class QAOrchestrator:
                     local_context=local_context,
                 )
                 try:
-                    vqa_summary = self._vision_client.summarize(
+                    vqa_summary = vision_client.summarize(
                         element_id=elem_id,
                         derived_question=derived_question,
                         local_context=local_context,
@@ -288,18 +440,32 @@ def run_qa_turn(
     chat_id: int,
     question: str,
     top_k: int = 8,
-    enable_image_vqa: bool = False,
-    enable_memory_summarizer: bool = False,
+    retrieval_mode: str | None = None,
+    elem_types: Iterable[str] | None = None,
+    search_mode: str | None = None,
+    max_history_turns: int | None = None,
+    enable_image_vqa: bool | None = None,
+    enable_memory_summarizer: bool | None = None,
+    text_evidence_limit: int | None = None,
+    image_evidence_limit: int | None = None,
 ) -> QATurnResult:
+    settings = get_qa_flow_settings()
     orchestrator = QAOrchestrator(
-        vision_client=VisionVQAClient() if enable_image_vqa else None,
-        config=QAFlowConfig(enable_memory_summarizer=enable_memory_summarizer),
+        config=QAFlowConfig.from_settings(settings),
+        qa_settings=settings,
     )
     return orchestrator.run(
         chat_id=chat_id,
         question=question,
         top_k=top_k,
         enable_image_vqa=enable_image_vqa,
+        enable_memory_summarizer=enable_memory_summarizer,
+        retrieval_mode=retrieval_mode,
+        elem_types=elem_types,
+        search_mode=search_mode,
+        max_history_turns=max_history_turns,
+        text_evidence_limit=text_evidence_limit,
+        image_evidence_limit=image_evidence_limit,
     )
 
 

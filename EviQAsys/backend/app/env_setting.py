@@ -103,6 +103,41 @@ class VisionVQASettings:
     max_tokens: int = _get_int_env("VISION_VQA_MAX_TOKENS", 400)
 
 
+def _get_bool_env(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None or raw_value == "":
+        return default
+    lowered = raw_value.strip().lower()
+    return lowered in {"1", "true", "yes", "y", "on"}
+
+
+def _get_elem_types_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = os.getenv(name)
+    raw_list = raw_value if raw_value is not None and raw_value != "" else ",".join(default)
+    normalized: list[str] = []
+    for entry in raw_list.split(","):
+        trimmed = entry.strip().lower()
+        if not trimmed or trimmed in normalized:
+            continue
+        normalized.append(trimmed)
+    return tuple(normalized) if normalized else default
+
+
+DEFAULT_QA_ELEM_TYPES: tuple[str, ...] = ("text", "header", "table", "image")
+
+
+@dataclass(frozen=True)
+class QAFlowSettings:
+    max_history_turns: int = _get_int_env("QA_MAX_HISTORY_TURNS", 8)
+    text_evidence_limit: int = _get_int_env("QA_TEXT_EVIDENCE_LIMIT", 8)
+    image_evidence_limit: int = _get_int_env("QA_IMAGE_EVIDENCE_LIMIT", 4)
+    enable_memory_summarizer: bool = _get_bool_env("QA_ENABLE_MEMORY_SUMMARIZER", False)
+    enable_image_vqa: bool = _get_bool_env("QA_ENABLE_IMAGE_VQA", False)
+    default_retrieval_mode: str = _get_env("QA_DEFAULT_RETRIEVAL_MODE", "auto")
+    default_search_mode: str = _get_env("QA_DEFAULT_SEARCH_MODE", "vector")
+    default_elem_types: tuple[str, ...] = _get_elem_types_env("QA_DEFAULT_ELEM_TYPES", DEFAULT_QA_ELEM_TYPES)
+
+
 @lru_cache(maxsize=1)
 def get_oceanbase_settings() -> OceanBaseSettings:
     """Return cached OceanBase connection settings."""
@@ -139,6 +174,12 @@ def get_vision_vqa_settings() -> VisionVQASettings:
     return VisionVQASettings()
 
 
+@lru_cache(maxsize=1)
+def get_qa_flow_settings() -> QAFlowSettings:
+    """Return QA flow defaults including retrieval/memory/VQA toggles."""
+    return QAFlowSettings()
+
+
 __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
@@ -158,10 +199,12 @@ __all__ = [
     "EmbeddingSettings",
     "LLMSettings",
     "VisionVQASettings",
+    "QAFlowSettings",
     "get_oceanbase_settings",
     "get_mineru_settings",
     "get_upload_settings",
     "get_embedding_settings",
     "get_llm_settings",
     "get_vision_vqa_settings",
+    "get_qa_flow_settings",
 ]

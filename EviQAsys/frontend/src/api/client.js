@@ -156,7 +156,19 @@ export async function getChatDetail(chatId) {
     return request(`/chats/${chatId}`)
 }
 
-export async function createTurn(chatId, { question, topK, enableImageVqa = false, enableMemorySummarizer = false } = {}) {
+export async function createTurn(
+    chatId,
+    {
+        question,
+        topK,
+        retrievalMode,
+        elemTypes,
+        searchMode,
+        maxHistoryTurns,
+        enableImageVqa,
+        enableMemorySummarizer,
+    } = {},
+) {
     const trimmedQuestion = (question ?? "").trim()
     if (!chatId) {
         throw new Error("Chat id is required")
@@ -164,14 +176,37 @@ export async function createTurn(chatId, { question, topK, enableImageVqa = fals
     if (!trimmedQuestion) {
         throw new Error("Question is required")
     }
+    const numericTopK = topK == null ? undefined : Number(topK)
+    const body = {
+        question: trimmedQuestion,
+    }
+    if (Number.isFinite(numericTopK)) {
+        body.top_k = numericTopK
+    }
+    if (retrievalMode) {
+        body.retrieval_mode = retrievalMode
+    }
+    if (Array.isArray(elemTypes) && elemTypes.length) {
+        body.elem_types = elemTypes
+    }
+    if (searchMode) {
+        body.search_mode = searchMode
+    }
+    if (maxHistoryTurns !== undefined && maxHistoryTurns !== null) {
+        const numericHistory = Number(maxHistoryTurns)
+        if (Number.isFinite(numericHistory)) {
+            body.max_history_turns = numericHistory
+        }
+    }
+    if (enableImageVqa !== undefined) {
+        body.enable_image_vqa = Boolean(enableImageVqa)
+    }
+    if (enableMemorySummarizer !== undefined) {
+        body.enable_memory_summarizer = Boolean(enableMemorySummarizer)
+    }
     return request(`/chats/${chatId}/turns`, {
         method: "POST",
-        body: {
-            question: trimmedQuestion,
-            top_k: topK,
-            enable_image_vqa: enableImageVqa,
-            enable_memory_summarizer: enableMemorySummarizer,
-        },
+        body,
     })
 }
 
