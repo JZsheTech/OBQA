@@ -323,10 +323,58 @@
   align-items: start;
 }
 
-.grid.chat-layout {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-  gap: var(--space-5);
+.chat-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, var(--chat-panel-width, 1fr)) 12px minmax(360px, var(--pdf-panel-width, 1fr));
+  align-items: stretch;
+  column-gap: var(--space-4);
+  row-gap: var(--space-5);
+}
+
+@media (max-width: 1080px) {
+  .chat-layout {
+    grid-template-columns: 1fr;
+    row-gap: var(--space-4);
+  }
+}
+
+.chat-panel,
+.pdf-column {
+  min-width: 0;
+}
+
+.resize-handle {
+  align-self: stretch;
+  width: 12px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+
+.resize-handle::before {
+  content: "";
+  width: 4px;
+  height: 54%;
+  border-radius: 999px;
+  background: #d3d9e6;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.03);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.resize-handle:hover::before,
+.resize-handle.is-active::before,
+.resize-handle:focus-visible::before {
+  background: #1f5bff;
+  box-shadow: 0 0 0 4px rgba(31, 91, 255, 0.15);
+}
+
+@media (max-width: 1080px) {
+  .resize-handle {
+    display: none;
+  }
 }
 
 .grid.three-column {
@@ -882,6 +930,22 @@
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+}
+
+.pdf-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+}
+
+.pdf-zoom-controls .rpv-core__button {
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
 }
 
 .pdf-viewer {

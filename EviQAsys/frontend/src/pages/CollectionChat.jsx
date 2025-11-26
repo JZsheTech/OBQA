@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { Viewer, Worker } from "@react-pdf-viewer/core"
+import { SpecialZoomLevel, Viewer, Worker } from "@react-pdf-viewer/core"
 import { pageNavigationPlugin } from "@react-pdf-viewer/page-navigation"
 import "@react-pdf-viewer/core/lib/styles/index.css"
+import { zoomPlugin } from "@react-pdf-viewer/zoom"
+import "@react-pdf-viewer/zoom/lib/styles/index.css"
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url"
 
 import {
@@ -24,6 +26,9 @@ const DEFAULT_RETRIEVAL_MODE = "auto"
 const DEFAULT_SEARCH_MODE = "vector"
 const DEFAULT_MAX_HISTORY_TURNS = "8"
 const DEFAULT_ELEM_TYPES = ["text", "header", "table", "image"]
+const DEFAULT_CHAT_PANEL_RATIO = 0.55
+const MIN_PANEL_RATIO = 0.32
+const MAX_PANEL_RATIO = 0.68
 const ELEMENT_TYPE_OPTIONS = [
     { value: "text", label: "Text" },
     { value: "header", label: "Header" },
@@ -340,9 +345,79 @@ export default function CollectionChat() {
     const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
     const [enableImageVqa, setEnableImageVqa] = useState(false)
     const [enableMemorySummarizer, setEnableMemorySummarizer] = useState(false)
+    const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
+    const [isResizing, setIsResizing] = useState(false)
+    const layoutRef = useRef(null)
 
     const navigationPlugin = pageNavigationPlugin()
     const { jumpToPage } = navigationPlugin
+    // zoomPlugin 是 React hook，必须在组件顶层直接调用以保证 Hook 顺序稳定
+    const zoomPluginInstance = zoomPlugin()
+    const { ZoomIn, ZoomOut, ZoomPopover } = zoomPluginInstance
+
+    const updatePanelRatio = useCallback(
+        (clientX) => {
+            if (!layoutRef.current || !Number.isFinite(clientX)) return
+            const rect = layoutRef.current.getBoundingClientRect()
+            if (!rect.width) return
+            const rawRatio = (clientX - rect.left) / rect.width
+            const nextRatio = Math.min(MAX_PANEL_RATIO, Math.max(MIN_PANEL_RATIO, rawRatio))
+            setChatPanelRatio(nextRatio)
+        },
+        [layoutRef],
+    )
+
+    const handleResizeStart = useCallback(
+        (clientX) => {
+            if (!layoutRef.current) return
+            updatePanelRatio(clientX)
+            setIsResizing(true)
+        },
+        [updatePanelRatio],
+    )
+
+    const handleResizeKeyDown = (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+        event.preventDefault()
+        const delta = event.key === "ArrowLeft" ? -0.02 : 0.02
+        setChatPanelRatio((prev) => Math.min(MAX_PANEL_RATIO, Math.max(MIN_PANEL_RATIO, prev + delta)))
+    }
+
+    const resetPanelRatio = useCallback(() => {
+        setChatPanelRatio(DEFAULT_CHAT_PANEL_RATIO)
+    }, [])
+
+    useEffect(() => {
+        if (!isResizing) return
+        const handleMouseMove = (event) => updatePanelRatio(event.clientX)
+        const handleTouchMove = (event) => {
+            const touch = event.touches?.[0]
+            if (touch) updatePanelRatio(touch.clientX)
+        }
+        const stopResize = () => setIsResizing(false)
+        const bodyStyle = typeof document !== "undefined" ? document.body?.style : null
+        const originalUserSelect = bodyStyle?.userSelect
+        if (bodyStyle) {
+            bodyStyle.userSelect = "none"
+        }
+        window.addEventListener("mousemove", handleMouseMove)
+        window.addEventListener("touchmove", handleTouchMove)
+        window.addEventListener("mouseup", stopResize)
+        window.addEventListener("touchend", stopResize)
+        window.addEventListener("touchcancel", stopResize)
+        window.addEventListener("mouseleave", stopResize)
+        return () => {
+            if (bodyStyle) {
+                bodyStyle.userSelect = originalUserSelect
+            }
+            window.removeEventListener("mousemove", handleMouseMove)
+            window.removeEventListener("touchmove", handleTouchMove)
+            window.removeEventListener("mouseup", stopResize)
+            window.removeEventListener("touchend", stopResize)
+            window.removeEventListener("touchcancel", stopResize)
+            window.removeEventListener("mouseleave", stopResize)
+        }
+    }, [isResizing, updatePanelRatio])
 
     useEffect(() => {
         loadChatDetail()
@@ -422,6 +497,15 @@ export default function CollectionChat() {
         if (!evidenceBoxes.length || evidencePageIndex == null) return {}
         return { [evidencePageIndex]: evidenceBoxes }
     }, [evidenceBoxes, evidenceDocId, evidencePageIndex, selectedDocId])
+
+    const layoutStyle = useMemo(() => {
+        const leftRatio = Math.min(MAX_PANEL_RATIO, Math.max(MIN_PANEL_RATIO, chatPanelRatio))
+        const rightRatio = Math.max(0.1, 1 - leftRatio)
+        return {
+            "--chat-panel-width": `${leftRatio}fr`,
+            "--pdf-panel-width": `${rightRatio}fr`,
+        }
+    }, [chatPanelRatio])
 
     const viewerKey = selectedDocId ? `doc-${selectedDocId}` : "no-doc"
     const selectedDocUrl = selectedDocId ? buildDocumentFileUrl(selectedDocId) : null
@@ -632,7 +716,7 @@ export default function CollectionChat() {
                 </div>
             )}
 
-            <div className="grid two-column chat-layout">
+            <div className="chat-layout" ref={layoutRef} style={layoutStyle}>
                 <div className="card chat-panel">
                     <div className="card__header">
                         <div>
@@ -859,6 +943,26 @@ export default function CollectionChat() {
                     </div>
                 </div>
 
+                <div
+                    className={`resize-handle${isResizing ? " is-active" : ""}`}
+                    role="separator"
+                    aria-orientation="vertical"
+                    aria-label="拖动调整聊天与 PDF 区域宽度"
+                    tabIndex={0}
+                    onMouseDown={(event) => {
+                        event.preventDefault()
+                        handleResizeStart(event.clientX)
+                    }}
+                    onTouchStart={(event) => {
+                        const touch = event.touches?.[0]
+                        if (!touch) return
+                        event.preventDefault()
+                        handleResizeStart(touch.clientX)
+                    }}
+                    onDoubleClick={resetPanelRatio}
+                    onKeyDown={handleResizeKeyDown}
+                />
+
                 <div className="stack pdf-column">
                     <div className="card pdf-panel">
                         <div className="card__header pdf-header">
@@ -908,6 +1012,18 @@ export default function CollectionChat() {
                                     {loadingDocs ? "文档加载中..." : `${documents.length} 个可选文档`}
                                 </span>
                             </div>
+                            <div className="pdf-zoom-controls">
+                                <div className="pill muted">缩放</div>
+                                <ZoomOut />
+                                <ZoomPopover />
+                                <ZoomIn />
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => zoomPluginInstance.zoomTo(SpecialZoomLevel.PageWidth)}
+                                >
+                                    重置为页宽
+                                </Button>
+                            </div>
                         </div>
 
                         {!selectedDocId ? (
@@ -918,6 +1034,7 @@ export default function CollectionChat() {
                                     <Viewer
                                         key={viewerKey}
                                         fileUrl={selectedDocUrl}
+                                        defaultScale={SpecialZoomLevel.PageWidth}
                                         renderPage={(props) => (
                                             <HighlightedPage
                                                 renderPageProps={props}
@@ -926,7 +1043,7 @@ export default function CollectionChat() {
                                             />
                                         )}
                                         initialPage={pageForHighlight ?? 0}
-                                        plugins={[navigationPlugin]}
+                                        plugins={[navigationPlugin, zoomPluginInstance]}
                                     />
                                 </Worker>
                                 {showEvidencePopover && selectedEvidence && (
