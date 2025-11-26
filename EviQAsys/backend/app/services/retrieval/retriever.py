@@ -45,15 +45,26 @@ class Retriever:
         top_k: int = 5,
         doc_id: int | None = None,
         elem_types: Iterable[str] | None = None,
-        search_mode: str = "vector",
+        search_mode: str = "hybrid",
         query_vector: Sequence[float] | None = None,
     ) -> list[RetrievalResult]:
-        search_mode = (search_mode or "vector").lower()
+        search_mode = (search_mode or "hybrid").lower()
         normalized_types = self._normalize_types(elem_types)
         if search_mode == "vector":
             vector = list(query_vector) if query_vector is not None else self.embed_query(query_text)
             rows = self._elements_repo.topk_by_collection(
                 collection_id=collection_id,
+                query_vec=vector,
+                k=top_k,
+                doc_id=doc_id,
+                elem_types=normalized_types,
+                max_candidates=self._max_candidates,
+            )
+        elif search_mode == "hybrid":
+            vector = list(query_vector) if query_vector is not None else self.embed_query(query_text)
+            rows = self._elements_repo.search_hybrid(
+                collection_id=collection_id,
+                query=query_text,
                 query_vec=vector,
                 k=top_k,
                 doc_id=doc_id,

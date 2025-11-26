@@ -22,9 +22,9 @@ class TurnCreateRequest(BaseModel):
         default=None,
         description="Optional element type filters (e.g., text/header/table/image/equation).",
     )
-    search_mode: Literal["vector", "fulltext"] | None = Field(
+    search_mode: Literal["vector", "fulltext", "hybrid"] | None = Field(
         default=None,
-        description="Search backend selection for this turn.",
+        description="Search backend selection for this turn (vector/fulltext/hybrid).",
     )
     max_history_turns: int | None = Field(
         default=None,

@@ -70,10 +70,10 @@ Retriever
 目标：让问答链路的检索/记忆/视觉开关具备“系统默认（env_setting.py）+ 单轮覆盖（前端传参）”的双层控制，并保持与现有接口的向后兼容。
 
 - 后端默认配置（EviQAsys/backend/app/env_setting.py）
-  - 增加 `QAFlowSettings`（或同名结构）与 `get_qa_flow_settings()`，集中声明 QA 相关默认值并允许环境变量覆盖：`QA_MAX_HISTORY_TURNS`（默认 8）、`QA_TEXT_EVIDENCE_LIMIT`（8）、`QA_IMAGE_EVIDENCE_LIMIT`（4）、`QA_ENABLE_MEMORY_SUMMARIZER`（False）、`QA_ENABLE_IMAGE_VQA`（False）、`QA_DEFAULT_RETRIEVAL_MODE`（auto|force|skip，默认 auto）、`QA_DEFAULT_SEARCH_MODE`（vector|fulltext，默认 vector）、`QA_DEFAULT_ELEM_TYPES`（逗号分隔，默认 text,header,table,image）。`QAFlowConfig` 的默认值需与这里保持一致。
+  - 增加 `QAFlowSettings`（或同名结构）与 `get_qa_flow_settings()`，集中声明 QA 相关默认值并允许环境变量覆盖：`QA_MAX_HISTORY_TURNS`（默认 8）、`QA_TEXT_EVIDENCE_LIMIT`（8）、`QA_IMAGE_EVIDENCE_LIMIT`（4）、`QA_ENABLE_MEMORY_SUMMARIZER`（False）、`QA_ENABLE_IMAGE_VQA`（False）、`QA_DEFAULT_RETRIEVAL_MODE`（auto|force|skip，默认 auto）、`QA_DEFAULT_SEARCH_MODE`（vector|fulltext|hybrid，默认 hybrid）、`QA_DEFAULT_ELEM_TYPES`（逗号分隔，默认 text,header,table,image）。`QAFlowConfig` 的默认值需与这里保持一致。
 
 - 请求/响应契约（EviQAsys/backend/app/schemas/qa.py + api/routes/chats.py）
-  - 在 `TurnCreateRequest` 增加可选字段：`retrieval_mode`（Literal["auto","force","skip"]）、`elem_types`（list[str]）、`search_mode`（Literal["vector","fulltext"]）、`max_history_turns`（int >=0）、`enable_image_vqa`、`enable_memory_summarizer`。旧字段默认行为不变，未提供时走 env 默认。
+  - 在 `TurnCreateRequest` 增加可选字段：`retrieval_mode`（Literal["auto","force","skip"]）、`elem_types`（list[str]）、`search_mode`（Literal["vector","fulltext","hybrid"]）、`max_history_turns`（int >=0）、`enable_image_vqa`、`enable_memory_summarizer`。旧字段默认行为不变，未提供时走 env 默认。
   - 在 `create_turn` 路由中读取上述字段，传入 `run_qa_turn`。保持 top_k 处理逻辑不变（1~30 取整，默认 8）。
   - `run_qa_turn` / `QAOrchestrator` 构造时注入 `QAFlowSettings`，并接受每次请求的临时覆盖值。
 
@@ -85,4 +85,4 @@ Retriever
 
 - 前端控制面板（EviQAsys/frontend）
   - 在 `src/api/client.js` 的 `createTurn` 请求中增加 `retrieval_mode`、`elem_types`、`search_mode`、`max_history_turns`、`enable_image_vqa`、`enable_memory_summarizer` 参数（保持 snake_case 与后端一致，未填写不传）。
-  - 在聊天页面（`src/pages/CollectionChat.jsx` / `DocumentChat.jsx` 或共享组件）新增交互控件：检索模式选择器（auto/force/skip）、搜索模式（vector/fulltext）、模态多选（text/header/table/image/equation）、历史轮数输入、记忆摘要开关、视觉问答开关。默认值与 env_setting 中保持一致，提交时组装到 `createTurn` 请求体。
+- 在聊天页面（`src/pages/CollectionChat.jsx` / `DocumentChat.jsx` 或共享组件）新增交互控件：检索模式选择器（auto/force/skip）、搜索模式（vector/fulltext/hybrid）、TopK 输入、模态多选（text/header/table/image/equation）、历史轮数输入、记忆摘要开关、视觉问答开关。默认值与 env_setting 中保持一致，提交时组装到 `createTurn` 请求体。

@@ -22,8 +22,8 @@
    - 无聊天数据时展示空态文案。
 
 6) 简单 Collection-RAG  
-   - 在 RAG 区域输入真实问题/关键词，选择向量或全文模式，设置 TopK（默认 5）后点击“检索”。  
+   - 在 RAG 区域输入真实问题/关键词，选择混合/向量/全文模式，设置 TopK（默认 5）后点击“检索”。  
    - 检索结果列出 element_id/doc_id/elem_type/score，文本为截断的 `text_content`。点击“查看全文”弹出 Drawer 展示全文，点击“复制”后可在剪贴板中粘贴验证。  
-   - 将搜索模式切换为另一模式重复验证，确认 `/api/retrieval/test` 请求携带 `collection_id` 和 `search_mode` 参数。
+   - 将搜索模式切换为其他模式重复验证，确认 `/api/retrieval/test` 请求携带 `collection_id` 和 `search_mode` 参数。
 
 > 全部验收步骤均为手工操作，不使用模拟数据或自动化脚本；检索与上传需依赖 MinerU 解析与真实向量数据。

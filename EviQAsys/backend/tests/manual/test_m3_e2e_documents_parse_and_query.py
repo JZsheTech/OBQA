@@ -42,8 +42,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k", type=int, default=5, help="Number of results to print.")
     parser.add_argument(
         "--search-mode",
-        choices=["vector", "fulltext"],
-        default="vector",
+        choices=["hybrid", "vector", "fulltext"],
+        default="hybrid",
         help="Retrieval mode used by Retriever.",
     )
     parser.add_argument(

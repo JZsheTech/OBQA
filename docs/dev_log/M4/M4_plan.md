@@ -346,7 +346,7 @@ M4 建议拆分为 5 个互相依赖的工作包，按顺序推进：
          query_text=search_query,
          top_k=top_k,
          elem_types=elem_types,
-         search_mode="vector",
+         search_mode=config.search_mode,
      )
      ```
 

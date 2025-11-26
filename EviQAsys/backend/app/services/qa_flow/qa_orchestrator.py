@@ -39,7 +39,7 @@ class QAFlowConfig:
     enable_memory_summarizer: bool = False
     enable_image_vqa: bool = False
     retrieval_mode: str = "auto"
-    search_mode: str = "vector"
+    search_mode: str = "hybrid"
     elem_types: tuple[str, ...] | None = ("text", "header", "table", "image")
 
     def __post_init__(self) -> None:
@@ -49,7 +49,7 @@ class QAFlowConfig:
         self.enable_memory_summarizer = bool(self.enable_memory_summarizer)
         self.enable_image_vqa = bool(self.enable_image_vqa)
         self.retrieval_mode = self._normalize_retrieval_mode(self.retrieval_mode) or "auto"
-        self.search_mode = self._normalize_search_mode(self.search_mode) or "vector"
+        self.search_mode = self._normalize_search_mode(self.search_mode) or "hybrid"
         self.elem_types = self._normalize_elem_types(self.elem_types) or None
 
     @classmethod
@@ -119,7 +119,7 @@ class QAFlowConfig:
         if not value:
             return None
         lowered = str(value).lower()
-        if lowered in {"vector", "fulltext"}:
+        if lowered in {"vector", "fulltext", "hybrid"}:
             return lowered
         return None
 

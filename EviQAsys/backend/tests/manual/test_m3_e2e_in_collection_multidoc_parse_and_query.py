@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "M3 manual e2e: ingest multiple PDFs into a single collection, "
-            "embed elements, then run semantic and full-text retrieval."
+            "embed elements, then run hybrid / semantic / full-text retrieval."
         ),
     )
     parser.add_argument(
@@ -72,8 +72,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--search-modes",
         nargs="+",
-        choices=["vector", "fulltext"],
-        default=["vector", "fulltext"],
+        choices=["hybrid", "vector", "fulltext"],
+        default=["hybrid", "vector", "fulltext"],
         help="Retrieval modes to execute.",
     )
     parser.add_argument("--keep", action="store_true", help="Keep created rows (skip cleanup).")

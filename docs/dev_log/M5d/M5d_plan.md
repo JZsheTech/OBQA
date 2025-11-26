@@ -9,7 +9,7 @@
 - **Document 详情数据面**：新增 `GET /api/documents/{document_id}` 返回 `DocumentRead` 扩展体，字段含 `collection_id/collection_name/title/file_name/num_pages/element_count/abstract/meta_info/md_text/created_at/parse_status`，`parse_status` 由 `element_count` 计算，404 时返回 envelope 错误。
 - **Document 聊天历史**：新增 `GET /api/documents/{document_id}/chats`，仅返回 `type=document` 的 chat，按创建时间倒序；前端条目点击跳转 `/documents/{document_id}/chat/{chat_id}`。
 - **PDF 下载**：新增 `GET /api/documents/{document_id}/file` 直接流式返回文件，文件名回落到 `file_name`，校验 doc 是否存在且路径位于 `UPLOAD_DIR`；不存在返回 404。
-- **Document-RAG**：沿用 `/api/retrieval/test`，必传 `collection_id`，附加 `doc_id` 过滤；前端提供关键词输入、检索模式（vector/fulltext）、TopK，列表截断展示并提供 Drawer 查看全文与复制。
+- **Document-RAG**：沿用 `/api/retrieval/test`，必传 `collection_id`，附加 `doc_id` 过滤；前端提供关键词输入、检索模式（hybrid/vector/fulltext）、TopK，列表截断展示并提供 Drawer 查看全文与复制。
 - **导航/面包屑**：PageHeader breadcrumbs 采用 `Home / Collection 名 / Document 名`；顶部 AppShell 标记更新为 “M5d document-detail”。
 
 ### 后端任务拆解

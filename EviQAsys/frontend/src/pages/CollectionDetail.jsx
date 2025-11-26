@@ -22,6 +22,7 @@ const documentSearchOptions = [
 ]
 
 const retrievalModes = [
+    { label: "混合检索", value: "hybrid" },
     { label: "向量检索", value: "vector" },
     { label: "全文检索", value: "fulltext" },
 ]
@@ -66,7 +67,7 @@ export default function CollectionDetail() {
     const [creatingChat, setCreatingChat] = useState(false)
 
     const [ragQuery, setRagQuery] = useState("")
-    const [ragMode, setRagMode] = useState("vector")
+    const [ragMode, setRagMode] = useState("hybrid")
     const [ragTopK, setRagTopK] = useState(5)
     const [ragResults, setRagResults] = useState([])
     const [ragLoading, setRagLoading] = useState(false)
@@ -506,7 +507,7 @@ export default function CollectionDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">简单 Collection-RAG</h3>
-                                <p className="caption">复用 /api/retrieval/test，支持向量/全文模式。</p>
+                                <p className="caption">复用 /api/retrieval/test，支持混合/向量/全文模式。</p>
                             </div>
                             <span className="pill muted">TopK {ragTopK}</span>
                         </div>

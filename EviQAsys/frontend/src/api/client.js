@@ -248,7 +248,7 @@ export async function runRetrieval({
     topK = 5,
     docId,
     elemTypes,
-    searchMode = "vector",
+    searchMode = "hybrid",
 }) {
     const keyword = (query ?? "").trim()
     if (!collectionId) {

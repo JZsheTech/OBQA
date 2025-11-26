@@ -4,7 +4,7 @@
 - 前端 API 封装：`listDocuments` 支持查询参数，新增 `getCollectionDetail`/`listCollectionChats`/`runRetrieval`；AppShell 顶部标记更新为 M5c collections-detail。
 - Collection 管理页：展示 collection name/description/created_at；文档列表区分“全部/搜索结果”视图，支持 title/abstract/md_text 搜索与 Reset，点击条目跳转 Document 页；加载/空态/错误 toast 完整。
 - 上传与聊天历史：多文件选择后串行调用上传接口，队列展示上传/失败状态并可刷新列表；聊天历史从 `/api/collections/{id}/chats` 读取，列表可跳转到 Collection Chat。
-- 简单 Collection-RAG：输入关键词 + 模式切换（vector/fulltext）调用 `/api/retrieval/test`，展示 score/elem_type/doc_id 等元信息；支持复制与详情 Drawer 查看全文。
+- 简单 Collection-RAG：输入关键词 + 模式切换（hybrid/vector/fulltext）调用 `/api/retrieval/test`，展示 score/elem_type/doc_id 等元信息；支持复制与详情 Drawer 查看全文。
 
 ### 已知限制 / 后续衔接
 - 文档列表未分页，适用于当前数据量；搜索使用 SQL LIKE，`md_text` 较大时查询可能偏慢。

@@ -14,6 +14,7 @@ import StatusPill from "../components/ui/StatusPill"
 import { useToast } from "../components/ui/Toast"
 
 const retrievalModes = [
+    { label: "混合检索", value: "hybrid" },
     { label: "向量检索", value: "vector" },
     { label: "全文检索", value: "fulltext" },
 ]
@@ -56,7 +57,7 @@ export default function DocumentDetail() {
     const [loadingChats, setLoadingChats] = useState(false)
 
     const [ragQuery, setRagQuery] = useState("")
-    const [ragMode, setRagMode] = useState("vector")
+    const [ragMode, setRagMode] = useState("hybrid")
     const [ragTopK, setRagTopK] = useState(5)
     const [ragResults, setRagResults] = useState([])
     const [ragLoading, setRagLoading] = useState(false)
@@ -291,7 +292,7 @@ export default function DocumentDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">Document-RAG 检索</h3>
-                                <p className="caption">带 doc_id 过滤的 /api/retrieval/test</p>
+                                <p className="caption">带 doc_id 过滤的 /api/retrieval/test（混合/向量/全文）。</p>
                             </div>
                             <span className="pill muted">TopK {ragTopK}</span>
                         </div>

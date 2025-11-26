@@ -135,7 +135,7 @@ class QAFlowSettings:
     enable_memory_summarizer: bool = _get_bool_env("QA_ENABLE_MEMORY_SUMMARIZER", False)
     enable_image_vqa: bool = _get_bool_env("QA_ENABLE_IMAGE_VQA", False)
     default_retrieval_mode: str = _get_env("QA_DEFAULT_RETRIEVAL_MODE", "auto")
-    default_search_mode: str = _get_env("QA_DEFAULT_SEARCH_MODE", "vector")
+    default_search_mode: str = _get_env("QA_DEFAULT_SEARCH_MODE", "hybrid")
     default_elem_types: tuple[str, ...] = _get_elem_types_env("QA_DEFAULT_ELEM_TYPES", DEFAULT_QA_ELEM_TYPES)
 
 

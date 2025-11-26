@@ -10,7 +10,7 @@
 - **文档列表 + 搜索**：`GET /api/collections/{id}/documents` 支持 `search_field=title|abstract|md_text` + `keyword`（大小写不敏感 LIKE），默认返回全部。响应结构扩充 `DocumentListItem` 以携带 `title/abstract/num_pages` 等元信息，parse_status 继续由后端计算。前端区分“全部”与“搜索结果”视图，显示搜索标签与 Reset。
 - **上传入口**：沿用 `/api/collections/{id}/documents` 单文件入口，前端允许多选后串行上传（展示进行中的文件名/进度/错误 toast），上传完成后刷新列表。保留后端 PDF 扩展名校验与重复检测。
 - **Collection 聊天历史**：新增 `GET /api/collections/{id}/chats`（type=collection），按创建时间倒序返回 `ChatRead`；前端列表条目可点击跳转 `/collections/{id}/chat/{chat_id}`，空态提示。
-- **简单 Collection-RAG**：复用 `/api/retrieval/test`，必传 `collection_id`，可选 `search_mode=vector|fulltext`、`top_k`、`doc_id`。前端提供关键词输入 + 模式切换，列表展示截断 `text_content`，详情弹窗支持复制。
+- **简单 Collection-RAG**：复用 `/api/retrieval/test`，必传 `collection_id`，可选 `search_mode=hybrid|vector|fulltext`、`top_k`、`doc_id`。前端提供关键词输入 + 模式切换，列表展示截断 `text_content`，详情弹窗支持复制。
 - **顶栏标记**：AppShell 顶部里程碑标记更新为 M5c collections-detail，便于识别当前阶段。
 
 ### 后端任务拆解
@@ -39,4 +39,4 @@
 - `/api/collections/{id}/documents` 支持 title/abstract/md_text 搜索，前端区分全部/搜索结果，空态可见。  
 - 上传入口支持多文件串行上传，成功/失败有 toast，列表可刷新。  
 - `/api/collections/{id}/chats` 可返回聊天历史，前端列表可点击跳转。  
-- Collection-RAG 输入可触发 `/api/retrieval/test` 检索并展示/复制 text_content，支持搜索模式切换。
+- Collection-RAG 输入可触发 `/api/retrieval/test` 检索并展示/复制 text_content，支持搜索模式切换（含混合模式）。

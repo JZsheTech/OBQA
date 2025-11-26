@@ -292,6 +292,96 @@ class ElementsRepository:
         matches.sort(key=lambda item: item["score"], reverse=True)
         return matches[:k]
 
+    def search_hybrid(
+        self,
+        *,
+        collection_id: int,
+        query: str,
+        query_vec: Sequence[float],
+        k: int = 5,
+        doc_id: int | None = None,
+        elem_types: set[str] | None = None,
+        vector_weight: float = 0.65,
+        fulltext_weight: float = 0.35,
+        max_candidates: int | None = 200,
+    ) -> list[dict[str, Any]]:
+        if len(query_vec) != VECTOR_DIM:
+            raise ValueError("query_vec dimension mismatch.")
+        query = (query or "").strip()
+        if not query:
+            raise ValueError("query text must be provided for hybrid search.")
+        candidate_limit = min(max(k, 20), max_candidates or max(k, 20))
+        vector_rows = self.topk_by_collection(
+            collection_id=collection_id,
+            query_vec=query_vec,
+            k=candidate_limit,
+            doc_id=doc_id,
+            elem_types=elem_types,
+            max_candidates=max_candidates,
+        )
+        fulltext_rows = self.search_fulltext(
+            collection_id=collection_id,
+            query=query,
+            k=candidate_limit,
+            doc_id=doc_id,
+            elem_types=elem_types,
+            max_candidates=max_candidates,
+        )
+        max_fulltext_score = max((float(row.get("score") or 0.0) for row in fulltext_rows), default=0.0)
+        vector_map = {int(row["element_id"]): row for row in vector_rows}
+        fulltext_map = {int(row["element_id"]): row for row in fulltext_rows}
+        combined: dict[int, dict[str, Any]] = {}
+        for elem_id, row in vector_map.items():
+            combined[elem_id] = {
+                **row,
+                "vector_score": float(row.get("score") or 0.0),
+            }
+        for elem_id, row in fulltext_map.items():
+            payload = combined.get(elem_id, {**row})
+            payload["fulltext_score"] = float(row.get("score") or 0.0)
+            combined[elem_id] = payload
+
+        def _normalize_vector_score(score: float | None) -> float | None:
+            if score is None:
+                return None
+            return max(0.0, min(1.0, (float(score) + 1.0) / 2.0))
+
+        def _normalize_fulltext_score(score: float | None, *, max_score: float) -> float | None:
+            if score is None:
+                return None
+            numeric = max(0.0, float(score))
+            if max_score > 0.0:
+                return min(1.0, numeric / max_score)
+            return numeric
+
+        def _blend_scores(vector_score: float | None, text_score: float | None) -> float | None:
+            weights = []
+            total = 0.0
+            blended = 0.0
+            if vector_score is not None:
+                weights.append(vector_weight)
+                blended += vector_weight * vector_score
+            if text_score is not None:
+                weights.append(fulltext_weight)
+                blended += fulltext_weight * text_score
+            total = sum(weights)
+            if total <= 0.0:
+                return None
+            return blended / total
+
+        scored_results: list[dict[str, Any]] = []
+        for elem_id, payload in combined.items():
+            vector_score = _normalize_vector_score(payload.get("vector_score"))
+            text_score = _normalize_fulltext_score(payload.get("fulltext_score"), max_score=max_fulltext_score)
+            blended_score = _blend_scores(vector_score, text_score)
+            if blended_score is None:
+                continue
+            payload["score"] = blended_score
+            scored_results.append(payload)
+
+        scored_results.sort(key=lambda item: item["score"], reverse=True)
+        return scored_results[:k]
+
     def _fetch_candidates(
         self,
         *,

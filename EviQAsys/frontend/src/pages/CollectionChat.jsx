@@ -23,9 +23,10 @@ import Modal from "../components/ui/Modal"
 import { useToast } from "../components/ui/Toast"
 
 const DEFAULT_RETRIEVAL_MODE = "auto"
-const DEFAULT_SEARCH_MODE = "vector"
+const DEFAULT_SEARCH_MODE = "hybrid"
 const DEFAULT_MAX_HISTORY_TURNS = "8"
 const DEFAULT_ELEM_TYPES = ["text", "header", "table", "image"]
+const DEFAULT_TOP_K = "8"
 const DEFAULT_CHAT_PANEL_RATIO = 0.55
 const MIN_PANEL_RATIO = 0.32
 const MAX_PANEL_RATIO = 0.68
@@ -341,6 +342,7 @@ export default function CollectionChat() {
     const [showEvidencePopover, setShowEvidencePopover] = useState(false)
     const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
     const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
+    const [topK, setTopK] = useState(DEFAULT_TOP_K)
     const [elemTypes, setElemTypes] = useState(DEFAULT_ELEM_TYPES)
     const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
     const [enableImageVqa, setEnableImageVqa] = useState(false)
@@ -486,6 +488,7 @@ export default function CollectionChat() {
     function resetQaControls() {
         setRetrievalMode(DEFAULT_RETRIEVAL_MODE)
         setSearchMode(DEFAULT_SEARCH_MODE)
+        setTopK(DEFAULT_TOP_K)
         setElemTypes([...DEFAULT_ELEM_TYPES])
         setMaxHistoryTurns(DEFAULT_MAX_HISTORY_TURNS)
         setEnableImageVqa(false)
@@ -580,17 +583,26 @@ export default function CollectionChat() {
             addToast({ type: "error", title: "缺少 chatId", message: "请先创建或选择聊天" })
             return
         }
+        const parsedTopK = topK === "" ? undefined : Number(topK)
+        const normalizedTopK =
+            parsedTopK === undefined || Number.isNaN(parsedTopK)
+                ? undefined
+                : Math.min(30, Math.max(1, Math.floor(parsedTopK)))
         const parsedHistory = maxHistoryTurns === "" ? undefined : Number(maxHistoryTurns)
         const normalizedHistory =
             parsedHistory === undefined || Number.isNaN(parsedHistory)
                 ? undefined
                 : Math.max(0, Math.floor(parsedHistory))
+        if (normalizedTopK !== undefined) {
+            setTopK(String(normalizedTopK))
+        }
         setSending(true)
         try {
             await createTurn(chatId, {
                 question,
                 retrievalMode,
                 searchMode,
+                topK: normalizedTopK,
                 elemTypes,
                 maxHistoryTurns: normalizedHistory,
                 enableImageVqa,
@@ -748,7 +760,7 @@ export default function CollectionChat() {
                             <div className="stack" style={{ gap: "4px" }}>
                                 <strong>QA 控制面板</strong>
                                 <span className="caption muted">
-                                    默认遵循 env_setting，可按需强制检索/跳过检索、切换向量/全文与元素类型。
+                                    默认遵循 env_setting，可按需强制/跳过检索，切换混合/向量/全文、调整 TopK 与元素类型。
                                 </span>
                             </div>
                             <Button variant="ghost" onClick={resetQaControls} type="button">
@@ -788,9 +800,26 @@ export default function CollectionChat() {
                                     value={searchMode}
                                     onChange={(event) => setSearchMode(event.target.value)}
                                 >
+                                    <option value="hybrid">混合</option>
                                     <option value="vector">向量</option>
                                     <option value="fulltext">全文</option>
                                 </select>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="topk-input">
+                                    TopK
+                                </label>
+                                <input
+                                    id="topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="30"
+                                    value={topK}
+                                    onChange={(event) => setTopK(event.target.value)}
+                                    placeholder="默认 8"
+                                />
+                                <span className="caption muted">用于问答检索的返回条数。</span>
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="history-turns-input">

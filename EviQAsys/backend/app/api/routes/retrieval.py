@@ -27,8 +27,8 @@ def test_retrieval(
         description="Comma separated element types (text,header,image,table,equation).",
     ),
     search_mode: str = Query(
-        "vector",
-        description="Search mode: vector (default) or fulltext.",
+        "hybrid",
+        description="Search mode: hybrid (default), vector, or fulltext.",
     ),
     retriever: Retriever = Depends(get_retriever),
 ) -> RetrievalEnvelope:
