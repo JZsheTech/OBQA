@@ -32,13 +32,6 @@ const DEFAULT_TOP_K = "8"
 const DEFAULT_CHAT_PANEL_RATIO = 0.55
 const MIN_PANEL_RATIO = 0.32
 const MAX_PANEL_RATIO = 0.68
-const ELEMENT_TYPE_OPTIONS = [
-    { value: "text", label: "Text" },
-    { value: "header", label: "Header" },
-    { value: "table", label: "Table" },
-    { value: "image", label: "Image" },
-    { value: "equation", label: "Equation" },
-]
 
 function formatDateTime(value) {
     if (!value) return "--"
@@ -329,16 +322,15 @@ export default function DocumentChat() {
     const [draftQuestion, setDraftQuestion] = useState("")
     const [sending, setSending] = useState(false)
     const [showChatDrawer, setShowChatDrawer] = useState(false)
-    const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
-    const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
-    const [topK, setTopK] = useState(DEFAULT_TOP_K)
-    const [elemTypes, setElemTypes] = useState(DEFAULT_ELEM_TYPES)
-    const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
-    const [enableImageVqa, setEnableImageVqa] = useState(false)
-    const [enableMemorySummarizer, setEnableMemorySummarizer] = useState(false)
+    const retrievalMode = DEFAULT_RETRIEVAL_MODE
+    const searchMode = DEFAULT_SEARCH_MODE
+    const topK = DEFAULT_TOP_K
+    const elemTypes = DEFAULT_ELEM_TYPES
+    const maxHistoryTurns = DEFAULT_MAX_HISTORY_TURNS
+    const enableImageVqa = false
+    const enableMemorySummarizer = false
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
     const [isResizing, setIsResizing] = useState(false)
-    const [chatTitleDraft, setChatTitleDraft] = useState("")
     const [savingChatTitle, setSavingChatTitle] = useState(false)
     const [showRenameModal, setShowRenameModal] = useState(false)
     const [renameTitle, setRenameTitle] = useState("")
@@ -434,41 +426,12 @@ export default function DocumentChat() {
     }, [chatId, documentId])
 
     useEffect(() => {
-        setChatTitleDraft(chatDetail?.title ?? "")
         setRenameTitle(chatDetail?.title ?? "")
     }, [chatDetail?.title])
 
     useEffect(() => {
         setShowEvidencePopover(false)
     }, [selectedEvidence])
-
-    const elemTypeSet = useMemo(
-        () => new Set(elemTypes.map((item) => (item || "").toLowerCase())),
-        [elemTypes],
-    )
-
-    function toggleElemType(value) {
-        const normalized = (value || "").toLowerCase()
-        setElemTypes((prev) => {
-            const next = new Set(prev.map((item) => (item || "").toLowerCase()))
-            if (next.has(normalized)) {
-                next.delete(normalized)
-            } else {
-                next.add(normalized)
-            }
-            return ELEMENT_TYPE_OPTIONS.map((option) => option.value).filter((option) => next.has(option))
-        })
-    }
-
-    function resetQaControls() {
-        setRetrievalMode(DEFAULT_RETRIEVAL_MODE)
-        setSearchMode(DEFAULT_SEARCH_MODE)
-        setTopK(DEFAULT_TOP_K)
-        setElemTypes([...DEFAULT_ELEM_TYPES])
-        setMaxHistoryTurns(DEFAULT_MAX_HISTORY_TURNS)
-        setEnableImageVqa(false)
-        setEnableMemorySummarizer(false)
-    }
 
     const evidencePageIndex = useMemo(
         () =>
@@ -607,18 +570,6 @@ export default function DocumentChat() {
         }
     }
 
-    async function handleSaveChatTitle() {
-        if (savingChatTitle) return
-        const trimmed = chatTitleDraft.trim()
-        await persistChatTitle(trimmed || null)
-    }
-
-    async function handleResetChatTitle() {
-        if (savingChatTitle) return
-        setChatTitleDraft("")
-        await persistChatTitle(null)
-    }
-
     async function handleRenameSave() {
         if (savingChatTitle) return
         const trimmed = renameTitle.trim()
@@ -640,19 +591,14 @@ export default function DocumentChat() {
             addToast({ type: "error", title: "聊天未绑定当前文档", message: "请切换或新建针对该文档的聊天" })
             return
         }
-        const parsedTopK = topK === "" ? undefined : Number(topK)
-        const normalizedTopK =
-            parsedTopK === undefined || Number.isNaN(parsedTopK)
-                ? undefined
-                : Math.min(30, Math.max(1, Math.floor(parsedTopK)))
-        const parsedHistory = maxHistoryTurns === "" ? undefined : Number(maxHistoryTurns)
-        const normalizedHistory =
-            parsedHistory === undefined || Number.isNaN(parsedHistory)
-                ? undefined
-                : Math.max(0, Math.floor(parsedHistory))
-        if (normalizedTopK !== undefined) {
-            setTopK(String(normalizedTopK))
-        }
+        const parsedTopK = Number(topK)
+        const normalizedTopK = Number.isNaN(parsedTopK)
+            ? undefined
+            : Math.min(30, Math.max(1, Math.floor(parsedTopK)))
+        const parsedHistory = Number(maxHistoryTurns)
+        const normalizedHistory = Number.isNaN(parsedHistory)
+            ? undefined
+            : Math.max(0, Math.floor(parsedHistory))
         setSending(true)
         try {
             await createTurn(chatId, {
@@ -808,6 +754,15 @@ export default function DocumentChat() {
             <div className="meta-toggle">
                 <span className="caption muted">固定单文档聊天，PDF 与 Evidence 高亮保持一致。</span>
                 <div className="meta-toggle__actions">
+                    <Button
+                        onClick={() => {
+                            setRenameTitle(chatDetail?.title ?? "")
+                            setShowRenameModal(true)
+                        }}
+                        disabled={!chatId || savingChatTitle}
+                    >
+                        修改聊天名称
+                    </Button>
                     <Button variant="ghost" onClick={() => setShowChatDrawer(true)}>
                         聊天列表
                     </Button>
@@ -825,42 +780,21 @@ export default function DocumentChat() {
 
             <div className="meta-panel">
                 <div className="meta-panel__header">
-                    <div>
-                        <h1 className="page-title">{chatTitle}</h1>
+                    <div className="stack" style={{ gap: "8px" }}>
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "10px",
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <h1 className="page-title">{chatTitle}</h1>
+                            {scopeMismatch && <span className="pill warning">文档不匹配或类型异常</span>}
+                        </div>
                         <p className="page-subtitle">
                             单文档问答：左侧聊天流 + 右侧固定 PDF 高亮。{loadingDocument && "加载 document..."}
                         </p>
-                        <div className="chat-title-editor">
-                            <label className="caption" htmlFor="chat-title-input">
-                                聊天名称（默认 Chat #{chatId || "new"}，可手动修改）
-                            </label>
-                            <div className="chat-title-editor__controls">
-                                <input
-                                    id="chat-title-input"
-                                    className="input"
-                                    value={chatTitleDraft}
-                                    onChange={(event) => setChatTitleDraft(event.target.value)}
-                                    placeholder={chatId ? `Chat #${chatId}` : "输入聊天名称"}
-                                    disabled={savingChatTitle || !chatId}
-                                />
-                                <Button onClick={handleSaveChatTitle} disabled={savingChatTitle || !chatId}>
-                                    {savingChatTitle ? "保存中..." : "保存名称"}
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    onClick={handleResetChatTitle}
-                                    disabled={savingChatTitle || !chatId}
-                                >
-                                    重置为默认
-                                </Button>
-                                <Button variant="ghost" onClick={() => setShowRenameModal(true)} disabled={!chatId}>
-                                    弹窗编辑
-                                </Button>
-                                {scopeMismatch && (
-                                    <span className="pill warning">文档不匹配或类型异常</span>
-                                )}
-                            </div>
-                        </div>
                     </div>
                     <div className="meta-panel__actions">
                         <div className="stack" style={{ gap: "6px", alignItems: "flex-end" }}>
@@ -914,162 +848,6 @@ export default function DocumentChat() {
                             )}
                         </div>
                     )}
-
-                    <div
-                        className="qa-control-panel"
-                        style={{
-                            margin: "0 0 12px",
-                            padding: "12px",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            background: "#f8fafc",
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "12px",
-                                marginBottom: "8px",
-                            }}
-                        >
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <strong>QA 控制面板</strong>
-                                <span className="caption muted">遵循 env_setting，可按需调整检索与元素过滤。</span>
-                            </div>
-                            <Button variant="ghost" onClick={resetQaControls} type="button">
-                                重置为默认
-                            </Button>
-                        </div>
-
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                                gap: "12px",
-                            }}
-                        >
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="retrieval-mode-select">
-                                    检索模式
-                                </label>
-                                <select
-                                    id="retrieval-mode-select"
-                                    className="search-bar__select"
-                                    value={retrievalMode}
-                                    onChange={(event) => setRetrievalMode(event.target.value)}
-                                >
-                                    <option value="auto">Auto · 决策模式</option>
-                                    <option value="force">Force · 强制检索</option>
-                                    <option value="skip">Skip · 直接回答</option>
-                                </select>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="search-mode-select">
-                                    搜索模式
-                                </label>
-                                <select
-                                    id="search-mode-select"
-                                    className="search-bar__select"
-                                    value={searchMode}
-                                    onChange={(event) => setSearchMode(event.target.value)}
-                                >
-                                    <option value="hybrid">混合</option>
-                                    <option value="vector">向量</option>
-                                    <option value="fulltext">全文</option>
-                                </select>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="topk-input">
-                                    TopK
-                                </label>
-                                <input
-                                    id="topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="30"
-                                    value={topK}
-                                    onChange={(event) => setTopK(event.target.value)}
-                                    placeholder="默认 8"
-                                />
-                                <span className="caption muted">用于问答检索的返回条数。</span>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="history-turns-input">
-                                    历史轮数
-                                </label>
-                                <input
-                                    id="history-turns-input"
-                                    className="input"
-                                    type="number"
-                                    min="0"
-                                    value={maxHistoryTurns}
-                                    onChange={(event) => setMaxHistoryTurns(event.target.value)}
-                                    placeholder="默认为 8"
-                                />
-                                <span className="caption muted">设为 0 表示不带入历史轮次。</span>
-                            </div>
-                        </div>
-
-                        <div className="stack" style={{ gap: "6px", marginTop: "10px" }}>
-                            <span className="caption">元素类型过滤</span>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                                {ELEMENT_TYPE_OPTIONS.map((option) => (
-                                    <label
-                                        key={option.value}
-                                        className="pill"
-                                        style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={elemTypeSet.has(option.value)}
-                                            onChange={() => toggleElemType(option.value)}
-                                        />
-                                        <span>{option.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "16px",
-                                flexWrap: "wrap",
-                                marginTop: "10px",
-                            }}
-                        >
-                            <label
-                                className="inline-kv"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={enableMemorySummarizer}
-                                    onChange={(event) => setEnableMemorySummarizer(event.target.checked)}
-                                />
-                                <span className="caption">记忆摘要开关</span>
-                            </label>
-                            <label
-                                className="inline-kv"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={enableImageVqa}
-                                    onChange={(event) => setEnableImageVqa(event.target.checked)}
-                                />
-                                <span className="caption">视觉问答（VQA）</span>
-                            </label>
-                        </div>
-                    </div>
 
                     <div className="chat-messages">
                         {loadingChat ? (
