@@ -254,7 +254,7 @@ export default function DocumentDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">Document 信息</h3>
-                                <p className="caption">来自 /api/documents/{documentId}</p>
+                                <p className="caption">文档基本信息</p>
                             </div>
                             <StatusPill status={parseStatus} />
                         </div>
@@ -323,7 +323,7 @@ export default function DocumentDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">Document-RAG 检索</h3>
-                                <p className="caption">带 doc_id 过滤的 /api/retrieval/test（混合/向量/全文）。</p>
+                                <p className="caption">检索</p>
                             </div>
                             <span className="pill muted">TopK {ragTopK}</span>
                         </div>
@@ -398,7 +398,7 @@ export default function DocumentDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">Document 聊天历史</h3>
-                                <p className="caption">来自 /api/documents/{documentId}/chats</p>
+                                <p className="caption">文档级聊天记录</p>
                             </div>
                             <div className="stack" style={{ gap: "8px", alignItems: "flex-end" }}>
                                 <Button variant="ghost" onClick={loadChats} disabled={loadingChats}>
