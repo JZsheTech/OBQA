@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { createCollection, healthCheck, listCollections } from "../api/client"
+import { createCollection, deleteCollection, healthCheck, listCollections } from "../api/client"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 import Modal from "../components/ui/Modal"
@@ -48,6 +48,8 @@ export default function CollectionsHome() {
 
     const [healthStatus, setHealthStatus] = useState({ state: "idle", message: "等待检查" })
     const apiBase = (import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:9075/api").replace(/\/+$/, "")
+
+    const [deletingCollections, setDeletingCollections] = useState(new Set())
 
     const healthTone = useMemo(() => {
         if (healthStatus.state === "ok") return "success"
@@ -112,6 +114,10 @@ export default function CollectionsHome() {
         await loadCollections()
     }
 
+    function getActiveQueryParams() {
+        return activeQuery ? { searchField: activeQuery.field, keyword: activeQuery.keyword } : {}
+    }
+
     async function handleCreateCollection() {
         setCreating(true)
         try {
@@ -129,6 +135,43 @@ export default function CollectionsHome() {
             addToast({ type: "error", title: "创建失败", message: error.message })
         } finally {
             setCreating(false)
+        }
+    }
+
+    async function handleDeleteCollection(event, item) {
+        event.stopPropagation()
+        const targetId = item?.id
+        if (!targetId) return
+        const confirmed = window.confirm(`确定删除 Collection “${item.name || targetId}” 吗？该操作不可撤销。`)
+        if (!confirmed) return
+        setDeletingCollections((prev) => {
+            const next = new Set(prev)
+            next.add(targetId)
+            return next
+        })
+        try {
+            await deleteCollection(targetId)
+            addToast({
+                type: "success",
+                title: "已删除 Collection",
+                message: item.name || `#${targetId}`,
+            })
+            await loadCollections(getActiveQueryParams())
+        } catch (error) {
+            addToast({ type: "error", title: "删除失败", message: error.message })
+        } finally {
+            setDeletingCollections((prev) => {
+                const next = new Set(prev)
+                next.delete(targetId)
+                return next
+            })
+        }
+    }
+
+    function handleCardKeyDown(event, targetId) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            navigate(`/collections/${targetId}`)
         }
     }
 
@@ -199,30 +242,46 @@ export default function CollectionsHome() {
 
                     {!loadingCollections && collections.length > 0 && (
                         <div className="collection-grid">
-                            {collections.map((item) => (
-                                <button
-                                    key={item.id}
-                                    type="button"
-                                    className="collection-card"
-                                    onClick={() => navigate(`/collections/${item.id}`)}
-                                >
-                                    <div className="collection-card__meta">
-                                        <div className="collection-card__name" title={item.name}>
-                                            {item.name}
+                            {collections.map((item) => {
+                                const deleting = deletingCollections.has(item.id)
+                                return (
+                                    <div
+                                        key={item.id}
+                                        role="button"
+                                        tabIndex={0}
+                                        className="collection-card"
+                                        onClick={() => navigate(`/collections/${item.id}`)}
+                                        onKeyDown={(event) => handleCardKeyDown(event, item.id)}
+                                    >
+                                        <div className="collection-card__meta">
+                                            <div className="collection-card__name" title={item.name}>
+                                                {item.name}
+                                            </div>
+                                            <div className="collection-card__meta-actions">
+                                                <div className="caption" title={item.created_at}>
+                                                    {formatDateTime(item.created_at)}
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="danger-link"
+                                                    style={{ color: "var(--color-danger)" }}
+                                                    disabled={deleting}
+                                                    onClick={(event) => handleDeleteCollection(event, item)}
+                                                >
+                                                    {deleting ? "删除中..." : "删除"}
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <div className="caption" title={item.created_at}>
-                                            {formatDateTime(item.created_at)}
+                                        <p className="collection-card__desc" title={item.description || "暂无描述"}>
+                                            {item.description || "暂无描述"}
+                                        </p>
+                                        <div className="collection-card__footer">
+                                            <span className="status-dot" style={{ background: "var(--color-brand)" }}></span>
+                                            <span className="caption">点击进入 Collection 管理页</span>
                                         </div>
                                     </div>
-                                    <p className="collection-card__desc" title={item.description || "暂无描述"}>
-                                        {item.description || "暂无描述"}
-                                    </p>
-                                    <div className="collection-card__footer">
-                                        <span className="status-dot" style={{ background: "var(--color-brand)" }}></span>
-                                        <span className="caption">点击进入 Collection 管理页</span>
-                                    </div>
-                                </button>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </div>

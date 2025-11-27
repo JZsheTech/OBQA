@@ -93,6 +93,13 @@ export async function createCollection({ name, description }) {
     })
 }
 
+export async function deleteCollection(collectionId) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    return request(`/collections/${collectionId}`, { method: "DELETE" })
+}
+
 export async function uploadDocument(collectionId, file) {
     if (!collectionId) {
         throw new Error("Collection id is required")
@@ -132,6 +139,13 @@ export async function listDocuments(collectionId, { searchField, keyword } = {})
     return request(path)
 }
 
+export async function deleteDocument(documentId) {
+    if (!documentId) {
+        throw new Error("Document id is required")
+    }
+    return request(`/documents/${documentId}`, { method: "DELETE" })
+}
+
 export async function listCollectionChats(collectionId) {
     if (!collectionId) {
         throw new Error("Collection id is required")
@@ -164,6 +178,13 @@ export async function updateChat(chatId, { title } = {}) {
         method: "PATCH",
         body: { title: title?.trim() || null },
     })
+}
+
+export async function deleteChat(chatId) {
+    if (!chatId) {
+        throw new Error("Chat id is required")
+    }
+    return request(`/chats/${chatId}`, { method: "DELETE" })
 }
 
 export async function createTurn(

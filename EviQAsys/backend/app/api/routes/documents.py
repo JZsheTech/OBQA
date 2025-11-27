@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -58,6 +58,23 @@ def get_document_detail(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found.")
     detail = _format_document_detail(document, collection)
     return DocumentEnvelope(code="OK", data=detail)
+
+
+@router.delete(
+    "/documents/{document_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_document(
+    document_id: int,
+    repo: DocumentsRepository = Depends(get_documents_repo),
+    upload_settings: UploadSettings = Depends(get_upload_config),
+) -> Response:
+    document = repo.get_by_id(document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+    _remove_document_file(document.get("file_path"), upload_settings)
+    repo.delete_document(document_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
@@ -149,6 +166,23 @@ def _safe_int(value: object) -> int | None:
         return int(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _remove_document_file(file_path: object, upload_settings: UploadSettings) -> None:
+    if not file_path:
+        return
+    try:
+        resolved_path = Path(str(file_path)).resolve()
+        upload_root = Path(upload_settings.root_dir).resolve()
+        resolved_path.relative_to(upload_root)
+    except Exception:  # noqa: BLE001 - defensive cleanup
+        logger.warning("Skip deleting document file outside upload root: %s", file_path)
+        return
+    try:
+        if resolved_path.is_file():
+            resolved_path.unlink()
+    except Exception:  # noqa: BLE001 - best-effort cleanup
+        logger.warning("Failed to delete document file %s", resolved_path, exc_info=True)
 
 
 __all__ = ["router"]

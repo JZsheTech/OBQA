@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel
 
 from ...repositories import ChatsRepository, CollectionsRepository, DocumentsRepository
@@ -122,6 +122,21 @@ def get_collection_detail(
     if not collection:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found.")
     return CollectionEnvelope(code="OK", data=CollectionRead(**collection))
+
+
+@router.delete(
+    "/collections/{collection_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_collection(
+    collection_id: int,
+    repo: CollectionsRepository = Depends(get_collections_repo),
+) -> Response:
+    collection = repo.get_by_id(collection_id)
+    if not collection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found.")
+    repo.delete_collection(collection_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

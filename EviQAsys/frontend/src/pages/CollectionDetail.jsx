@@ -7,6 +7,8 @@ import {
     runRetrieval,
     createCollectionChat,
     uploadDocument,
+    deleteDocument,
+    deleteChat,
 } from "../api/client"
 import DebugIdFooter from "../components/DebugIdFooter"
 import PageHeader from "../components/layout/PageHeader"
@@ -59,6 +61,7 @@ export default function CollectionDetail() {
     const [searchResults, setSearchResults] = useState([])
     const [searching, setSearching] = useState(false)
     const [hasSearched, setHasSearched] = useState(false)
+    const [deletingDocumentIds, setDeletingDocumentIds] = useState(new Set())
 
     const [uploadQueue, setUploadQueue] = useState([])
     const [uploading, setUploading] = useState(false)
@@ -66,6 +69,7 @@ export default function CollectionDetail() {
     const [chats, setChats] = useState([])
     const [loadingChats, setLoadingChats] = useState(false)
     const [creatingChat, setCreatingChat] = useState(false)
+    const [deletingChatIds, setDeletingChatIds] = useState(new Set())
 
     const [ragQuery, setRagQuery] = useState("")
     const [ragMode, setRagMode] = useState("hybrid")
@@ -145,6 +149,39 @@ export default function CollectionDetail() {
         }
     }
 
+    async function handleDeleteChat(event, chat) {
+        event.stopPropagation()
+        const targetId = chat?.id
+        if (!targetId) return
+        const confirmed = window.confirm(`确定删除聊天 “${chat.title || `Chat #${targetId}`}” 吗？历史对话将被清除。`)
+        if (!confirmed) return
+        setDeletingChatIds((prev) => {
+            const next = new Set(prev)
+            next.add(targetId)
+            return next
+        })
+        try {
+            await deleteChat(targetId)
+            addToast({ type: "success", title: "已删除聊天", message: chat.title || `Chat #${targetId}` })
+            await loadChats()
+        } catch (error) {
+            addToast({ type: "error", title: "删除聊天失败", message: error.message })
+        } finally {
+            setDeletingChatIds((prev) => {
+                const next = new Set(prev)
+                next.delete(targetId)
+                return next
+            })
+        }
+    }
+
+    function handleChatCardKeyDown(event, chatId) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            navigate(`/collections/${collectionId}/chat/${chatId}`)
+        }
+    }
+
     async function handleSearch() {
         const keyword = searchText.trim()
         if (!keyword) {
@@ -170,6 +207,56 @@ export default function CollectionDetail() {
         setHasSearched(false)
         setSearchResults([])
         await loadDocuments()
+    }
+
+    async function refreshSearchResultsAfterChange() {
+        const keyword = searchText.trim()
+        if (hasSearched && keyword) {
+            try {
+                const data = await listDocuments(collectionId, { searchField, keyword })
+                setSearchResults(Array.isArray(data) ? data : [])
+            } catch (error) {
+                addToast({ type: "error", title: "刷新搜索结果失败", message: error.message })
+            }
+        } else if (hasSearched && !keyword) {
+            setHasSearched(false)
+            setSearchResults([])
+        }
+    }
+
+    async function handleDeleteDocument(event, doc) {
+        event.stopPropagation()
+        const targetId = doc?.id
+        if (!targetId) return
+        const label = doc.title || doc.file_name || `Doc #${targetId}`
+        const confirmed = window.confirm(`确定删除文档 “${label}” 吗？该操作会清除其解析内容和聊天记录。`)
+        if (!confirmed) return
+        setDeletingDocumentIds((prev) => {
+            const next = new Set(prev)
+            next.add(targetId)
+            return next
+        })
+        try {
+            await deleteDocument(targetId)
+            addToast({ type: "success", title: "已删除文档", message: label })
+            await loadDocuments()
+            await refreshSearchResultsAfterChange()
+        } catch (error) {
+            addToast({ type: "error", title: "删除文档失败", message: error.message })
+        } finally {
+            setDeletingDocumentIds((prev) => {
+                const next = new Set(prev)
+                next.delete(targetId)
+                return next
+            })
+        }
+    }
+
+    function handleDocKeyDown(event, docId) {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault()
+            navigate(`/collections/${collectionId}/documents/${docId}`)
+        }
     }
 
     function handleFileSelect(event) {
@@ -251,6 +338,43 @@ export default function CollectionDetail() {
 
     const allDocCount = documents.length
     const searchCount = searchResults.length
+
+    const renderDocumentCard = (doc, keyPrefix = "doc") => {
+        const deleting = deletingDocumentIds.has(doc.id)
+        return (
+            <div
+                key={`${keyPrefix}-${doc.id}`}
+                role="button"
+                tabIndex={0}
+                className="list-item doc-card"
+                onClick={() => navigate(`/collections/${collectionId}/documents/${doc.id}`)}
+                onKeyDown={(event) => handleDocKeyDown(event, doc.id)}
+            >
+                <div className="doc-card__main">
+                    <div className="doc-card__title">{doc.title || doc.file_name || "Untitled"}</div>
+                    <p className="caption" title={doc.file_name}>
+                        {doc.file_name || "未保存文件名"}
+                    </p>
+                    {doc.abstract && <p className="caption muted">摘要：{truncate(doc.abstract, 120)}</p>}
+                </div>
+                <div className="doc-card__meta">
+                    <StatusPill status={doc.parse_status} />
+                    <span className="pill muted">{doc.element_count ?? 0} elements</span>
+                    <span className="pill muted">{doc.num_pages ?? "?"} pages</span>
+                    <span className="caption">{formatDateTime(doc.created_at)}</span>
+                    <Button
+                        variant="ghost"
+                        className="danger-link"
+                        style={{ color: "var(--color-danger)" }}
+                        disabled={deleting}
+                        onClick={(event) => handleDeleteDocument(event, doc)}
+                    >
+                        {deleting ? "删除中..." : "删除"}
+                    </Button>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <>
@@ -353,30 +477,7 @@ export default function CollectionDetail() {
                                 <div className="empty-state">当前 Collection 暂无文档，可上传后刷新查看。</div>
                             ) : (
                                 <div className="list">
-                                    {documents.map((doc) => (
-                                        <button
-                                            key={doc.id}
-                                            type="button"
-                                            className="list-item doc-card"
-                                            onClick={() =>
-                                                navigate(`/collections/${collectionId}/documents/${doc.id}`)
-                                            }
-                                        >
-                                            <div className="doc-card__main">
-                                                <div className="doc-card__title">{doc.title || doc.file_name || "Untitled"}</div>
-                                                <p className="caption" title={doc.file_name}>
-                                                    {doc.file_name || "未保存文件名"}
-                                                </p>
-                                                {doc.abstract && <p className="caption muted">摘要：{truncate(doc.abstract, 120)}</p>}
-                                            </div>
-                                            <div className="doc-card__meta">
-                                                <StatusPill status={doc.parse_status} />
-                                                <span className="pill muted">{doc.element_count ?? 0} elements</span>
-                                                <span className="pill muted">{doc.num_pages ?? "?"} pages</span>
-                                                <span className="caption">{formatDateTime(doc.created_at)}</span>
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {documents.map((doc) => renderDocumentCard(doc))}
                                 </div>
                             )}
                         </div>
@@ -397,29 +498,7 @@ export default function CollectionDetail() {
                                 <div className="empty-state">未命中文档，尝试更换关键字或字段。</div>
                             ) : (
                                 <div className="list">
-                                    {searchResults.map((doc) => (
-                                        <button
-                                            key={`search-${doc.id}`}
-                                            type="button"
-                                            className="list-item doc-card"
-                                            onClick={() =>
-                                                navigate(`/collections/${collectionId}/documents/${doc.id}`)
-                                            }
-                                        >
-                                            <div className="doc-card__main">
-                                                <div className="doc-card__title">{doc.title || doc.file_name || "Untitled"}</div>
-                                                <p className="caption" title={doc.file_name}>
-                                                    {doc.file_name || "未保存文件名"}
-                                                </p>
-                                                {doc.abstract && <p className="caption muted">摘要：{truncate(doc.abstract, 120)}</p>}
-                                            </div>
-                                            <div className="doc-card__meta">
-                                                <StatusPill status={doc.parse_status} />
-                                                <span className="pill muted">{doc.element_count ?? 0} elements</span>
-                                                <span className="caption">{formatDateTime(doc.created_at)}</span>
-                                            </div>
-                                        </button>
-                                    ))}
+                                    {searchResults.map((doc) => renderDocumentCard(doc, "search"))}
                                 </div>
                             )}
                         </div>
@@ -486,20 +565,36 @@ export default function CollectionDetail() {
                             <div className="empty-state">暂无聊天记录，M5e 将提供创建聊天的入口。</div>
                         ) : (
                             <div className="list">
-                                {chats.map((chat) => (
-                                    <button
-                                        key={chat.id}
-                                        type="button"
-                                        className="list-item"
-                                        onClick={() => navigate(`/collections/${collectionId}/chat/${chat.id}`)}
-                                    >
-                                        <div>
-                                            <strong>{chat.title || `Chat #${chat.id}`}</strong>
-                                            <p className="caption">{formatDateTime(chat.created_at)}</p>
+                                {chats.map((chat) => {
+                                    const deleting = deletingChatIds.has(chat.id)
+                                    return (
+                                        <div
+                                            key={chat.id}
+                                            role="button"
+                                            tabIndex={0}
+                                            className="list-item"
+                                            onClick={() => navigate(`/collections/${collectionId}/chat/${chat.id}`)}
+                                            onKeyDown={(event) => handleChatCardKeyDown(event, chat.id)}
+                                        >
+                                            <div>
+                                                <strong>{chat.title || `Chat #${chat.id}`}</strong>
+                                                <p className="caption">{formatDateTime(chat.created_at)}</p>
+                                            </div>
+                                            <div className="list-item__meta">
+                                                <span className="pill muted">{chat.type}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="danger-link"
+                                                    style={{ color: "var(--color-danger)" }}
+                                                    disabled={deleting}
+                                                    onClick={(event) => handleDeleteChat(event, chat)}
+                                                >
+                                                    {deleting ? "删除中..." : "删除"}
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <span className="pill muted">{chat.type}</span>
-                                    </button>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>

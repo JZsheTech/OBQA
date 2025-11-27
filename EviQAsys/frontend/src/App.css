@@ -221,6 +221,19 @@
   color: white;
 }
 
+.btn.danger-link {
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--color-danger);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn.danger-link:hover {
+  background: rgba(220, 38, 38, 0.08);
+  transform: none;
+}
+
 .pill {
   padding: 4px 10px;
   border-radius: 999px;
@@ -463,6 +476,12 @@
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
+}
+
+.collection-card__meta-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .collection-card__name {

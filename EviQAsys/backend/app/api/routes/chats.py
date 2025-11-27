@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
 from ...repositories import ChatsRepository, CollectionsRepository, ElementsRepository, TurnsRepository
@@ -122,6 +122,21 @@ def update_chat(
     if not refreshed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found after update.")
     return ChatEnvelope(code="OK", data=_to_chat_read(refreshed))
+
+
+@router.delete(
+    "/chats/{chat_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def delete_chat(
+    chat_id: int,
+    chats_repo: ChatsRepository = Depends(get_chats_repo),
+) -> Response:
+    chat = chats_repo.get_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
+    chats_repo.delete_chat(chat_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(
