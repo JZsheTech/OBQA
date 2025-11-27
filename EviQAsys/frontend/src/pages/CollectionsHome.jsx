@@ -182,7 +182,6 @@ export default function CollectionsHome() {
             <PageHeader
                 breadcrumbs={[{ label: "Home" }]}
                 title="知识库主页"
-                subtitle="按 name/description 搜索或创建 Collection，真实数据来源于后端 /api/collections。"
                 actions={
                     <Button onClick={() => setShowModal(true)}>
                         + 新建 Collection
@@ -196,9 +195,7 @@ export default function CollectionsHome() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">查找 Collection</h3>
-                                <p className="caption">支持按 name/description 模糊搜索，结果与后端保持一致。</p>
                             </div>
-                            <span className="tag">M5b DoD</span>
                         </div>
                         <SearchBar
                             value={searchText}
@@ -324,38 +321,6 @@ export default function CollectionsHome() {
                                 <span className="caption">支持 name / description 模糊匹配，Reset 恢复全量列表。</span>
                             </div>
                         </div>
-                    </div>
-
-                    <div className="card">
-                        <div className="card__header">
-                            <div>
-                                <h3 className="card__title">设计稿对齐</h3>
-                                <p className="caption">依照 dependency/frontUI_design 的信息架构与色板落地。</p>
-                            </div>
-                        </div>
-                        <ul className="list">
-                            <li className="list-item">
-                                <div>
-                                    <strong>列表真实读取</strong>
-                                    <p className="caption">从 /api/collections 获取最新数据，含 created_at/description 截断展示。</p>
-                                </div>
-                                <span className="pill success">已完成</span>
-                            </li>
-                            <li className="list-item">
-                                <div>
-                                    <strong>搜索 + Reset</strong>
-                                    <p className="caption">显示 “Searched result” 标签，Reset 清除过滤并重新请求。</p>
-                                </div>
-                                <span className="pill success">可用</span>
-                            </li>
-                            <li className="list-item">
-                                <div>
-                                    <strong>新建 Collection</strong>
-                                    <p className="caption">Modal 校验必填，提交后 toast 提示并刷新列表。</p>
-                                </div>
-                                <span className="pill success">联通</span>
-                            </li>
-                        </ul>
                     </div>
                 </div>
             </div>

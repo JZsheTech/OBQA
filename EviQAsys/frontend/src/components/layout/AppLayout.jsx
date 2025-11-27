@@ -14,11 +14,6 @@ const tabs = [
         to: "/chat-history",
         match: (pathname) => pathname.startsWith("/chat-history"),
     },
-    {
-        label: "PDF 高亮测试",
-        to: "/pdf-highlight-demo",
-        match: (pathname) => pathname.startsWith("/pdf-highlight-demo"),
-    },
 ]
 
 function tabClassName(pathname, tab) {
@@ -52,7 +47,6 @@ export default function AppLayout() {
                     </span>
                 </Link>
                 <div className="top-actions">
-                    <span className="pill muted">M5e collection-chat</span>
                     <span className="pill muted">API: {formatBaseLabel(apiBase)}</span>
                     <div className="avatar" aria-hidden="true"></div>
                 </div>
