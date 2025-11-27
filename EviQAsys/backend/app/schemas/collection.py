@@ -20,3 +20,8 @@ class CollectionCreate(CollectionBase):
 class CollectionRead(CollectionBase):
     id: int
     created_at: datetime
+
+
+class CollectionUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None

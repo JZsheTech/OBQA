@@ -1,4 +1,4 @@
-from .collection import CollectionBase, CollectionCreate, CollectionRead
+from .collection import CollectionBase, CollectionCreate, CollectionRead, CollectionUpdate
 from .document import DocumentBase, DocumentCreate, DocumentDetail, DocumentListItem, DocumentRead, DocumentUploadResponse
 from .chat import ChatBase, ChatCreate, ChatRead, CollectionChatHistory, DocumentChatHistory
 from .retrieval import RetrievalCandidate, RetrievalEnvelope
@@ -18,6 +18,7 @@ __all__ = [
     "CollectionBase",
     "CollectionCreate",
     "CollectionRead",
+    "CollectionUpdate",
     "DocumentBase",
     "DocumentCreate",
     "DocumentDetail",

@@ -100,6 +100,36 @@ export async function deleteCollection(collectionId) {
     return request(`/collections/${collectionId}`, { method: "DELETE" })
 }
 
+export async function updateCollection(collectionId, { name, description } = {}) {
+    if (!collectionId) {
+        throw new Error("Collection id is required")
+    }
+    const payload = {}
+    if (name !== undefined) {
+        payload.name = name
+    }
+    if (description !== undefined) {
+        payload.description = description
+    }
+    if (Object.keys(payload).length === 0) {
+        throw new Error("At least one field (name/description) is required")
+    }
+    const trimmedName = payload.name !== undefined ? (payload.name ?? "").trim() : undefined
+    if (trimmedName !== undefined) {
+        if (!trimmedName) {
+            throw new Error("Collection name cannot be empty")
+        }
+        payload.name = trimmedName
+    }
+    if (payload.description !== undefined) {
+        payload.description = (payload.description ?? "").trim()
+    }
+    return request(`/collections/${collectionId}`, {
+        method: "PATCH",
+        body: payload,
+    })
+}
+
 export async function uploadDocument(collectionId, file) {
     if (!collectionId) {
         throw new Error("Collection id is required")

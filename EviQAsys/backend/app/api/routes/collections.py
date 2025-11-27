@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Qu
 from pydantic import BaseModel
 
 from ...repositories import ChatsRepository, CollectionsRepository, DocumentsRepository
-from ...schemas import ChatRead, CollectionCreate, CollectionRead, DocumentListItem, DocumentUploadResponse
+from ...schemas import ChatRead, CollectionCreate, CollectionRead, CollectionUpdate, DocumentListItem, DocumentUploadResponse
 from ...services.index import DocumentIndexer
 from ...services.ingestion import DocumentIngestor, DuplicateDocumentError
 
@@ -108,6 +108,45 @@ def create_collection(
             detail="Failed to create collection.",
         )
     return CollectionEnvelope(code="OK", data=CollectionRead(**collection))
+
+
+@router.patch(
+    "/collections/{collection_id}",
+    response_model=CollectionEnvelope,
+)
+def update_collection(
+    collection_id: int,
+    payload: CollectionUpdate,
+    repo: CollectionsRepository = Depends(get_collections_repo),
+) -> CollectionEnvelope:
+    existing = repo.get_by_id(collection_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found.")
+    name_provided = payload.name is not None
+    description_provided = payload.description is not None
+    if not name_provided and not description_provided:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one of name or description must be provided.",
+        )
+    normalized_name = (payload.name or "").strip() if name_provided else None
+    if name_provided and not normalized_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Collection name cannot be empty.",
+        )
+    normalized_description = (
+        (payload.description or "").strip() if description_provided else None
+    )
+    repo.update_collection(
+        collection_id,
+        name=normalized_name if name_provided else None,
+        description=normalized_description if description_provided else None,
+    )
+    refreshed = repo.get_by_id(collection_id)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found after update.")
+    return CollectionEnvelope(code="OK", data=CollectionRead(**refreshed))
 
 
 @router.get(

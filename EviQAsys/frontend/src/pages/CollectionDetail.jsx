@@ -10,11 +10,13 @@ import {
     uploadDocument,
     deleteDocument,
     deleteChat,
+    updateCollection,
 } from "../api/client"
 import DebugIdFooter from "../components/DebugIdFooter"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 import Drawer from "../components/ui/Drawer"
+import Modal from "../components/ui/Modal"
 import SearchBar from "../components/ui/SearchBar"
 import StatusPill from "../components/ui/StatusPill"
 import { useToast } from "../components/ui/Toast"
@@ -54,6 +56,9 @@ export default function CollectionDetail() {
 
     const [collection, setCollection] = useState(null)
     const [loadingCollection, setLoadingCollection] = useState(false)
+    const [showEditModal, setShowEditModal] = useState(false)
+    const [editForm, setEditForm] = useState({ name: "", description: "" })
+    const [savingCollection, setSavingCollection] = useState(false)
 
     const [documents, setDocuments] = useState([])
     const [loadingDocuments, setLoadingDocuments] = useState(false)
@@ -100,6 +105,10 @@ export default function CollectionDetail() {
         try {
             const data = await getCollectionDetail(collectionId)
             setCollection(data)
+            setEditForm({
+                name: data?.name ?? "",
+                description: data?.description ?? "",
+            })
         } catch (error) {
             addToast({ type: "error", title: "加载 Collection 失败", message: error.message })
         } finally {
@@ -155,7 +164,9 @@ export default function CollectionDetail() {
         event.stopPropagation()
         const targetId = chat?.id
         if (!targetId) return
-        const confirmed = window.confirm(`确定删除聊天 “${chat.title || `Chat #${targetId}`}” 吗？历史对话将被清除。`)
+        const confirmed = window.confirm(
+            `确定删除聊天 “${chat.title || `Chat #${targetId}`}” 吗？历史对话将被清除。`,
+        )
         if (!confirmed) return
         setDeletingChatIds((prev) => {
             const next = new Set(prev)
@@ -174,6 +185,37 @@ export default function CollectionDetail() {
                 next.delete(targetId)
                 return next
             })
+        }
+    }
+
+    function openEditModal() {
+        setEditForm({
+            name: collection?.name ?? "",
+            description: collection?.description ?? "",
+        })
+        setShowEditModal(true)
+    }
+
+    async function handleUpdateCollection() {
+        if (!collectionId) return
+        const trimmedName = (editForm.name ?? "").trim()
+        if (!trimmedName) {
+            addToast({ type: "error", title: "名称必填", message: "Collection name 不能为空" })
+            return
+        }
+        setSavingCollection(true)
+        try {
+            await updateCollection(collectionId, {
+                name: trimmedName,
+                description: (editForm.description ?? "").trim(),
+            })
+            addToast({ type: "success", title: "已更新 Collection", message: trimmedName })
+            setShowEditModal(false)
+            await loadCollection()
+        } catch (error) {
+            addToast({ type: "error", title: "更新失败", message: error.message })
+        } finally {
+            setSavingCollection(false)
         }
     }
 
@@ -465,7 +507,12 @@ export default function CollectionDetail() {
                                 <h3 className="card__title">Collection 信息</h3>
                                 <p className="caption">展示 name/description/created_at 元数据。</p>
                             </div>
-                            <span className="pill muted">{loadingCollection ? "加载中..." : "M5c ready"}</span>
+                            <div className="segmented-control">
+                                <Button variant="ghost" onClick={openEditModal} disabled={loadingCollection}>
+                                    编辑
+                                </Button>
+                                <span className="pill muted">{loadingCollection ? "加载中..." : "M5c ready"}</span>
+                            </div>
                         </div>
                         <div className="info-grid">
                             <div className="info-item">
@@ -727,6 +774,46 @@ export default function CollectionDetail() {
             </div>
 
             <DebugIdFooter segments={[{ label: "Collection", value: collection?.id ?? collectionId }]} />
+
+            <Modal
+                open={showEditModal}
+                title="编辑 Collection"
+                onClose={() => setShowEditModal(false)}
+                footer={
+                    <div className="segmented-control">
+                        <Button variant="ghost" onClick={() => setShowEditModal(false)} disabled={savingCollection}>
+                            取消
+                        </Button>
+                        <Button onClick={handleUpdateCollection} disabled={savingCollection}>
+                            {savingCollection ? "保存中..." : "保存"}
+                        </Button>
+                    </div>
+                }
+            >
+                <div className="stack">
+                    <label className="input-group">
+                        <span className="caption">名称</span>
+                        <input
+                            className="input"
+                            value={editForm.name}
+                            onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
+                            placeholder="请输入 Collection 名称"
+                        />
+                    </label>
+                    <label className="input-group">
+                        <span className="caption">描述</span>
+                        <textarea
+                            className="input"
+                            rows={3}
+                            value={editForm.description}
+                            onChange={(event) =>
+                                setEditForm((prev) => ({ ...prev, description: event.target.value }))
+                            }
+                            placeholder="请输入描述（可选）"
+                        ></textarea>
+                    </label>
+                </div>
+            </Modal>
 
             <Drawer
                 open={Boolean(selectedResult)}

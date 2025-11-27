@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { listChatHistory } from "../api/client"
+import { deleteChat, listChatHistory } from "../api/client"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 import { useToast } from "../components/ui/Toast"
@@ -38,6 +38,7 @@ export default function ChatHistory() {
     const { addToast } = useToast()
     const [history, setHistory] = useState({ collections: [], documents: [] })
     const [loading, setLoading] = useState(false)
+    const [deletingIds, setDeletingIds] = useState(new Set())
 
     const loadHistory = useCallback(async () => {
         setLoading(true)
@@ -60,6 +61,30 @@ export default function ChatHistory() {
     useEffect(() => {
         loadHistory()
     }, [loadHistory])
+
+    async function handleDelete(chatId) {
+        if (!chatId) return
+        const confirmed = window.confirm("确定删除该聊天记录吗？聊天内容将被清除。")
+        if (!confirmed) return
+        setDeletingIds((prev) => {
+            const next = new Set(prev)
+            next.add(chatId)
+            return next
+        })
+        try {
+            await deleteChat(chatId)
+            addToast({ type: "success", title: "已删除聊天", message: `Chat #${chatId}` })
+            await loadHistory()
+        } catch (error) {
+            addToast({ type: "error", title: "删除聊天失败", message: error.message })
+        } finally {
+            setDeletingIds((prev) => {
+                const next = new Set(prev)
+                next.delete(chatId)
+                return next
+            })
+        }
+    }
 
     return (
         <>
@@ -108,6 +133,7 @@ export default function ChatHistory() {
                                     onClick={() =>
                                         navigate(`/collections/${item.collection_id}/chat/${item.chat_id}`)
                                     }
+                                    disabled={deletingIds.has(item.chat_id)}
                                 >
                                     <div>
                                         <strong>
@@ -116,7 +142,21 @@ export default function ChatHistory() {
                                         </strong>
                                         <p className="caption">{formatDateTime(item.created_at)}</p>
                                     </div>
-                                    <span className="pill muted">Collection</span>
+                                    <div className="list-item__meta">
+                                        <span className="pill muted">Collection</span>
+                                        <Button
+                                            variant="ghost"
+                                            className="danger-link"
+                                            style={{ color: "var(--color-danger)" }}
+                                            disabled={deletingIds.has(item.chat_id)}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                handleDelete(item.chat_id)
+                                            }}
+                                        >
+                                            {deletingIds.has(item.chat_id) ? "删除中..." : "删除"}
+                                        </Button>
+                                    </div>
                                 </button>
                             ))}
                         </div>
@@ -145,6 +185,7 @@ export default function ChatHistory() {
                                     type="button"
                                     className="list-item"
                                     onClick={() => navigate(`/documents/${item.document_id}/chat/${item.chat_id}`)}
+                                    disabled={deletingIds.has(item.chat_id)}
                                 >
                                     <div>
                                         <strong>
@@ -154,7 +195,21 @@ export default function ChatHistory() {
                                         </strong>
                                         <p className="caption">{formatDateTime(item.created_at)}</p>
                                     </div>
-                                    <span className="pill muted">Document</span>
+                                    <div className="list-item__meta">
+                                        <span className="pill muted">Document</span>
+                                        <Button
+                                            variant="ghost"
+                                            className="danger-link"
+                                            style={{ color: "var(--color-danger)" }}
+                                            disabled={deletingIds.has(item.chat_id)}
+                                            onClick={(event) => {
+                                                event.stopPropagation()
+                                                handleDelete(item.chat_id)
+                                            }}
+                                        >
+                                            {deletingIds.has(item.chat_id) ? "删除中..." : "删除"}
+                                        </Button>
+                                    </div>
                                 </button>
                             ))}
                         </div>
