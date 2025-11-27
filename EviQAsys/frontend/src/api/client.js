@@ -280,6 +280,10 @@ export async function listDocumentChats(documentId) {
     return request(`/documents/${documentId}/chats`)
 }
 
+export async function listChatHistory() {
+    return request("/chat-history")
+}
+
 export function buildDocumentFileUrl(documentId) {
     if (!documentId) {
         throw new Error("Document id is required")

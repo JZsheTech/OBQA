@@ -88,6 +88,36 @@ class ChatsRepository:
             )
             return rows_to_dicts(result)
 
+    def list_collection_history(self) -> list[dict[str, Any]]:
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT c.id AS chat_id, c.title AS chat_title, c.created_at AS created_at, "
+                    "c.collection_id AS collection_id, col.name AS collection_name "
+                    "FROM chats c "
+                    "JOIN collections col ON col.id = c.collection_id "
+                    "WHERE c.`type` = 'collection' "
+                    "ORDER BY c.created_at DESC, c.id DESC",
+                ),
+            )
+            return rows_to_dicts(result)
+
+    def list_document_history(self) -> list[dict[str, Any]]:
+        with self._connection_provider() as connection:
+            result = connection.execute(
+                text(
+                    "SELECT c.id AS chat_id, c.title AS chat_title, c.created_at AS created_at, "
+                    "c.document_id AS document_id, d.title AS document_title, "
+                    "d.collection_id AS collection_id, col.name AS collection_name "
+                    "FROM chats c "
+                    "JOIN documents d ON d.id = c.document_id "
+                    "LEFT JOIN collections col ON col.id = d.collection_id "
+                    "WHERE c.`type` = 'document' "
+                    "ORDER BY c.created_at DESC, c.id DESC",
+                ),
+            )
+            return rows_to_dicts(result)
+
     def update_chat(self, chat_id: int, **fields: Any) -> RepositoryResult:
         allowed = {"title", "max_turn_order"}
         payload = {key: value for key, value in fields.items() if key in allowed}

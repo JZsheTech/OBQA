@@ -42,3 +42,25 @@ class ChatRead(ChatBase):
     id: int
     collection_id: int | None = None
     created_at: datetime
+
+
+class CollectionChatHistory(BaseModel):
+    chat_id: int
+    chat_title: str | None = None
+    collection_id: int
+    collection_name: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentChatHistory(BaseModel):
+    chat_id: int
+    chat_title: str | None = None
+    document_id: int
+    document_title: str | None = None
+    collection_id: int | None = None
+    collection_name: str | None = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

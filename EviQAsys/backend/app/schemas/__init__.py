@@ -1,6 +1,6 @@
 from .collection import CollectionBase, CollectionCreate, CollectionRead
 from .document import DocumentBase, DocumentCreate, DocumentDetail, DocumentListItem, DocumentRead, DocumentUploadResponse
-from .chat import ChatBase, ChatCreate, ChatRead
+from .chat import ChatBase, ChatCreate, ChatRead, CollectionChatHistory, DocumentChatHistory
 from .retrieval import RetrievalCandidate, RetrievalEnvelope
 from .qa import (
     TurnCreateRequest,
@@ -27,6 +27,8 @@ __all__ = [
     "ChatBase",
     "ChatCreate",
     "ChatRead",
+    "CollectionChatHistory",
+    "DocumentChatHistory",
     "RetrievalCandidate",
     "RetrievalEnvelope",
     "TurnCreateRequest",

@@ -7,9 +7,11 @@ from pydantic import BaseModel
 
 from ...repositories import ChatsRepository, CollectionsRepository, DocumentsRepository, ElementsRepository, TurnsRepository
 from ...schemas import (
+    CollectionChatHistory,
     ChatDetail,
     ChatDetailEnvelope,
     ChatRead,
+    DocumentChatHistory,
     TurnCreateRequest,
     TurnEvidencesEnvelope,
     TurnEvidencesResponse,
@@ -35,6 +37,16 @@ class ChatUpdateRequest(BaseModel):
 class ChatEnvelope(BaseModel):
     code: str = "OK"
     data: ChatRead
+
+
+class ChatHistoryPayload(BaseModel):
+    collections: list[CollectionChatHistory]
+    documents: list[DocumentChatHistory]
+
+
+class ChatHistoryEnvelope(BaseModel):
+    code: str = "OK"
+    data: ChatHistoryPayload
 
 
 def get_chats_repo() -> ChatsRepository:
@@ -96,6 +108,53 @@ def create_collection_chat(
     else:
         chat = chats_repo.create_chat(collection_id=collection_id, chat_type="collection", title=title)
     return ChatEnvelope(code="OK", data=_to_chat_read(chat))
+
+
+@router.get(
+    "/chat-history",
+    response_model=ChatHistoryEnvelope,
+)
+def list_chat_history(
+    chats_repo: ChatsRepository = Depends(get_chats_repo),
+) -> ChatHistoryEnvelope:
+    collection_rows = chats_repo.list_collection_history()
+    document_rows = chats_repo.list_document_history()
+
+    collections = []
+    for row in collection_rows:
+        collection_id = row.get("collection_id")
+        if collection_id is None:
+            continue
+        collections.append(
+            CollectionChatHistory(
+                chat_id=int(row["chat_id"]),
+                chat_title=row.get("chat_title"),
+                collection_id=int(collection_id),
+                collection_name=row.get("collection_name"),
+                created_at=row["created_at"],
+            ),
+        )
+
+    documents = []
+    for row in document_rows:
+        document_id = row.get("document_id")
+        if document_id is None:
+            continue
+        collection_id = row.get("collection_id")
+        documents.append(
+            DocumentChatHistory(
+                chat_id=int(row["chat_id"]),
+                chat_title=row.get("chat_title"),
+                document_id=int(document_id),
+                document_title=row.get("document_title"),
+                collection_id=int(collection_id) if collection_id is not None else None,
+                collection_name=row.get("collection_name"),
+                created_at=row["created_at"],
+            ),
+        )
+
+    payload = ChatHistoryPayload(collections=collections, documents=documents)
+    return ChatHistoryEnvelope(code="OK", data=payload)
 
 
 @router.get(
