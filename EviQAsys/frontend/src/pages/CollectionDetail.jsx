@@ -505,13 +505,11 @@ export default function CollectionDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">Collection 信息</h3>
-                                <p className="caption">展示 name/description/created_at 元数据。</p>
                             </div>
                             <div className="segmented-control">
                                 <Button variant="ghost" onClick={openEditModal} disabled={loadingCollection}>
                                     编辑
                                 </Button>
-                                <span className="pill muted">{loadingCollection ? "加载中..." : "M5c ready"}</span>
                             </div>
                         </div>
                         <div className="info-grid">
@@ -534,7 +532,6 @@ export default function CollectionDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">文档列表</h3>
-                                <p className="caption">全部/搜索视图来自 /api/collections/{collectionId}/documents。</p>
                             </div>
                             <Button variant="ghost" onClick={loadDocuments} disabled={loadingDocuments}>
                                 {loadingDocuments ? "刷新中..." : "刷新"}
@@ -702,7 +699,6 @@ export default function CollectionDetail() {
                         <div className="card__header">
                             <div>
                                 <h3 className="card__title">简单 Collection-RAG</h3>
-                                <p className="caption">复用 /api/retrieval/test，支持混合/向量/全文模式。</p>
                             </div>
                             <span className="pill muted">TopK {ragTopK}</span>
                         </div>
