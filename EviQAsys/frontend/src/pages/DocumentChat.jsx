@@ -1,4 +1,5 @@
 import { useParams } from "react-router-dom"
+import DebugIdFooter from "../components/DebugIdFooter"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 
@@ -34,6 +35,13 @@ export default function DocumentChat() {
                     <div className="empty-state">展示 bbox 与页码的 viewer 占位</div>
                 </div>
             </div>
+
+            <DebugIdFooter
+                segments={[
+                    { label: "Document", value: documentId },
+                    { label: "Chat", value: chatId ?? "new" },
+                ]}
+            />
         </>
     )
 }

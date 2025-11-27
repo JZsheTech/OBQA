@@ -156,6 +156,16 @@ export async function getChatDetail(chatId) {
     return request(`/chats/${chatId}`)
 }
 
+export async function updateChat(chatId, { title } = {}) {
+    if (!chatId) {
+        throw new Error("Chat id is required")
+    }
+    return request(`/chats/${chatId}`, {
+        method: "PATCH",
+        body: { title: title?.trim() || null },
+    })
+}
+
 export async function createTurn(
     chatId,
     {

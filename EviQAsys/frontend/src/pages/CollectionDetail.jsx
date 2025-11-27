@@ -8,6 +8,7 @@ import {
     createCollectionChat,
     uploadDocument,
 } from "../api/client"
+import DebugIdFooter from "../components/DebugIdFooter"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 import Drawer from "../components/ui/Drawer"
@@ -577,6 +578,8 @@ export default function CollectionDetail() {
                     </div>
                 </div>
             </div>
+
+            <DebugIdFooter segments={[{ label: "Collection", value: collection?.id ?? collectionId }]} />
 
             <Drawer
                 open={Boolean(selectedResult)}

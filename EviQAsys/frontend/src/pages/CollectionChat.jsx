@@ -11,11 +11,15 @@ import {
     buildDocumentFileUrl,
     createCollectionChat,
     createTurn,
+    getCollectionDetail,
     getChatDetail,
+    getDocumentDetail,
     getTurnEvidences,
     listCollectionChats,
     listDocuments,
+    updateChat,
 } from "../api/client"
+import DebugIdFooter from "../components/DebugIdFooter"
 import Breadcrumbs from "../components/ui/Breadcrumbs"
 import Button from "../components/ui/Button"
 import Drawer from "../components/ui/Drawer"
@@ -324,6 +328,8 @@ export default function CollectionChat() {
     const { addToast } = useToast()
 
     const [chatDetail, setChatDetail] = useState(null)
+    const [collectionDetail, setCollectionDetail] = useState(null)
+    const [documentDetail, setDocumentDetail] = useState(null)
     const [turns, setTurns] = useState([])
     const [chatList, setChatList] = useState([])
     const [documents, setDocuments] = useState([])
@@ -331,13 +337,19 @@ export default function CollectionChat() {
     const [selectedEvidence, setSelectedEvidence] = useState(null)
     const [pageForHighlight, setPageForHighlight] = useState(null)
     const [loadingChat, setLoadingChat] = useState(false)
+    const [loadingCollection, setLoadingCollection] = useState(false)
+    const [loadingDocument, setLoadingDocument] = useState(false)
     const [loadingDocs, setLoadingDocs] = useState(false)
     const [loadingChatList, setLoadingChatList] = useState(false)
     const [draftQuestion, setDraftQuestion] = useState("")
     const [sending, setSending] = useState(false)
+    const [chatTitleDraft, setChatTitleDraft] = useState("")
+    const [savingChatTitle, setSavingChatTitle] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
     const [newChatTitle, setNewChatTitle] = useState("")
     const [showChatDrawer, setShowChatDrawer] = useState(false)
+    const [showRenameModal, setShowRenameModal] = useState(false)
+    const [renameTitle, setRenameTitle] = useState("")
     const [showMetaPanel, setShowMetaPanel] = useState(false)
     const [showEvidencePopover, setShowEvidencePopover] = useState(false)
     const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
@@ -432,6 +444,30 @@ export default function CollectionChat() {
     }, [chatId, collectionId])
 
     useEffect(() => {
+        const targetCollectionId = chatDetail?.collection_id ?? collectionId
+        if (targetCollectionId) {
+            loadCollectionDetail(targetCollectionId)
+        }
+    }, [chatDetail?.collection_id, collectionId])
+
+    useEffect(() => {
+        if (chatDetail?.document_id) {
+            loadDocumentDetail(chatDetail.document_id)
+        }
+    }, [chatDetail?.document_id])
+
+    useEffect(() => {
+        if (documentDetail?.collection_id) {
+            loadCollectionDetail(documentDetail.collection_id)
+        }
+    }, [documentDetail?.collection_id])
+
+    useEffect(() => {
+        setChatTitleDraft(chatDetail?.title ?? "")
+        setRenameTitle(chatDetail?.title ?? "")
+    }, [chatDetail?.title])
+
+    useEffect(() => {
         if (selectedDocId || documents.length === 0) return
         const evidenceDoc =
             selectedEvidence?.document_id ||
@@ -513,6 +549,34 @@ export default function CollectionChat() {
     const viewerKey = selectedDocId ? `doc-${selectedDocId}` : "no-doc"
     const selectedDocUrl = selectedDocId ? buildDocumentFileUrl(selectedDocId) : null
 
+    async function loadCollectionDetail(targetId = collectionId) {
+        if (!targetId) return
+        if (collectionDetail?.id && Number(collectionDetail.id) === Number(targetId)) return
+        setLoadingCollection(true)
+        try {
+            const data = await getCollectionDetail(targetId)
+            setCollectionDetail(data)
+        } catch (error) {
+            addToast({ type: "error", title: "加载 Collection 失败", message: error.message })
+        } finally {
+            setLoadingCollection(false)
+        }
+    }
+
+    async function loadDocumentDetail(targetId) {
+        if (!targetId) return
+        if (documentDetail?.id && Number(documentDetail.id) === Number(targetId)) return
+        setLoadingDocument(true)
+        try {
+            const data = await getDocumentDetail(targetId)
+            setDocumentDetail(data)
+        } catch (error) {
+            addToast({ type: "error", title: "加载 Document 失败", message: error.message })
+        } finally {
+            setLoadingDocument(false)
+        }
+    }
+
     async function loadChatDetail() {
         if (!chatId) return
         setLoadingChat(true)
@@ -571,6 +635,46 @@ export default function CollectionChat() {
         } catch (error) {
             addToast({ type: "error", title: "创建聊天失败", message: error.message })
         }
+    }
+
+    async function persistChatTitle(nextTitle) {
+        if (!chatId) {
+            addToast({ type: "error", title: "缺少 chatId", message: "无法保存聊天标题" })
+            return
+        }
+        setSavingChatTitle(true)
+        try {
+            await updateChat(chatId, { title: nextTitle })
+            await Promise.all([loadChatDetail(), loadChatList()])
+            addToast({
+                type: "success",
+                title: "聊天标题已更新",
+                message: nextTitle ? nextTitle : `已重置为 Chat #${chatId}`,
+            })
+        } catch (error) {
+            addToast({ type: "error", title: "保存聊天标题失败", message: error.message })
+        } finally {
+            setSavingChatTitle(false)
+        }
+    }
+
+    async function handleSaveChatTitle() {
+        if (savingChatTitle) return
+        const trimmed = chatTitleDraft.trim()
+        await persistChatTitle(trimmed || null)
+    }
+
+    async function handleResetChatTitle() {
+        if (savingChatTitle) return
+        setChatTitleDraft("")
+        await persistChatTitle(null)
+    }
+
+    async function handleRenameSave() {
+        if (savingChatTitle) return
+        const trimmed = renameTitle.trim()
+        await persistChatTitle(trimmed || null)
+        setShowRenameModal(false)
     }
 
     async function handleSendQuestion() {
@@ -656,6 +760,18 @@ export default function CollectionChat() {
         return "Collection Chat"
     }, [chatDetail?.title, chatId])
 
+    const chatType = useMemo(
+        () => (chatDetail?.type || "collection").toLowerCase(),
+        [chatDetail?.type],
+    )
+
+    const collectionName = useMemo(() => {
+        if (collectionDetail?.name) return collectionDetail.name
+        if (chatDetail?.collection_id) return `Collection ${chatDetail.collection_id}`
+        if (collectionId) return `Collection ${collectionId}`
+        return "Collection"
+    }, [collectionDetail?.name, chatDetail?.collection_id, collectionId])
+
     const selectedEvidenceMeta = selectedEvidence
         ? [
               { label: "Doc", value: selectedEvidence.document_id ?? "-" },
@@ -664,11 +780,45 @@ export default function CollectionChat() {
           ]
         : []
 
+    const collectionBreadcrumbId = chatDetail?.collection_id ?? collectionId
+    const documentBreadcrumbCollectionId = documentDetail?.collection_id ?? chatDetail?.collection_id ?? collectionId
+    const parentLabel =
+        chatType === "document"
+            ? documentDetail?.title ||
+              documentDetail?.file_name ||
+              (chatDetail?.document_id ? `Document ${chatDetail.document_id}` : "Document")
+            : collectionName
+    const parentHref =
+        chatType === "document"
+            ? chatDetail?.document_id && documentBreadcrumbCollectionId
+                ? `/collections/${documentBreadcrumbCollectionId}/documents/${chatDetail.document_id}`
+                : undefined
+            : collectionBreadcrumbId
+                ? `/collections/${collectionBreadcrumbId}`
+                : undefined
     const breadcrumbs = [
         { label: "Home", href: "/" },
-        { label: `Collection ${collectionId}`, href: `/collections/${collectionId}` },
+        { label: parentLabel, href: parentHref },
         { label: chatTitle },
     ]
+
+    const debugSegments = useMemo(() => {
+        const segments = []
+        if (chatType === "document" || chatDetail?.document_id) {
+            if (chatDetail?.document_id) {
+                segments.push({ label: "Document", value: chatDetail.document_id })
+            }
+        } else {
+            const targetCollectionId = chatDetail?.collection_id ?? collectionId
+            if (targetCollectionId) {
+                segments.push({ label: "Collection", value: targetCollectionId })
+            }
+        }
+        if (chatId) {
+            segments.push({ label: "Chat", value: chatId })
+        }
+        return segments
+    }, [chatType, chatDetail?.document_id, chatDetail?.collection_id, collectionId, chatId])
 
     const handleHighlightClick = () => {
         if (!selectedEvidence) return
@@ -699,9 +849,21 @@ export default function CollectionChat() {
 
             <div className="meta-toggle">
                 <span className="caption muted">页面头部信息已折叠以扩大聊天和 PDF 区域。</span>
-                <Button variant="ghost" onClick={() => setShowMetaPanel((prev) => !prev)}>
-                    {showMetaPanel ? "收起操作" : "展开操作"}
-                </Button>
+                <div className="meta-toggle__actions">
+                    <Button
+                        variant="ghost"
+                        onClick={() => {
+                            setRenameTitle(chatDetail?.title ?? "")
+                            setShowRenameModal(true)
+                        }}
+                        disabled={!chatId || savingChatTitle}
+                    >
+                        编辑聊天名
+                    </Button>
+                    <Button variant="ghost" onClick={() => setShowMetaPanel((prev) => !prev)}>
+                        {showMetaPanel ? "收起操作" : "展开操作"}
+                    </Button>
+                </div>
             </div>
 
             {showMetaPanel && (
@@ -712,6 +874,37 @@ export default function CollectionChat() {
                             <p className="page-subtitle">
                                 双栏布局：左侧聊天流，右侧 PDF 预览，可展开聊天列表查看历史会话。
                             </p>
+                            <div className="chat-title-editor">
+                                <label className="caption" htmlFor="chat-title-input">
+                                    聊天名称（默认 Chat #{chatId}，可手动修改）
+                                </label>
+                                <div className="chat-title-editor__controls">
+                                    <input
+                                        id="chat-title-input"
+                                        className="input"
+                                        value={chatTitleDraft}
+                                        onChange={(event) => setChatTitleDraft(event.target.value)}
+                                        placeholder={chatId ? `Chat #${chatId}` : "输入聊天名称"}
+                                        disabled={savingChatTitle}
+                                    />
+                                    <Button onClick={handleSaveChatTitle} disabled={savingChatTitle || !chatId}>
+                                        {savingChatTitle ? "保存中..." : "保存名称"}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        onClick={handleResetChatTitle}
+                                        disabled={savingChatTitle || !chatId}
+                                    >
+                                        重置为默认
+                                    </Button>
+                                    {loadingCollection && (
+                                        <span className="caption muted">加载 Collection 名称中...</span>
+                                    )}
+                                    {chatType === "document" && loadingDocument && (
+                                        <span className="caption muted">加载 Document 名称中...</span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                         <div className="meta-panel__actions">
                             <Button variant="ghost" onClick={() => setShowChatDrawer(true)}>
@@ -1180,6 +1373,8 @@ export default function CollectionChat() {
                 </div>
             </div>
 
+            <DebugIdFooter segments={debugSegments} />
+
             <Modal
                 open={showCreateModal}
                 title="新建 Collection Chat"
@@ -1253,6 +1448,38 @@ export default function CollectionChat() {
                     </div>
                 )}
             </Drawer>
+
+            <Modal
+                open={showRenameModal}
+                title="编辑聊天名称"
+                description="默认名称为 Chat #id，可在此修改。"
+                onClose={() => setShowRenameModal(false)}
+                footer={
+                    <>
+                        <Button variant="ghost" onClick={() => setShowRenameModal(false)}>
+                            取消
+                        </Button>
+                        <Button onClick={handleRenameSave} disabled={savingChatTitle || !chatId}>
+                            {savingChatTitle ? "保存中..." : "保存"}
+                        </Button>
+                    </>
+                }
+            >
+                <div className="stack">
+                    <label className="caption" htmlFor="rename-title-input">
+                        聊天名称
+                    </label>
+                    <input
+                        id="rename-title-input"
+                        className="input"
+                        value={renameTitle}
+                        onChange={(event) => setRenameTitle(event.target.value)}
+                        placeholder={chatId ? `Chat #${chatId}` : "输入聊天名称"}
+                        disabled={savingChatTitle}
+                    />
+                    <p className="caption muted">留空将恢复为默认 Chat #id。</p>
+                </div>
+            </Modal>
         </>
     )
 }

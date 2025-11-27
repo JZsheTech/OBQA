@@ -27,6 +27,10 @@ class ChatCreateRequest(BaseModel):
     title: str | None = None
 
 
+class ChatUpdateRequest(BaseModel):
+    title: str | None = None
+
+
 class ChatEnvelope(BaseModel):
     code: str = "OK"
     data: ChatRead
@@ -98,6 +102,26 @@ def get_chat_detail(
         evidence_no_mapping=mapping,
     )
     return ChatDetailEnvelope(code="OK", data=detail)
+
+
+@router.patch(
+    "/chats/{chat_id}",
+    response_model=ChatEnvelope,
+)
+def update_chat(
+    chat_id: int,
+    payload: ChatUpdateRequest,
+    chats_repo: ChatsRepository = Depends(get_chats_repo),
+) -> ChatEnvelope:
+    chat = chats_repo.get_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
+    title = (payload.title or "").strip() or None
+    chats_repo.update_chat(chat_id, title=title)
+    refreshed = chats_repo.get_by_id(chat_id)
+    if not refreshed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found after update.")
+    return ChatEnvelope(code="OK", data=_to_chat_read(refreshed))
 
 
 @router.get(

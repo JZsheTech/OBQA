@@ -7,6 +7,7 @@ import {
     listDocumentChats,
     runRetrieval,
 } from "../api/client"
+import DebugIdFooter from "../components/DebugIdFooter"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
 import Drawer from "../components/ui/Drawer"
@@ -401,6 +402,13 @@ export default function DocumentDetail() {
                     </div>
                 </div>
             </div>
+
+            <DebugIdFooter
+                segments={[
+                    { label: "Collection", value: document?.collection_id ?? collectionIdFromRoute },
+                    { label: "Document", value: document?.id ?? documentId },
+                ]}
+            />
 
             <Drawer
                 open={Boolean(selectedResult)}
