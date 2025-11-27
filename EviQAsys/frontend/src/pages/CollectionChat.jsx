@@ -350,7 +350,7 @@ export default function CollectionChat() {
     const [showChatDrawer, setShowChatDrawer] = useState(false)
     const [showRenameModal, setShowRenameModal] = useState(false)
     const [renameTitle, setRenameTitle] = useState("")
-    const [showMetaPanel, setShowMetaPanel] = useState(false)
+    const [showMetaPanel] = useState(false)
     const [showEvidencePopover, setShowEvidencePopover] = useState(false)
     const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
     const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
@@ -848,7 +848,6 @@ export default function CollectionChat() {
             <Breadcrumbs items={breadcrumbs} />
 
             <div className="meta-toggle">
-                <span className="caption muted">页面头部信息已折叠以扩大聊天和 PDF 区域。</span>
                 <div className="meta-toggle__actions">
                     <Button
                         variant="ghost"
@@ -859,9 +858,6 @@ export default function CollectionChat() {
                         disabled={!chatId || savingChatTitle}
                     >
                         编辑聊天名
-                    </Button>
-                    <Button variant="ghost" onClick={() => setShowMetaPanel((prev) => !prev)}>
-                        {showMetaPanel ? "收起操作" : "展开操作"}
                     </Button>
                 </div>
             </div>
