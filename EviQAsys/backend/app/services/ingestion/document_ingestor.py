@@ -284,6 +284,9 @@ class DocumentIngestor:
         processed_items: list[dict[str, Any]],
     ) -> str:
         fallback = self._clean_metadata_text(default_title) or "untitled"
+        merged = self._merge_header_title_fragments(processed_items)
+        if merged:
+            return merged
         for item in processed_items:
             if item.get("elem_type") != "header":
                 continue
@@ -291,6 +294,75 @@ class DocumentIngestor:
             if header_name and header_name.lower() != "root":
                 return header_name
         return fallback
+
+    def _merge_header_title_fragments(self, items: list[dict[str, Any]]) -> str | None:
+        """Join contiguous header lines on the first page to recover split titles."""
+        first_header_idx = None
+        for idx, item in enumerate(items):
+            if item.get("elem_type") != "header":
+                continue
+            header_name = self._clean_metadata_text(item.get("header_name"))
+            if header_name and header_name.lower() != "root":
+                first_header_idx = idx
+                break
+        if first_header_idx is None:
+            return None
+        base = items[first_header_idx]
+        base_level = base.get("header_level")
+        base_page = self._resolve_page_index(base)
+        fragments = [self._clean_metadata_text(base.get("header_name"))]
+        prev_bbox = base.get("bbox") or base.get("bbox_json")
+        for candidate in items[first_header_idx + 1 :]:
+            if candidate.get("elem_type") != "header":
+                break
+            if base_level is not None and candidate.get("header_level") != base_level:
+                break
+            if self._resolve_page_index(candidate) != base_page:
+                break
+            candidate_text = self._clean_metadata_text(candidate.get("header_name"))
+            if not candidate_text or candidate_text.lower() == "root":
+                break
+            if self._is_section_break_header(candidate_text):
+                break
+            curr_bbox = candidate.get("bbox") or candidate.get("bbox_json")
+            if not self._within_title_gap(prev_bbox, curr_bbox):
+                break
+            fragments.append(candidate_text)
+            prev_bbox = curr_bbox or prev_bbox
+        merged = self._clean_metadata_text(" ".join(fragment for fragment in fragments if fragment))
+        return merged or None
+
+    @staticmethod
+    def _resolve_page_index(item: dict[str, Any]) -> int | None:
+        for key in ("page_idx", "page_no"):
+            value = item.get(key)
+            if value is None:
+                continue
+            try:
+                page = int(value)
+            except (TypeError, ValueError):
+                continue
+            if key == "page_no" and page > 0:
+                return page - 1
+            return page
+        return None
+
+    @staticmethod
+    def _within_title_gap(prev_bbox: Any, curr_bbox: Any, *, max_gap: float = 80.0) -> bool:
+        if not prev_bbox or not curr_bbox:
+            return True
+        try:
+            prev_bottom = float(prev_bbox[3])
+            curr_top = float(curr_bbox[1])
+        except (TypeError, ValueError, IndexError):
+            return True
+        return (curr_top - prev_bottom) <= max_gap
+
+    @staticmethod
+    def _is_section_break_header(text: str) -> bool:
+        lowered = text.lower()
+        stop_tokens = ("abstract", "introduction", "table of contents", "contents", "keywords")
+        return any(token in lowered for token in stop_tokens)
 
     def _inject_contextual_text_content(
         self,
