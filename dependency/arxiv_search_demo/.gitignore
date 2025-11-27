@@ -1,0 +1,27 @@
+*
+!*/
+!*.py
+!*.ipynb
+!*.md
+!*.txt
+!*.ts
+!*.tsx
+!*.css
+!*.json
+!*.html
+!*.gitkeep
+!.gitignore
+!dependency/api_key/**
+!EviQAsys/frontend/**
+!docs/dev_log/M2/ref_data_format/**
+!*.sql
+!dependency/frontUI_design/**
+
+frontend/node_modules/**
+frontend/.vite/**
+
+debug/
+sample_data
+log/
+testpy/
+# !*.pyc
