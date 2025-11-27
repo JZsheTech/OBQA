@@ -6,6 +6,7 @@ import {
     listDocuments,
     runRetrieval,
     createCollectionChat,
+    createDocumentChat,
     uploadDocument,
     deleteDocument,
     deleteChat,
@@ -70,6 +71,7 @@ export default function CollectionDetail() {
     const [loadingChats, setLoadingChats] = useState(false)
     const [creatingChat, setCreatingChat] = useState(false)
     const [deletingChatIds, setDeletingChatIds] = useState(new Set())
+    const [creatingDocChatIds, setCreatingDocChatIds] = useState(new Set())
 
     const [ragQuery, setRagQuery] = useState("")
     const [ragMode, setRagMode] = useState("hybrid")
@@ -252,11 +254,52 @@ export default function CollectionDetail() {
         }
     }
 
+    async function handleCreateDocumentChat(event, doc) {
+        if (event?.stopPropagation) event.stopPropagation()
+        if (event?.preventDefault) event.preventDefault()
+        if (!doc?.id || !collectionId) return
+        const docId = doc.id
+        setCreatingDocChatIds((prev) => {
+            const next = new Set(prev)
+            next.add(docId)
+            return next
+        })
+        try {
+            const result = await createDocumentChat({
+                documentId: docId,
+                collectionId,
+                title: doc.title || doc.file_name || null,
+            })
+            const newChatId = result?.id ?? result?.data?.id
+            if (newChatId) {
+                navigate(`/documents/${docId}/chat/${newChatId}`)
+                addToast({ type: "success", title: "已创建文档聊天", message: `Chat #${newChatId}` })
+            } else {
+                addToast({ type: "info", title: "聊天已创建", message: "请在聊天列表中选择" })
+            }
+        } catch (error) {
+            addToast({ type: "error", title: "创建文档聊天失败", message: error.message })
+        } finally {
+            setCreatingDocChatIds((prev) => {
+                const next = new Set(prev)
+                next.delete(docId)
+                return next
+            })
+        }
+    }
+
     function handleDocKeyDown(event, docId) {
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault()
             navigate(`/collections/${collectionId}/documents/${docId}`)
         }
+    }
+
+    function handleDocCardClick(event, docId) {
+        if (event?.defaultPrevented) return
+        const isAction = event?.target?.closest?.(".doc-card__action")
+        if (isAction) return
+        navigate(`/collections/${collectionId}/documents/${docId}`)
     }
 
     function handleFileSelect(event) {
@@ -341,13 +384,14 @@ export default function CollectionDetail() {
 
     const renderDocumentCard = (doc, keyPrefix = "doc") => {
         const deleting = deletingDocumentIds.has(doc.id)
+        const creatingDocChat = creatingDocChatIds.has(doc.id)
         return (
             <div
                 key={`${keyPrefix}-${doc.id}`}
                 role="button"
                 tabIndex={0}
                 className="list-item doc-card"
-                onClick={() => navigate(`/collections/${collectionId}/documents/${doc.id}`)}
+                onClick={(event) => handleDocCardClick(event, doc.id)}
                 onKeyDown={(event) => handleDocKeyDown(event, doc.id)}
             >
                 <div className="doc-card__main">
@@ -363,8 +407,16 @@ export default function CollectionDetail() {
                     <span className="pill muted">{doc.num_pages ?? "?"} pages</span>
                     <span className="caption">{formatDateTime(doc.created_at)}</span>
                     <Button
+                        variant="tonal"
+                        className="doc-card__action"
+                        onClick={(event) => handleCreateDocumentChat(event, doc)}
+                        disabled={creatingDocChat}
+                    >
+                        {creatingDocChat ? "创建中..." : "新建 Document Chat"}
+                    </Button>
+                    <Button
                         variant="ghost"
-                        className="danger-link"
+                        className="doc-card__action danger-link"
                         style={{ color: "var(--color-danger)" }}
                         disabled={deleting}
                         onClick={(event) => handleDeleteDocument(event, doc)}
