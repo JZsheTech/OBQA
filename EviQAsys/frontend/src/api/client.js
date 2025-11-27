@@ -153,14 +153,32 @@ export async function listCollectionChats(collectionId) {
     return request(`/collections/${collectionId}/chats`)
 }
 
-export async function createCollectionChat(collectionId, { title } = {}) {
+export async function createCollectionChat(collectionId, { title, docId } = {}) {
     if (!collectionId) {
         throw new Error("Collection id is required")
     }
+    const body = { title: title?.trim() || null }
+    if (docId !== undefined && docId !== null) {
+        const numericDocId = Number(docId)
+        if (!Number.isFinite(numericDocId)) {
+            throw new Error("docId must be a number")
+        }
+        body.doc_id = numericDocId
+    }
     return request(`/collections/${collectionId}/chats`, {
         method: "POST",
-        body: { title: title?.trim() || null },
+        body,
     })
+}
+
+export async function createDocumentChat({ documentId, collectionId, title } = {}) {
+    if (!documentId) {
+        throw new Error("Document id is required")
+    }
+    if (!collectionId) {
+        throw new Error("Collection id is required to create document chat")
+    }
+    return createCollectionChat(collectionId, { title, docId: documentId })
 }
 
 export async function getChatDetail(chatId) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
     buildDocumentFileUrl,
+    createDocumentChat,
     getCollectionDetail,
     getDocumentDetail,
     listDocumentChats,
@@ -56,6 +57,7 @@ export default function DocumentDetail() {
 
     const [chats, setChats] = useState([])
     const [loadingChats, setLoadingChats] = useState(false)
+    const [creatingChat, setCreatingChat] = useState(false)
 
     const [ragQuery, setRagQuery] = useState("")
     const [ragMode, setRagMode] = useState("hybrid")
@@ -128,6 +130,34 @@ export default function DocumentDetail() {
             addToast({ type: "error", title: "加载聊天历史失败", message: error.message })
         } finally {
             setLoadingChats(false)
+        }
+    }
+
+    async function handleCreateChat() {
+        if (!documentId) return
+        const targetCollectionId = document?.collection_id ?? collectionIdFromRoute
+        if (!targetCollectionId) {
+            addToast({ type: "error", title: "缺少 collection_id", message: "无法创建文档级聊天" })
+            return
+        }
+        if (creatingChat) return
+        setCreatingChat(true)
+        try {
+            const result = await createDocumentChat({
+                documentId,
+                collectionId: targetCollectionId,
+                title: document?.title || document?.file_name || null,
+            })
+            await loadChats()
+            const newChatId = result?.id ?? result?.data?.id
+            if (newChatId) {
+                navigate(`/documents/${documentId}/chat/${newChatId}`)
+            }
+            addToast({ type: "success", title: "已创建 Document Chat", message: "跳转到新会话" })
+        } catch (error) {
+            addToast({ type: "error", title: "创建聊天失败", message: error.message })
+        } finally {
+            setCreatingChat(false)
         }
     }
 
@@ -370,9 +400,14 @@ export default function DocumentDetail() {
                                 <h3 className="card__title">Document 聊天历史</h3>
                                 <p className="caption">来自 /api/documents/{documentId}/chats</p>
                             </div>
-                            <Button variant="ghost" onClick={loadChats} disabled={loadingChats}>
-                                {loadingChats ? "刷新中..." : "刷新"}
-                            </Button>
+                            <div className="stack" style={{ gap: "8px", alignItems: "flex-end" }}>
+                                <Button variant="ghost" onClick={loadChats} disabled={loadingChats}>
+                                    {loadingChats ? "刷新中..." : "刷新"}
+                                </Button>
+                                <Button onClick={handleCreateChat} disabled={creatingChat}>
+                                    {creatingChat ? "创建中..." : "新建 Document Chat"}
+                                </Button>
+                            </div>
                         </div>
                         {loadingChats ? (
                             <div className="inline-kv">
@@ -380,7 +415,9 @@ export default function DocumentDetail() {
                                 <strong>加载中...</strong>
                             </div>
                         ) : chats.length === 0 ? (
-                            <div className="empty-state">暂无文档级聊天记录，M5e 将提供创建入口。</div>
+                            <div className="empty-state">
+                                暂无文档级聊天记录，点击 “新建 Document Chat” 开始对话。
+                            </div>
                         ) : (
                             <div className="list">
                                 {chats.map((chat) => (

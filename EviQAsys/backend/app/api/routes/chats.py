@@ -5,7 +5,7 @@ from typing import Iterable
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 
-from ...repositories import ChatsRepository, CollectionsRepository, ElementsRepository, TurnsRepository
+from ...repositories import ChatsRepository, CollectionsRepository, DocumentsRepository, ElementsRepository, TurnsRepository
 from ...schemas import (
     ChatDetail,
     ChatDetailEnvelope,
@@ -25,6 +25,7 @@ router = APIRouter(tags=["chats"])
 
 class ChatCreateRequest(BaseModel):
     title: str | None = None
+    doc_id: int | None = None
 
 
 class ChatUpdateRequest(BaseModel):
@@ -44,6 +45,10 @@ def get_collections_repo() -> CollectionsRepository:
     return CollectionsRepository()
 
 
+def get_documents_repo() -> DocumentsRepository:
+    return DocumentsRepository()
+
+
 def get_turns_repo() -> TurnsRepository:
     return TurnsRepository()
 
@@ -61,13 +66,35 @@ def create_collection_chat(
     collection_id: int,
     payload: ChatCreateRequest,
     collections_repo: CollectionsRepository = Depends(get_collections_repo),
+    documents_repo: DocumentsRepository = Depends(get_documents_repo),
     chats_repo: ChatsRepository = Depends(get_chats_repo),
 ) -> ChatEnvelope:
     collection = collections_repo.get_by_id(collection_id)
     if not collection:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found.")
     title = (payload.title or "").strip() or None
-    chat = chats_repo.create_chat(collection_id=collection_id, chat_type="collection", title=title)
+    target_doc_id = payload.doc_id
+    chat_type = "document" if target_doc_id is not None else "collection"
+    if chat_type == "document":
+        try:
+            normalized_doc_id = int(target_doc_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid doc_id.")
+        document = documents_repo.get_by_id(normalized_doc_id)
+        if not document:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found.")
+        if int(document.get("collection_id")) != collection_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Document does not belong to the collection.",
+            )
+        chat = chats_repo.create_chat(
+            document_id=normalized_doc_id,
+            chat_type="document",
+            title=title,
+        )
+    else:
+        chat = chats_repo.create_chat(collection_id=collection_id, chat_type="collection", title=title)
     return ChatEnvelope(code="OK", data=_to_chat_read(chat))
 
 
