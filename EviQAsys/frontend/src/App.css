@@ -336,6 +336,17 @@
   align-items: start;
 }
 
+.panel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  align-items: stretch;
+}
+
+.panel-stack > .card {
+  width: 100%;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

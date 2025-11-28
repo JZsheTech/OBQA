@@ -245,7 +245,7 @@ export default function ArxivFavorites() {
                 subtitle="管理已收藏的 arXiv 论文，并将其导入到问答系统"
             />
 
-            <div className="grid two-column">
+            <div className="panel-stack">
                 <div className="card">
                     <div className="card__header">
                         <div>

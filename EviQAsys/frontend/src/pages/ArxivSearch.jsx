@@ -198,7 +198,7 @@ export default function ArxivSearch() {
                 subtitle="按标题、作者或分类检索 arXiv，并将结果收藏到本地收藏夹"
             />
 
-            <div className="grid two-column">
+            <div className="panel-stack">
                 <div className="card">
                     <div className="card__header">
                         <div>
