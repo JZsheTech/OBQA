@@ -10,6 +10,16 @@ const tabs = [
             pathname.startsWith("/documents"),
     },
     {
+        label: "arXiv 搜索",
+        to: "/arxiv/search",
+        match: (pathname) => pathname.startsWith("/arxiv/search"),
+    },
+    {
+        label: "arXiv 收藏夹",
+        to: "/arxiv/favorites",
+        match: (pathname) => pathname.startsWith("/arxiv/favorites"),
+    },
+    {
         label: "Chat 历史",
         to: "/chat-history",
         match: (pathname) => pathname.startsWith("/chat-history"),

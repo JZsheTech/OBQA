@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS documents (
   num_pages INT,
   element_count INT DEFAULT 0,
   meta_info JSON,
+  arxiv_favorite_id BIGINT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   CONSTRAINT fk_documents_collection
@@ -77,6 +78,15 @@ SET @missing_meta_info := (
   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'meta_info'
 );
 SET @sql := IF(@missing_meta_info = 0, 'ALTER TABLE documents ADD COLUMN meta_info JSON AFTER element_count', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_arxiv_favorite := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND COLUMN_NAME = 'arxiv_favorite_id'
+);
+SET @sql := IF(@missing_arxiv_favorite = 0, 'ALTER TABLE documents ADD COLUMN arxiv_favorite_id BIGINT NULL AFTER meta_info', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
@@ -203,3 +213,39 @@ CREATE TABLE IF NOT EXISTS turn2element (
     FOREIGN KEY (element_id) REFERENCES elements(id)
     ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS arxiv_favorite_doc (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  arxiv_id VARCHAR(64) NOT NULL,
+  version VARCHAR(16),
+  title TEXT NOT NULL,
+  summary MEDIUMTEXT,
+  authors JSON,
+  primary_category VARCHAR(64),
+  categories JSON,
+  pdf_url VARCHAR(1024),
+  abs_url VARCHAR(1024),
+  doi VARCHAR(128),
+  journal_ref VARCHAR(512),
+  tags VARCHAR(512),
+  note MEDIUMTEXT,
+  published DATETIME,
+  updated DATETIME,
+  document_id BIGINT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT uq_arxiv_favorite_doc_arxiv_id UNIQUE (arxiv_id),
+  CONSTRAINT fk_arxiv_favorite_doc_document
+    FOREIGN KEY (document_id) REFERENCES documents(id)
+    ON DELETE SET NULL
+);
+
+SET @missing_arxiv_doc_fk := (
+  SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'documents' AND CONSTRAINT_NAME = 'fk_documents_arxiv_favorite'
+);
+SET @sql := IF(@missing_arxiv_doc_fk = 0, 'ALTER TABLE documents ADD CONSTRAINT fk_documents_arxiv_favorite FOREIGN KEY (arxiv_favorite_id) REFERENCES arxiv_favorite_doc(id) ON DELETE SET NULL', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

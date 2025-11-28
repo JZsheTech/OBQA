@@ -34,6 +34,7 @@ class DocumentsRepository:
         meta_info: dict[str, Any] | None = None,
         md_text: str | None = None,
         element_count: int | None = None,
+        arxiv_favorite_id: int | None = None,
     ) -> dict[str, Any]:
         payload = {
             "collection_id": collection_id,
@@ -47,6 +48,7 @@ class DocumentsRepository:
             "meta_info": meta_info,
             "md_text": md_text,
             "element_count": element_count,
+            "arxiv_favorite_id": arxiv_favorite_id,
         }
         sql, params = dict_to_insert(self.table_name, payload)
         with self._connection_provider() as connection:
@@ -55,7 +57,7 @@ class DocumentsRepository:
             fetched = connection.execute(
                 text(
                     "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "file_size_bytes, num_pages, element_count, meta_info, arxiv_favorite_id, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": doc_id},
@@ -68,7 +70,7 @@ class DocumentsRepository:
             result = connection.execute(
                 text(
                     "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "file_size_bytes, num_pages, element_count, meta_info, arxiv_favorite_id, created_at "
                     "FROM documents WHERE id = :id",
                 ),
                 {"id": document_id},
@@ -80,7 +82,7 @@ class DocumentsRepository:
             result = connection.execute(
                 text(
                     "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "file_size_bytes, num_pages, element_count, meta_info, arxiv_favorite_id, created_at "
                     "FROM documents WHERE collection_id = :collection_id "
                     "ORDER BY created_at DESC, id DESC",
                 ),
@@ -107,7 +109,7 @@ class DocumentsRepository:
             result = connection.execute(
                 text(
                     "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "file_size_bytes, num_pages, element_count, meta_info, arxiv_favorite_id, created_at "
                     "FROM documents WHERE collection_id = :collection_id "
                     f"AND {predicate} LIKE :pattern "
                     "ORDER BY created_at DESC, id DESC",
@@ -128,6 +130,7 @@ class DocumentsRepository:
             "abstract",
             "meta_info",
             "md_text",
+            "arxiv_favorite_id",
         }
         payload = {key: value for key, value in fields.items() if key in allowed_fields}
         if not payload:
@@ -149,7 +152,7 @@ class DocumentsRepository:
             result = connection.execute(
                 text(
                     "SELECT id, collection_id, title, md_text, abstract, file_name, file_path, file_sha256, "
-                    "file_size_bytes, num_pages, element_count, meta_info, created_at "
+                    "file_size_bytes, num_pages, element_count, meta_info, arxiv_favorite_id, created_at "
                     "FROM documents "
                     "WHERE collection_id = :collection_id AND file_name = :file_name "
                     "AND file_sha256 = :file_sha256 "

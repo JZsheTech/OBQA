@@ -336,6 +336,38 @@
   align-items: start;
 }
 
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.form-label {
+  font-weight: 700;
+  color: var(--color-ink-strong);
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: white;
+  color: var(--color-ink);
+}
+
+.form-field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
 .chat-layout {
   display: grid;
   grid-template-columns: minmax(340px, var(--chat-panel-width, 1fr)) 12px minmax(360px, var(--pdf-panel-width, 1fr));
@@ -428,6 +460,64 @@
   gap: var(--space-2);
   color: var(--color-ink-soft);
   font-weight: 600;
+}
+
+.list-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: white;
+  box-shadow: var(--shadow-soft);
+}
+
+.list-card--clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.list-card--clickable:hover {
+  box-shadow: 0 14px 32px rgba(10, 20, 40, 0.12);
+  transform: translateY(-1px);
+}
+
+.list-card--clickable:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.list-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.list-card__title {
+  margin: 6px 0;
+  font-size: 1.05rem;
+  color: var(--color-ink-strong);
+}
+
+.list-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+}
+
+.list-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  margin: var(--space-2) 0;
+}
+
+.list-card__summary {
+  margin: 0;
+  color: var(--color-ink);
+  line-height: 1.55;
 }
 
 .empty-state {
@@ -538,6 +628,18 @@
   background: var(--color-brand-weak);
   color: var(--color-brand-strong);
   font-weight: 700;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-ink-strong);
+  font-weight: 700;
+  font-size: 0.85rem;
 }
 
 .caption {

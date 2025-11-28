@@ -43,6 +43,7 @@ class DocumentDetail(BaseModel):
     element_count: int | None = None
     md_text: str | None = None
     meta_info: dict[str, Any] | None = None
+    arxiv_favorite_id: int | None = None
     created_at: datetime
     parse_status: str
 
@@ -56,6 +57,7 @@ class DocumentListItem(BaseModel):
     file_size_bytes: int | None = None
     element_count: int | None = None
     num_pages: int | None = None
+    arxiv_favorite_id: int | None = None
     created_at: datetime
     parse_status: str
 

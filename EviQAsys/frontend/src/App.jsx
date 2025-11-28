@@ -6,6 +6,8 @@ import CollectionDetail from "./pages/CollectionDetail"
 import CollectionsHome from "./pages/CollectionsHome"
 import DocumentChat from "./pages/DocumentChat"
 import DocumentDetail from "./pages/DocumentDetail"
+import ArxivSearch from "./pages/ArxivSearch"
+import ArxivFavorites from "./pages/ArxivFavorites"
 import NotFound from "./pages/NotFound"
 import PdfHighlightDemo from "./pages/PdfHighlightDemo"
 import "./App.css"
@@ -22,6 +24,8 @@ function App() {
                     <Route path="documents/:documentId/chat/:chatId" element={<DocumentChat />} />
                     <Route path="chat-history" element={<ChatHistory />} />
                     <Route path="pdf-highlight-demo" element={<PdfHighlightDemo />} />
+                    <Route path="arxiv/search" element={<ArxivSearch />} />
+                    <Route path="arxiv/favorites" element={<ArxivFavorites />} />
                     <Route path="*" element={<NotFound />} />
                 </Route>
             </Routes>

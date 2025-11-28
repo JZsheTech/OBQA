@@ -302,6 +302,7 @@ def _to_document_list_item(doc: dict[str, Any]) -> DocumentListItem:
         file_size_bytes=_safe_int(doc.get("file_size_bytes")),
         element_count=element_count,
         num_pages=doc.get("num_pages"),
+        arxiv_favorite_id=_safe_int(doc.get("arxiv_favorite_id")),
         created_at=doc["created_at"],
         parse_status=parse_status,
     )

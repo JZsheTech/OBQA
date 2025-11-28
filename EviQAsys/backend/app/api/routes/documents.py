@@ -156,6 +156,7 @@ def _format_document_detail(
         element_count=element_count,
         md_text=document.get("md_text"),
         meta_info=meta_info,
+        arxiv_favorite_id=_safe_int(document.get("arxiv_favorite_id")),
         created_at=document["created_at"],
         parse_status=parse_status,
     )

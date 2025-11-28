@@ -355,3 +355,106 @@ export async function runRetrieval({
     }
     return request(`/retrieval/test?${params.toString()}`)
 }
+
+export async function searchArxiv({
+    allTerms,
+    title,
+    abstract,
+    author,
+    categories,
+    dateMode,
+    dateFrom,
+    dateTo,
+    sortBy,
+    sortOrder,
+    maxResults,
+    idList,
+} = {}) {
+    const payload = {
+        all_terms: allTerms,
+        title,
+        abstract,
+        author,
+        categories,
+        date_mode: dateMode,
+        date_from: dateFrom,
+        date_to: dateTo,
+        sort_by: sortBy,
+        sort_order: sortOrder,
+        max_results: maxResults,
+        id_list: idList,
+    }
+    return request("/arxiv/search", { method: "POST", body: payload })
+}
+
+export async function saveArxivFavorite({ paper, tags, note }) {
+    if (!paper || !paper.arxiv_id) {
+        throw new Error("paper with arxiv_id is required")
+    }
+    return request("/arxiv/favorites", {
+        method: "POST",
+        body: { paper, tags: tags ?? null, note: note ?? null },
+    })
+}
+
+export async function listArxivFavorites({
+    page = 1,
+    pageSize = 20,
+    keyword,
+    author,
+    category,
+    tag,
+    sortBy,
+    sortOrder,
+} = {}) {
+    const params = new URLSearchParams()
+    params.set("page", page)
+    params.set("page_size", pageSize)
+    if (keyword) params.set("keyword", keyword)
+    if (author) params.set("author", author)
+    if (category) params.set("category", category)
+    if (tag) params.set("tag", tag)
+    if (sortBy) params.set("sort_by", sortBy)
+    if (sortOrder) params.set("sort_order", sortOrder)
+    return request(`/arxiv/favorites?${params.toString()}`)
+}
+
+export async function getArxivFavorite(favoriteId) {
+    if (!favoriteId) {
+        throw new Error("favoriteId is required")
+    }
+    return request(`/arxiv/favorites/${favoriteId}`)
+}
+
+export async function updateArxivFavorite(favoriteId, { tags, note } = {}) {
+    if (!favoriteId) {
+        throw new Error("favoriteId is required")
+    }
+    if (tags === undefined && note === undefined) {
+        throw new Error("tags or note is required to update favorite")
+    }
+    return request(`/arxiv/favorites/${favoriteId}`, {
+        method: "PATCH",
+        body: { tags, note },
+    })
+}
+
+export async function deleteArxivFavorite(favoriteId) {
+    if (!favoriteId) {
+        throw new Error("favoriteId is required")
+    }
+    return request(`/arxiv/favorites/${favoriteId}`, { method: "DELETE" })
+}
+
+export async function importArxivFavorite(favoriteId, { collectionId }) {
+    if (!favoriteId) {
+        throw new Error("favoriteId is required")
+    }
+    if (!collectionId) {
+        throw new Error("collectionId is required")
+    }
+    return request(`/arxiv/favorites/${favoriteId}/import`, {
+        method: "POST",
+        body: { collection_id: collectionId },
+    })
+}

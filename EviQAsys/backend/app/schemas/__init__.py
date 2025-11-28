@@ -1,6 +1,17 @@
 from .collection import CollectionBase, CollectionCreate, CollectionRead, CollectionUpdate
 from .document import DocumentBase, DocumentCreate, DocumentDetail, DocumentListItem, DocumentRead, DocumentUploadResponse
 from .chat import ChatBase, ChatCreate, ChatRead, CollectionChatHistory, DocumentChatHistory
+from .arxiv import (
+    ArxivPaper,
+    ArxivSearchRequest,
+    ArxivSearchResponse,
+    ArxivFavoriteCreate,
+    ArxivFavoriteUpdate,
+    ArxivFavoriteItem,
+    ArxivFavoriteList,
+    ArxivImportRequest,
+    ArxivImportResponse,
+)
 from .retrieval import RetrievalCandidate, RetrievalEnvelope
 from .qa import (
     TurnCreateRequest,
@@ -25,6 +36,15 @@ __all__ = [
     "DocumentListItem",
     "DocumentRead",
     "DocumentUploadResponse",
+    "ArxivPaper",
+    "ArxivSearchRequest",
+    "ArxivSearchResponse",
+    "ArxivFavoriteCreate",
+    "ArxivFavoriteUpdate",
+    "ArxivFavoriteItem",
+    "ArxivFavoriteList",
+    "ArxivImportRequest",
+    "ArxivImportResponse",
     "ChatBase",
     "ChatCreate",
     "ChatRead",

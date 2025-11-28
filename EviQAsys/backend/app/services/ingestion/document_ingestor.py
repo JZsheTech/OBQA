@@ -63,7 +63,7 @@ class DocumentIngestor:
         upload.file.seek(0)
         stored = self._persist_stream(collection_id, upload.file, upload.filename)
         try:
-            return self._ingest_stored_file(collection_id, stored)
+            return self._ingest_stored_file(collection_id, stored, arxiv_favorite_id=None)
         except Exception:
             # Clean up persisted artifact on failure.
             try:
@@ -74,7 +74,13 @@ class DocumentIngestor:
         finally:
             upload.file.seek(0)
 
-    def ingest_path(self, collection_id: int, file_path: str | Path) -> dict[str, Any]:
+    def ingest_path(
+        self,
+        collection_id: int,
+        file_path: str | Path,
+        *,
+        arxiv_favorite_id: int | None = None,
+    ) -> dict[str, Any]:
         """Helper for manual scripts that already have a PDF on disk."""
         path = Path(file_path)
         if not path.exists():
@@ -82,7 +88,7 @@ class DocumentIngestor:
         self._ensure_collection_exists(collection_id)
         with path.open("rb") as stream:
             stored = self._persist_stream(collection_id, stream, path.name)
-        return self._ingest_stored_file(collection_id, stored)
+        return self._ingest_stored_file(collection_id, stored, arxiv_favorite_id=arxiv_favorite_id)
 
     def _ensure_collection_exists(self, collection_id: int) -> None:
         collection = self._collections_repo.get_by_id(collection_id)
@@ -122,7 +128,13 @@ class DocumentIngestor:
             file_sha256=file_hash,
         )
 
-    def _ingest_stored_file(self, collection_id: int, stored: StoredUpload) -> dict[str, Any]:
+    def _ingest_stored_file(
+        self,
+        collection_id: int,
+        stored: StoredUpload,
+        *,
+        arxiv_favorite_id: int | None,
+    ) -> dict[str, Any]:
         duplicate = self._documents_repo.find_duplicate(
             collection_id=collection_id,
             file_name=stored.original_name,
@@ -140,6 +152,7 @@ class DocumentIngestor:
             file_path=str(stored.path),
             file_sha256=stored.file_sha256,
             file_size_bytes=stored.file_size_bytes,
+            arxiv_favorite_id=arxiv_favorite_id,
         )
         try:
             parse_result = self._mineru_adapter.parse(stored.path, file_name=stored.original_name)
