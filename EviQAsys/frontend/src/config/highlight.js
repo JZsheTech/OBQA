@@ -1,2 +1,3 @@
 export const HIGHLIGHT_BBOX_BASE = 1000
-export const HIGHLIGHT_BBOX_OFFSET = 4
+export const HIGHLIGHT_BBOX_OFFSET_X = 4
+export const HIGHLIGHT_BBOX_OFFSET_Y = 3

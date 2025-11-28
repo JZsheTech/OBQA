@@ -17,7 +17,7 @@ import {
     listDocumentChats,
     updateChat,
 } from "../api/client"
-import { HIGHLIGHT_BBOX_BASE, HIGHLIGHT_BBOX_OFFSET } from "../config/highlight"
+import { HIGHLIGHT_BBOX_BASE, HIGHLIGHT_BBOX_OFFSET_X, HIGHLIGHT_BBOX_OFFSET_Y } from "../config/highlight"
 import DebugIdFooter from "../components/DebugIdFooter"
 import Breadcrumbs from "../components/ui/Breadcrumbs"
 import Button from "../components/ui/Button"
@@ -112,8 +112,8 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     const inUnitRange = ordered.every((value) => value >= 0 && value <= 1)
     const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= HIGHLIGHT_BBOX_BASE)
 
-    const adjustedRight = inThousandRange ? right + HIGHLIGHT_BBOX_OFFSET : right
-    const adjustedBottom = inThousandRange ? bottom + HIGHLIGHT_BBOX_OFFSET : bottom
+    const adjustedRight = inThousandRange ? right + HIGHLIGHT_BBOX_OFFSET_X : right
+    const adjustedBottom = inThousandRange ? bottom + HIGHLIGHT_BBOX_OFFSET_Y : bottom
 
     const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / HIGHLIGHT_BBOX_BASE : 1
     const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / HIGHLIGHT_BBOX_BASE : 1
