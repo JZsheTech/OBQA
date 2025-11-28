@@ -715,6 +715,15 @@
   margin: 0;
 }
 
+.modal__authors {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 6px;
+  line-height: 1.6;
+  margin: 0;
+  word-break: break-word;
+}
+
 .drawer {
   position: fixed;
   top: 0;

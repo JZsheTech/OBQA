@@ -25,6 +25,17 @@ function formatList(list) {
     return list.join(", ")
 }
 
+function truncateText(text, length = 140) {
+    const normalized = normalizeText(text)
+    if (!normalized) return "—"
+    return normalized.length > length ? `${normalized.slice(0, length)}…` : normalized
+}
+
+function formatAuthorsCompact(list, length = 140) {
+    if (!list || list.length === 0) return "—"
+    return truncateText(list.join(", "), length)
+}
+
 function normalizeText(value) {
     if (typeof value !== "string") return ""
     return value.replace(/\s+/g, " ").trim()
@@ -387,7 +398,7 @@ export default function ArxivSearch() {
                                         </div>
                                     </header>
                                     <div className="list-card__meta">
-                                        <span>作者：{formatList(paper.authors)}</span>
+                                        <span>作者：{formatAuthorsCompact(paper.authors)}</span>
                                         <span>分类：{formatList(paper.categories)}</span>
                                         <span>
                                             发布时间：{formatDate(paper.published)} · 更新：{formatDate(paper.updated)}
@@ -429,12 +440,15 @@ export default function ArxivSearch() {
                 {detailPaper && (
                     <div className="stack">
                         <div className="list-card__meta" style={{ marginTop: 0 }}>
-                            <span>作者：{formatList(detailPaper.authors)}</span>
                             <span>分类：{formatList(detailPaper.categories)}</span>
                         </div>
                         <div className="list-card__meta" style={{ marginTop: 0 }}>
                             <span>发布时间：{formatDate(detailPaper.published)}</span>
                             <span>更新：{formatDate(detailPaper.updated)}</span>
+                        </div>
+                        <p className="muted" style={{ margin: 0 }}>作者</p>
+                        <div className="modal__authors">
+                            {formatList(detailPaper.authors)}
                         </div>
                         <p className="muted" style={{ margin: 0 }}>摘要</p>
                         <div className="modal__summary">
