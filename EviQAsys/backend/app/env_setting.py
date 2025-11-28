@@ -3,32 +3,67 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
+
+import yaml
 
 
-def _get_env(name: str, default: str) -> str:
-    value = os.getenv(name)
+CONFIG_PATH = Path(__file__).resolve().parent / "config.yaml"
+
+
+def _load_config() -> dict[str, object]:
+    """Load YAML configuration, returning an empty dict if missing or invalid."""
+    if not CONFIG_PATH.exists():
+        return {}
+    try:
+        with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+            loaded = yaml.safe_load(config_file) or {}
+            return loaded if isinstance(loaded, dict) else {}
+    except (OSError, yaml.YAMLError):
+        return {}
+
+
+CONFIG = _load_config()
+
+
+def get_config(name: str, default: str | int | float | bool | None = None) -> str | int | float | bool | None:
+    """Return a config value preferring YAML, then environment variables."""
+    if name in CONFIG:
+        value = CONFIG.get(name)
+        if value not in {None, ""}:
+            return value
+
+    env_value = os.getenv(name)
+    if env_value not in (None, ""):
+        return env_value
+
+    return default
+
+
+def _get_env(name: str, default: str | None = None) -> str | None:
+    value = get_config(name, default)
     if value is None or value == "":
         return default
-    return value
+    return str(value)
 
 
 def _get_int_env(name: str, default: int) -> int:
-    raw_value = os.getenv(name)
+    raw_value = get_config(name, default)
     if raw_value is None or raw_value == "":
         return default
     try:
         return int(raw_value)
-    except ValueError as exc:  # pragma: no cover - defensive guard rails
+    except (ValueError, TypeError) as exc:  # pragma: no cover - defensive guard rails
         raise ValueError(f"Invalid integer for {name}: {raw_value}") from exc
 
 
 def _get_float_env(name: str, default: float) -> float:
-    raw_value = os.getenv(name)
+    raw_value = get_config(name, default)
     if raw_value is None or raw_value == "":
         return default
     try:
         return float(raw_value)
-    except ValueError as exc:  # pragma: no cover - defensive guard rails
+    except (ValueError, TypeError) as exc:  # pragma: no cover - defensive guard rails
         raise ValueError(f"Invalid float for {name}: {raw_value}") from exc
 
 
@@ -53,9 +88,9 @@ OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
 OLLAMA_BASE_URL: str = f"{OLLAMA_PROTOCOL}://{OLLAMA_HOST}:{OLLAMA_PORT}"
 OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
-DEFAULT_TEXT_LLM_MODEL: str = "x-ai/grok-4.1-fast"
-OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY", "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")
-DEFAULT_VLSION_MODEL = "x-ai/grok-4-fast"
+DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4.1-fast")
+OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
+DEFAULT_VLSION_MODEL = _get_env("DEFAULT_VLSION_MODEL", "x-ai/grok-4-fast")
 
 @dataclass(frozen=True)
 class MinerUSettings:
@@ -105,16 +140,21 @@ class VisionVQASettings:
 
 
 def _get_bool_env(name: str, default: bool) -> bool:
-    raw_value = os.getenv(name)
+    raw_value = get_config(name, default)
     if raw_value is None or raw_value == "":
         return default
-    lowered = raw_value.strip().lower()
+    if isinstance(raw_value, bool):
+        return raw_value
+    lowered = str(raw_value).strip().lower()
     return lowered in {"1", "true", "yes", "y", "on"}
 
 
 def _get_elem_types_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
-    raw_value = os.getenv(name)
-    raw_list = raw_value if raw_value is not None and raw_value != "" else ",".join(default)
+    raw_value = get_config(name, ",".join(default))
+    if isinstance(raw_value, (list, tuple)):
+        raw_list = ",".join(str(entry) for entry in raw_value)
+    else:
+        raw_list = raw_value if raw_value is not None and raw_value != "" else ",".join(default)
     normalized: list[str] = []
     for entry in raw_list.split(","):
         trimmed = entry.strip().lower()
