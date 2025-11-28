@@ -249,6 +249,24 @@ key={ev.evidence_no}
 > * 实际定位/高亮逻辑由前端负责（PDF viewer 内部实现），**后端只需提供 bbox 等元信息**；
 > * 任意 UI 形态（侧边栏列表、tooltip、下划线、mask 层）都需遵守：**点击/hover 最终是用 element_id 去定位**。
 
+### 3.4 PDF 高亮偏移配置（避免遮挡正文）
+
+* MinerU 的 bbox 以 `0~1000` 网格给出，前端渲染时按页面实际宽高等比缩放。
+* 为避免高亮框压住右侧/下方文字，千分制 bbox 会在换算前对右下角顶点做可配置偏移：
+
+  * 配置文件：`EviQAsys/frontend/src/config/highlight.js`
+  * 常量：
+    * `HIGHLIGHT_BBOX_BASE`（默认 `1000`）：千分制坐标基准。
+    * `HIGHLIGHT_BBOX_OFFSET_X`：仅在千分制 bbox 上，向右扩展的偏移（默认 `4`）。
+    * `HIGHLIGHT_BBOX_OFFSET_Y`：仅在千分制 bbox 上，向下扩展的偏移（默认 `4`）。
+
+* 行为：
+
+  * 当 bbox 坐标落在 `0~HIGHLIGHT_BBOX_BASE` 时，渲染前先对 `right/bottom` 分别加上 `OFFSET_X/OFFSET_Y`，再按页面尺寸缩放；
+  * 若 bbox 已是 0~1 的归一化坐标，则不应用偏移。
+
+> 调整建议：若高亮仍遮挡文字，可在上述配置文件中分别增大 `HIGHLIGHT_BBOX_OFFSET_X`（水平）或 `HIGHLIGHT_BBOX_OFFSET_Y`（垂直）。
+
 ---
 
 ## 4. 多轮对话与 Evidence 稳定性
