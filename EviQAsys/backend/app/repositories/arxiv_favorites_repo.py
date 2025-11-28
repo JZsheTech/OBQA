@@ -120,6 +120,7 @@ class ArxivFavoritesRepository:
         author: str | None = None,
         category: str | None = None,
         tag: str | None = None,
+        note: str | None = None,
         sort_by: str = "created_at",
         sort_order: str = "desc",
     ) -> Tuple[list[dict[str, Any]], int]:
@@ -139,6 +140,9 @@ class ArxivFavoritesRepository:
         if tag:
             clauses.append("LOWER(afd.tags) LIKE :tag")
             params["tag"] = f"%{tag.lower()}%"
+        if note:
+            clauses.append("LOWER(afd.note) LIKE :note")
+            params["note"] = f"%{note.lower()}%"
         where_clause = ""
         if clauses:
             where_clause = " WHERE " + " AND ".join(clauses)

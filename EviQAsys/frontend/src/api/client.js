@@ -404,6 +404,7 @@ export async function listArxivFavorites({
     author,
     category,
     tag,
+    note,
     sortBy,
     sortOrder,
 } = {}) {
@@ -414,6 +415,7 @@ export async function listArxivFavorites({
     if (author) params.set("author", author)
     if (category) params.set("category", category)
     if (tag) params.set("tag", tag)
+    if (note) params.set("note", note)
     if (sortBy) params.set("sort_by", sortBy)
     if (sortOrder) params.set("sort_order", sortOrder)
     return request(`/arxiv/favorites?${params.toString()}`)

@@ -62,6 +62,7 @@ export default function ArxivFavorites() {
         author: "",
         category: "",
         tag: "",
+        note: "",
         sortBy: "created_at",
         sortOrder: "desc",
     })
@@ -106,6 +107,7 @@ export default function ArxivFavorites() {
                 author: filters.author.trim() || undefined,
                 category: filters.category.trim() || undefined,
                 tag: filters.tag.trim() || undefined,
+                note: filters.note.trim() || undefined,
                 sortBy: filters.sortBy,
                 sortOrder: filters.sortOrder,
             })
@@ -141,6 +143,7 @@ export default function ArxivFavorites() {
             author: "",
             category: "",
             tag: "",
+            note: "",
             sortBy: "created_at",
             sortOrder: "desc",
         })
@@ -153,10 +156,14 @@ export default function ArxivFavorites() {
             addToast({ type: "info", title: "无需保存", message: "未修改 tags 或 note" })
             return
         }
+        const tags = payload.tags ?? ""
+        const note = payload.note ?? ""
         setSavingId(itemId)
         try {
-            await updateArxivFavorite(itemId, { tags: payload.tags, note: payload.note })
+            await updateArxivFavorite(itemId, { tags, note })
             addToast({ type: "success", title: "已保存备注", message: `#${itemId}` })
+            setFavorites((prev) => prev.map((fav) => (fav.id === itemId ? { ...fav, tags, note } : fav)))
+            setDetailPaper((prev) => (prev?.id === itemId ? { ...prev, tags, note } : prev))
             await loadFavorites(pageInfo.page)
         } catch (error) {
             addToast({ type: "error", title: "保存失败", message: error.message })
@@ -250,7 +257,7 @@ export default function ArxivFavorites() {
                     <div className="card__header">
                         <div>
                             <h3 className="card__title">筛选与排序</h3>
-                            <p className="caption">按关键词、作者、标签快速定位收藏</p>
+                            <p className="caption">按关键词、作者、标签与备注快速定位收藏</p>
                         </div>
                         <div className="search-bar__actions">
                             <Button variant="ghost" onClick={handleResetFilters} disabled={loading}>
@@ -290,12 +297,21 @@ export default function ArxivFavorites() {
                             />
                         </label>
                         <label className="form-field">
-                            <span className="form-label">标签包含</span>
+                            <span className="form-label">标签包含（逗号分隔多个）</span>
                             <input
                                 type="text"
                                 value={filters.tag}
                                 onChange={(event) => handleFilterChange("tag", event.target.value)}
-                                placeholder="收藏 tags/note"
+                                placeholder="物理, 机器学习"
+                            />
+                        </label>
+                        <label className="form-field">
+                            <span className="form-label">备注包含</span>
+                            <input
+                                type="text"
+                                value={filters.note}
+                                onChange={(event) => handleFilterChange("note", event.target.value)}
+                                placeholder="备注关键词"
                             />
                         </label>
                         <label className="form-field">
@@ -322,6 +338,9 @@ export default function ArxivFavorites() {
                             </select>
                         </label>
                     </div>
+                    <p className="caption" style={{ margin: "0 0 8px" }}>
+                        Tags 可用逗号分隔多个值，标签与备注筛选条件默认以 AND 组合。
+                    </p>
                     <div className="card__footer">
                         <div className="inline-kv">
                             <strong>导入目标 Collection</strong>
@@ -409,46 +428,18 @@ export default function ArxivFavorites() {
                                         )}
                                     </div>
                                     <p className="list-card__summary">{summarize(item.summary)}</p>
-                                    <div className="form-grid" style={{ marginTop: "12px" }}>
-                                        <label className="form-field">
-                                            <span className="form-label">Tags</span>
-                                            <input
-                                                type="text"
-                                                value={editMap[item.id]?.tags ?? ""}
-                                                onChange={(event) =>
-                                                    setEditMap((prev) => ({
-                                                        ...prev,
-                                                        [item.id]: {
-                                                            ...prev[item.id],
-                                                            tags: event.target.value,
-                                                        },
-                                                    }))
-                                                }
-                                            />
-                                        </label>
-                                        <label className="form-field" style={{ gridColumn: "span 2" }}>
-                                            <span className="form-label">Note</span>
-                                            <textarea
-                                                value={editMap[item.id]?.note ?? ""}
-                                                onChange={(event) =>
-                                                    setEditMap((prev) => ({
-                                                        ...prev,
-                                                        [item.id]: {
-                                                            ...prev[item.id],
-                                                            note: event.target.value,
-                                                        },
-                                                    }))
-                                                }
-                                            />
-                                        </label>
+                                    <div className="list-card__meta" style={{ marginTop: "8px" }}>
+                                        <span>Tags：{normalizeText(item.tags) || "—"}</span>
+                                    </div>
+                                    <div className="list-card__meta" style={{ marginTop: "4px", alignItems: "flex-start" }}>
+                                        <span>备注：{truncateText(item.note, 120)}</span>
                                     </div>
                                     <div className="list-card__actions">
                                         <Button
                                             variant="tonal"
-                                            onClick={() => handleSaveMeta(item.id)}
-                                            disabled={savingId === item.id}
+                                            onClick={() => setDetailPaper(item)}
                                         >
-                                            {savingId === item.id ? "保存中..." : "保存备注"}
+                                            编辑 Tags/Note
                                         </Button>
                                         {item.abs_url && (
                                             <a
@@ -508,6 +499,53 @@ export default function ArxivFavorites() {
                         <div className="list-card__meta" style={{ marginTop: 0 }}>
                             <span>发布时间：{formatDate(detailPaper.published)}</span>
                             <span>更新：{formatDate(detailPaper.updated)}</span>
+                        </div>
+                        <div className="form-grid" style={{ marginTop: "8px" }}>
+                            <label className="form-field">
+                                <span className="form-label">Tags（逗号分隔）</span>
+                                <input
+                                    type="text"
+                                    value={editMap[detailPaper.id]?.tags ?? ""}
+                                    onChange={(event) =>
+                                        setEditMap((prev) => ({
+                                            ...prev,
+                                            [detailPaper.id]: {
+                                                ...prev[detailPaper.id],
+                                                tags: event.target.value,
+                                            },
+                                        }))
+                                    }
+                                    placeholder="例如：物理, 数据挖掘"
+                                />
+                            </label>
+                            <label className="form-field" style={{ gridColumn: "span 2" }}>
+                                <span className="form-label">Note</span>
+                                <textarea
+                                    value={editMap[detailPaper.id]?.note ?? ""}
+                                    onChange={(event) =>
+                                        setEditMap((prev) => ({
+                                            ...prev,
+                                            [detailPaper.id]: {
+                                                ...prev[detailPaper.id],
+                                                note: event.target.value,
+                                            },
+                                        }))
+                                    }
+                                    placeholder="添加备注"
+                                />
+                            </label>
+                        </div>
+                        <p className="caption" style={{ margin: "0 0 4px" }}>
+                            多个标签用逗号分隔；标签和备注检索默认使用 AND 组合。
+                        </p>
+                        <div className="list-card__actions" style={{ marginTop: "-4px" }}>
+                            <Button
+                                variant="tonal"
+                                onClick={() => handleSaveMeta(detailPaper.id)}
+                                disabled={savingId === detailPaper.id}
+                            >
+                                {savingId === detailPaper.id ? "保存中..." : "保存 Tags/Note"}
+                            </Button>
                         </div>
                         <p className="muted" style={{ margin: 0 }}>作者</p>
                         <div className="modal__authors">

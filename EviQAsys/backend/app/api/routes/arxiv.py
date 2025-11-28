@@ -124,6 +124,7 @@ def list_favorites(
     author: str | None = Query(default=None, description="Filter by author substring"),
     category: str | None = Query(default=None, description="Filter by category substring"),
     tag: str | None = Query(default=None, description="Filter by tags substring"),
+    note: str | None = Query(default=None, description="Filter by note substring"),
     sort_by: Literal["created_at", "published", "updated"] = Query(default="created_at"),
     sort_order: Literal["asc", "desc"] = Query(default="desc"),
 ) -> FavoriteListEnvelope:
@@ -134,6 +135,7 @@ def list_favorites(
         author=author,
         category=category,
         tag=tag,
+        note=note,
         sort_by=sort_by,
         sort_order=sort_order,
     )
