@@ -53,6 +53,20 @@ function summarize(text, length = 180) {
     return normalized.length > length ? `${normalized.slice(0, length)}…` : normalized
 }
 
+function splitTags(value) {
+    if (!value) return []
+    const raw = typeof value === "string" ? value : ""
+    const hasSeparator = /[,，、;；]/.test(raw)
+    if (hasSeparator) {
+        return raw
+            .split(/[,，、;；]/)
+            .map((part) => normalizeText(part))
+            .filter(Boolean)
+    }
+    const normalized = normalizeText(raw)
+    return normalized ? [normalized] : []
+}
+
 export default function ArxivFavorites() {
     const { addToast } = useToast()
     const [favorites, setFavorites] = useState([])
@@ -156,14 +170,36 @@ export default function ArxivFavorites() {
             addToast({ type: "info", title: "无需保存", message: "未修改 tags 或 note" })
             return
         }
-        const tags = payload.tags ?? ""
+        const tagsInput = payload.tags ?? ""
         const note = payload.note ?? ""
+        const trimmedTags = tagsInput.trim()
+        const hasComma = /[,，]/.test(trimmedTags)
+        const looksLikeMultipleWithoutComma =
+            !hasComma && trimmedTags ? trimmedTags.split(/\s+/).filter(Boolean).length > 1 || /[、;；]/.test(trimmedTags) : false
+        if (looksLikeMultipleWithoutComma) {
+            addToast({
+                type: "error",
+                title: "标签格式错误",
+                message: "多个标签请使用逗号分隔，例如：物理,化学",
+            })
+            return
+        }
+        const tagsParts = trimmedTags
+            ? (hasComma ? trimmedTags.split(/[,，]/) : [trimmedTags])
+                .map((part) => normalizeText(part))
+                .filter(Boolean)
+            : []
+        const cleanedTags = hasComma ? tagsParts.join(",") : trimmedTags
         setSavingId(itemId)
         try {
-            await updateArxivFavorite(itemId, { tags, note })
+            await updateArxivFavorite(itemId, { tags: cleanedTags, note })
             addToast({ type: "success", title: "已保存备注", message: `#${itemId}` })
-            setFavorites((prev) => prev.map((fav) => (fav.id === itemId ? { ...fav, tags, note } : fav)))
-            setDetailPaper((prev) => (prev?.id === itemId ? { ...prev, tags, note } : prev))
+            setFavorites((prev) => prev.map((fav) => (fav.id === itemId ? { ...fav, tags: cleanedTags, note } : fav)))
+            setDetailPaper((prev) => (prev?.id === itemId ? { ...prev, tags: cleanedTags, note } : prev))
+            setEditMap((prev) => ({
+                ...prev,
+                [itemId]: { ...(prev[itemId] || {}), tags: cleanedTags, note },
+            }))
             await loadFavorites(pageInfo.page)
         } catch (error) {
             addToast({ type: "error", title: "保存失败", message: error.message })
@@ -297,7 +333,7 @@ export default function ArxivFavorites() {
                             />
                         </label>
                         <label className="form-field">
-                            <span className="form-label">标签包含（逗号分隔多个）</span>
+                            <span className="form-label">Tags 包含（逗号分隔多个）</span>
                             <input
                                 type="text"
                                 value={filters.tag}
@@ -306,7 +342,7 @@ export default function ArxivFavorites() {
                             />
                         </label>
                         <label className="form-field">
-                            <span className="form-label">备注包含</span>
+                            <span className="form-label">Notes 包含</span>
                             <input
                                 type="text"
                                 value={filters.note}
@@ -375,95 +411,109 @@ export default function ArxivFavorites() {
                         <div className="empty-state">暂无收藏，先在“arXiv 搜索”中添加吧。</div>
                     ) : (
                         <div className="stack">
-                            {favorites.map((item) => (
-                                <article
-                                    key={item.id}
-                                    className="list-card list-card--clickable"
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={(event) => handleCardClick(event, item)}
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Enter" && !event.target.closest("button, a, input, textarea, select")) {
-                                            setDetailPaper(item)
-                                        }
-                                    }}
-                                >
-                                    <header className="list-card__header">
-                                        <div>
-                                            <div className="badge">#{item.arxiv_id}</div>
-                                            <h4 className="list-card__title">{item.title}</h4>
-                                            <p className="caption">
-                                                {item.primary_category || "未分组"} · {formatDate(item.published)}
-                                            </p>
+                            {favorites.map((item) => {
+                                const tagItems = splitTags(item.tags)
+                                return (
+                                    <article
+                                        key={item.id}
+                                        className="list-card list-card--clickable"
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(event) => handleCardClick(event, item)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" && !event.target.closest("button, a, input, textarea, select")) {
+                                                setDetailPaper(item)
+                                            }
+                                        }}
+                                    >
+                                        <header className="list-card__header">
+                                            <div>
+                                                <div className="badge">#{item.arxiv_id}</div>
+                                                <h4 className="list-card__title">{item.title}</h4>
+                                                <p className="caption">
+                                                    {item.primary_category || "未分组"} · {formatDate(item.published)}
+                                                </p>
+                                            </div>
+                                            <div className="list-card__actions">
+                                                <Button
+                                                    variant="tonal"
+                                                    onClick={() => handleImport(item)}
+                                                    disabled={importingId === item.id || item.document_id}
+                                                >
+                                                    {item.document_id
+                                                        ? `已导入 Doc #${item.document_id}`
+                                                        : importingId === item.id
+                                                            ? "导入中..."
+                                                            : "导入到 Collection"}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    onClick={() => handleDelete(item)}
+                                                >
+                                                    删除
+                                                </Button>
+                                            </div>
+                                        </header>
+                                        <div className="list-card__meta">
+                                            <span>作者：{formatAuthorsCompact(item.authors)}</span>
+                                            <span>分类：{formatList(item.categories)}</span>
+                                            <span>更新：{formatDate(item.updated)}</span>
+                                            {item.document_id && (
+                                                <span className="pill success">
+                                                    已关联 Document #{item.document_id}
+                                                    {item.document_collection_id ? ` · Collection #${item.document_collection_id}` : ""}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="list-card__summary">{summarize(item.summary)}</p>
+                                        <div className="list-card__meta" style={{ marginTop: "8px", alignItems: "flex-start", gap: "8px" }}>
+                                            <span>Tags：</span>
+                                            <div className="chip-row">
+                                                {tagItems.length === 0 ? (
+                                                    <span className="caption">—</span>
+                                                ) : (
+                                                    tagItems.map((tag, index) => (
+                                                        <span className="pill muted" key={`${item.id}-tag-${index}`}>
+                                                            {tag}
+                                                        </span>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="list-card__meta" style={{ marginTop: "4px", alignItems: "flex-start" }}>
+                                            <span>备注：{truncateText(item.note, 120)}</span>
                                         </div>
                                         <div className="list-card__actions">
                                             <Button
                                                 variant="tonal"
-                                                onClick={() => handleImport(item)}
-                                                disabled={importingId === item.id || item.document_id}
+                                                onClick={() => setDetailPaper(item)}
                                             >
-                                                {item.document_id
-                                                    ? `已导入 Doc #${item.document_id}`
-                                                    : importingId === item.id
-                                                        ? "导入中..."
-                                                        : "导入到 Collection"}
+                                                编辑 Tags/Note
                                             </Button>
-                                            <Button
-                                                variant="ghost"
-                                                onClick={() => handleDelete(item)}
-                                            >
-                                                删除
-                                            </Button>
+                                            {item.abs_url && (
+                                                <a
+                                                    className="btn btn-ghost"
+                                                    href={item.abs_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    查看 arXiv
+                                                </a>
+                                            )}
+                                            {item.pdf_url && (
+                                                <a
+                                                    className="btn btn-tonal"
+                                                    href={item.pdf_url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    PDF
+                                                </a>
+                                            )}
                                         </div>
-                                    </header>
-                                    <div className="list-card__meta">
-                                        <span>作者：{formatAuthorsCompact(item.authors)}</span>
-                                        <span>分类：{formatList(item.categories)}</span>
-                                        <span>更新：{formatDate(item.updated)}</span>
-                                        {item.document_id && (
-                                            <span className="pill success">
-                                                已关联 Document #{item.document_id}
-                                                {item.document_collection_id ? ` · Collection #${item.document_collection_id}` : ""}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="list-card__summary">{summarize(item.summary)}</p>
-                                    <div className="list-card__meta" style={{ marginTop: "8px" }}>
-                                        <span>Tags：{normalizeText(item.tags) || "—"}</span>
-                                    </div>
-                                    <div className="list-card__meta" style={{ marginTop: "4px", alignItems: "flex-start" }}>
-                                        <span>备注：{truncateText(item.note, 120)}</span>
-                                    </div>
-                                    <div className="list-card__actions">
-                                        <Button
-                                            variant="tonal"
-                                            onClick={() => setDetailPaper(item)}
-                                        >
-                                            编辑 Tags/Note
-                                        </Button>
-                                        {item.abs_url && (
-                                            <a
-                                                className="btn btn-ghost"
-                                                href={item.abs_url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                查看 arXiv
-                                            </a>
-                                        )}
-                                        {item.pdf_url && (
-                                            <a
-                                                className="btn btn-tonal"
-                                                href={item.pdf_url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                PDF
-                                            </a>
-                                        )}
-                                    </div>
-                                </article>
-                            ))}
+                                    </article>
+                                )
+                            })}
                         </div>
                     )}
                 </div>
