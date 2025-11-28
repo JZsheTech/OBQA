@@ -8,6 +8,7 @@ import workerSrc from "pdfjs-dist/build/pdf.worker.min.js?url"
 import { buildDemoPdfUrl } from "../api/client"
 import PageHeader from "../components/layout/PageHeader"
 import Button from "../components/ui/Button"
+import { HIGHLIGHT_BBOX_BASE, HIGHLIGHT_BBOX_OFFSET } from "../config/highlight"
 
 const DEMO_HIGHLIGHTS = {
     // MinerU bbox: [x1, y1, x2, y2] on a 0~1000 grid.
@@ -53,16 +54,19 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
 
     const ordered = [left, top, right, bottom]
     const inUnitRange = ordered.every((value) => value >= 0 && value <= 1)
-    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= 1000)
+    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= HIGHLIGHT_BBOX_BASE)
 
     // MinerU bbox 使用 0~1000 的基准，需要按实际页面宽高缩放。
-    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
-    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
+    const adjustedRight = inThousandRange ? right + HIGHLIGHT_BBOX_OFFSET : right
+    const adjustedBottom = inThousandRange ? bottom + HIGHLIGHT_BBOX_OFFSET : bottom
+
+    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / HIGHLIGHT_BBOX_BASE : 1
+    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / HIGHLIGHT_BBOX_BASE : 1
 
     const x = left * scaleX
     const y = top * scaleY
-    const width = (right - left) * scaleX
-    const height = (bottom - top) * scaleY
+    const width = (adjustedRight - left) * scaleX
+    const height = (adjustedBottom - top) * scaleY
 
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
     return { x, y, width, height, isNormalized: inUnitRange || inThousandRange }

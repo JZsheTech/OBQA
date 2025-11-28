@@ -19,6 +19,7 @@ import {
     listDocuments,
     updateChat,
 } from "../api/client"
+import { HIGHLIGHT_BBOX_BASE, HIGHLIGHT_BBOX_OFFSET } from "../config/highlight"
 import DebugIdFooter from "../components/DebugIdFooter"
 import Breadcrumbs from "../components/ui/Breadcrumbs"
 import Button from "../components/ui/Button"
@@ -111,7 +112,7 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
 
     const ordered = [left, top, right, bottom]
     const inUnitRange = ordered.every((value) => value >= 0 && value <= 1)
-    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= 1000)
+    const inThousandRange = !inUnitRange && ordered.every((value) => value >= 0 && value <= HIGHLIGHT_BBOX_BASE)
 
     if (inUnitRange || inThousandRange) {
         console.debug("Scaling bbox to PDF points", {
@@ -123,13 +124,16 @@ function resolveBBoxToRect(bbox, originalWidth, originalHeight) {
     }
 
     // MinerU bbox 使用 0~1000 的基准，坐标为左上 / 右下点，需要按实际页面宽高缩放。
-    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / 1000 : 1
-    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / 1000 : 1
+    const adjustedRight = inThousandRange ? right + HIGHLIGHT_BBOX_OFFSET : right
+    const adjustedBottom = inThousandRange ? bottom + HIGHLIGHT_BBOX_OFFSET : bottom
+
+    const scaleX = inUnitRange ? originalWidth : inThousandRange ? originalWidth / HIGHLIGHT_BBOX_BASE : 1
+    const scaleY = inUnitRange ? originalHeight : inThousandRange ? originalHeight / HIGHLIGHT_BBOX_BASE : 1
 
     const x = left * scaleX
     const y = top * scaleY
-    const width = (right - left) * scaleX
-    const height = (bottom - top) * scaleY
+    const width = (adjustedRight - left) * scaleX
+    const height = (adjustedBottom - top) * scaleY
 
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null
 
