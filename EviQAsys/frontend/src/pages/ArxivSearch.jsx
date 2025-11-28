@@ -437,7 +437,9 @@ export default function ArxivSearch() {
                             <span>更新：{formatDate(detailPaper.updated)}</span>
                         </div>
                         <p className="muted" style={{ margin: 0 }}>摘要</p>
-                        <p style={{ whiteSpace: "pre-line" }}>{detailPaper.summary || "暂无摘要"}</p>
+                        <div className="modal__summary">
+                            {detailPaper.summary || "暂无摘要"}
+                        </div>
                     </div>
                 )}
             </Modal>
