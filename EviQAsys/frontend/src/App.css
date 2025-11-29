@@ -466,6 +466,21 @@
   box-shadow: 0 12px 28px rgba(31, 91, 255, 0.08);
 }
 
+.list-item--interactive {
+  cursor: pointer;
+  text-align: left;
+}
+
+.list-item--interactive:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+.list-item--interactive[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .list-item__meta {
   display: flex;
   gap: var(--space-2);

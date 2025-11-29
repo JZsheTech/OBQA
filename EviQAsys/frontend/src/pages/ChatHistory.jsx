@@ -125,40 +125,54 @@ export default function ChatHistory() {
                         <div className="empty-state">暂无 Collection 聊天历史。</div>
                     ) : (
                         <div className="list">
-                            {history.collections.map((item) => (
-                                <button
-                                    key={item.chat_id}
-                                    type="button"
-                                    className="list-item"
-                                    onClick={() =>
-                                        navigate(`/collections/${item.collection_id}/chat/${item.chat_id}`)
+                            {history.collections.map((item) => {
+                                const isDeleting = deletingIds.has(item.chat_id)
+                                const handleNavigate = () => {
+                                    if (isDeleting) return
+                                    navigate(`/collections/${item.collection_id}/chat/${item.chat_id}`)
+                                }
+                                const handleKeyDown = (event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault()
+                                        handleNavigate()
                                     }
-                                    disabled={deletingIds.has(item.chat_id)}
-                                >
-                                    <div>
-                                        <strong>
-                                            {formatCollectionName(item.collection_name, item.collection_id)} ·{" "}
-                                            {formatChatTitle(item.chat_title, item.chat_id)}
-                                        </strong>
-                                        <p className="caption">{formatDateTime(item.created_at)}</p>
+                                }
+                                return (
+                                    <div
+                                        key={item.chat_id}
+                                        role="button"
+                                        tabIndex={isDeleting ? -1 : 0}
+                                        className="list-item list-item--interactive"
+                                        aria-disabled={isDeleting}
+                                        onClick={handleNavigate}
+                                        onKeyDown={handleKeyDown}
+                                    >
+                                        <div>
+                                            <strong>
+                                                {formatCollectionName(item.collection_name, item.collection_id)} ·{" "}
+                                                {formatChatTitle(item.chat_title, item.chat_id)}
+                                            </strong>
+                                            <p className="caption">{formatDateTime(item.created_at)}</p>
+                                        </div>
+                                        <div className="list-item__meta">
+                                            <span className="pill muted">Collection</span>
+                                            <Button
+                                                variant="ghost"
+                                                className="danger-link"
+                                                style={{ color: "var(--color-danger)" }}
+                                                disabled={isDeleting}
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    if (isDeleting) return
+                                                    handleDelete(item.chat_id)
+                                                }}
+                                            >
+                                                {isDeleting ? "删除中..." : "删除"}
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="list-item__meta">
-                                        <span className="pill muted">Collection</span>
-                                        <Button
-                                            variant="ghost"
-                                            className="danger-link"
-                                            style={{ color: "var(--color-danger)" }}
-                                            disabled={deletingIds.has(item.chat_id)}
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                handleDelete(item.chat_id)
-                                            }}
-                                        >
-                                            {deletingIds.has(item.chat_id) ? "删除中..." : "删除"}
-                                        </Button>
-                                    </div>
-                                </button>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </div>
@@ -179,39 +193,55 @@ export default function ChatHistory() {
                         <div className="empty-state">暂无 Document 聊天历史。</div>
                     ) : (
                         <div className="list">
-                            {history.documents.map((item) => (
-                                <button
-                                    key={item.chat_id}
-                                    type="button"
-                                    className="list-item"
-                                    onClick={() => navigate(`/documents/${item.document_id}/chat/${item.chat_id}`)}
-                                    disabled={deletingIds.has(item.chat_id)}
-                                >
-                                    <div>
-                                        <strong>
-                                            {formatCollectionName(item.collection_name, item.collection_id)} &gt;{" "}
-                                            {formatDocumentTitle(item.document_title, item.document_id)} ·{" "}
-                                            {formatChatTitle(item.chat_title, item.chat_id)}
-                                        </strong>
-                                        <p className="caption">{formatDateTime(item.created_at)}</p>
+                            {history.documents.map((item) => {
+                                const isDeleting = deletingIds.has(item.chat_id)
+                                const handleNavigate = () => {
+                                    if (isDeleting) return
+                                    navigate(`/documents/${item.document_id}/chat/${item.chat_id}`)
+                                }
+                                const handleKeyDown = (event) => {
+                                    if (event.key === "Enter" || event.key === " ") {
+                                        event.preventDefault()
+                                        handleNavigate()
+                                    }
+                                }
+                                return (
+                                    <div
+                                        key={item.chat_id}
+                                        role="button"
+                                        tabIndex={isDeleting ? -1 : 0}
+                                        className="list-item list-item--interactive"
+                                        aria-disabled={isDeleting}
+                                        onClick={handleNavigate}
+                                        onKeyDown={handleKeyDown}
+                                    >
+                                        <div>
+                                            <strong>
+                                                {formatCollectionName(item.collection_name, item.collection_id)} &gt;{" "}
+                                                {formatDocumentTitle(item.document_title, item.document_id)} ·{" "}
+                                                {formatChatTitle(item.chat_title, item.chat_id)}
+                                            </strong>
+                                            <p className="caption">{formatDateTime(item.created_at)}</p>
+                                        </div>
+                                        <div className="list-item__meta">
+                                            <span className="pill muted">Document</span>
+                                            <Button
+                                                variant="ghost"
+                                                className="danger-link"
+                                                style={{ color: "var(--color-danger)" }}
+                                                disabled={isDeleting}
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    if (isDeleting) return
+                                                    handleDelete(item.chat_id)
+                                                }}
+                                            >
+                                                {isDeleting ? "删除中..." : "删除"}
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="list-item__meta">
-                                        <span className="pill muted">Document</span>
-                                        <Button
-                                            variant="ghost"
-                                            className="danger-link"
-                                            style={{ color: "var(--color-danger)" }}
-                                            disabled={deletingIds.has(item.chat_id)}
-                                            onClick={(event) => {
-                                                event.stopPropagation()
-                                                handleDelete(item.chat_id)
-                                            }}
-                                        >
-                                            {deletingIds.has(item.chat_id) ? "删除中..." : "删除"}
-                                        </Button>
-                                    </div>
-                                </button>
-                            ))}
+                                )
+                            })}
                         </div>
                     )}
                 </div>
