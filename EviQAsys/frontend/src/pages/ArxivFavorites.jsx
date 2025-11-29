@@ -523,6 +523,7 @@ export default function ArxivFavorites() {
                 title={detailPaper?.title || detailPaper?.arxiv_id || "论文详情"}
                 description={detailPaper?.arxiv_id ? `arXiv ID: ${detailPaper.arxiv_id}` : undefined}
                 onClose={() => setDetailPaper(null)}
+                size="lg"
                 footer={
                     detailPaper && (
                         <>

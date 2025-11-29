@@ -707,6 +707,11 @@
   overflow: hidden;
 }
 
+.modal--lg {
+  max-width: 840px;
+  width: min(96vw, 840px);
+}
+
 .modal__body {
   display: flex;
   flex-direction: column;
