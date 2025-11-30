@@ -143,7 +143,7 @@ uvicorn EviQAsys.backend.app.main:app --app-dir EviQAsys/backend --reload --port
     - 将文件保存到 `UPLOAD_DIR`（由 `UploadSettings` 控制）。
     - 调用 MinerU 解析（`services/integrations/MinerUAdapter`），拿到 `content_list / images / md_text`。
     - 经 `services/parser`：
-      - `header_processor.preprocess_headers`：修正标题层级，构造 `header_level/level_nav/order_start/order_end`，并生成章节摘要。
+      - `header_processor.preprocess_headers`：修正标题层级，构造 `header_level/level_nav/order_start/order_end`，并生成章节摘要；同时将 MinerU 返回的页眉元素（`type="header"`）视作噪声，等同 `discarded` 直接丢弃，避免写入 elements/chunks。
       - `unifier.normalize_element`：统一构造 `elem_type/text_content/raw_text_content/page_no/bbox_json/text_caption/image_base64`。
     - 通过 `ElementsRepository.batch_insert` 写入 `elements` 表，更新 `documents.element_count` 等。
 
@@ -409,4 +409,3 @@ uvicorn EviQAsys.backend.app.main:app --app-dir EviQAsys/backend --reload --port
    - 如行为与 `docs/zh` 中描述发生偏差，应优先更新文档，再对代码进行调整或在文档中注明差异原因。
 
 通过以上路径，可以在不迷失细节的前提下快速定位到正确的模块，并保持与现有设计文档的一致性。
-

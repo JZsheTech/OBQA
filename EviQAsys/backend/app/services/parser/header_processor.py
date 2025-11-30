@@ -29,12 +29,20 @@ class HeaderContext:
 
 
 def preprocess_headers(content_list: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Augment MinerU content list entries with header hierarchy metadata."""
-    items = [
-        entry
-        for entry in list(content_list)
-        if not (isinstance(entry, dict) and (entry.get("type") or "").lower() == "discarded")
-    ]
+    """Augment MinerU content list entries with header hierarchy metadata.
+
+    MinerU marks page headers with ``type == "header"``; these are noise and should
+    be treated the same as ``discarded`` entries so they do not reach the elements
+    or chunks tables.
+    """
+    items: list[dict[str, Any]] = []
+    for entry in list(content_list):
+        if not isinstance(entry, dict):
+            continue
+        elem_type = (entry.get("type") or "").lower()
+        if elem_type in {"discarded", "header"}:
+            continue
+        items.append(entry)
     processed: list[dict[str, Any]] = []
     header_stack: list[HeaderContext] = []
     order_end_map: dict[int, int] = {}
