@@ -15,7 +15,7 @@
 - chunks（主索引表）：字段包含 `id/doc_id/collection_id/order/level_nav/chunk_text_main/elem_ids/page_start/page_end/elem_types/vec_embedding`，按 section 内顺序生成；image/table 强制单元素单 chunk，排在该 section chunk 列表末尾；允许元素跨页合并。 
 - page_text_chunks（可选页级表）：每页聚合文本生成 `page_no` 级大 chunk，仅含文本向量（无多模态），字段包含`id/doc_id/collection_id/chunk_text_main/elem_ids/page_no/elem_types/vec_embedding`；用于二级检索的页过滤。
 
-@todo chunk存elem_types， 那检索时如何指定特定类型的chunk进行检索？ 是否应该把chunk的type简化为image, table, text这3种类型，直接设置为chunk_type，在前端检索页面也这样简化展示，这是根据合并策略进行划分的。
+@todo chunk存elem_types， 那检索时如何指定特定类型的chunk进行检索？所以chunk表不应该存elem_types， 应该把chunk的type简化为image, table, text这3种类型，直接设置为chunk_type，在前端检索页面也这样简化展示，这是根据合并策略进行划分的。
 
 ### 3.2 索引与生成流程
 - chunk builder：解析完成后触发，按 doc 读取 elements → 过滤空白/控制字符 → 在同一 `level_nav` 内按元素数量窗口合并（无 overlap）， → 直到遇到section边界 或者 字符数>= `MIN_CHARACTOR_CHUNK_SIZE`(优先判断) AND 合并的Elements个数达到`MAX_ELEM_CHUNK_SIZE`(前一个条件满足后才判断)时停止合并 → 写入 chunks → 触发 chunk 级嵌入（文本用 `chunk_text_main`，image/table 走图文联合路径）。
