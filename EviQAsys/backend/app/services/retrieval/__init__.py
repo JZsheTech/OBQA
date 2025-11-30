@@ -1,3 +1,3 @@
-from .retriever import Retriever, RetrievalResult
+from .retriever import ChunkRetrievalResult, Retriever
 
-__all__ = ["Retriever", "RetrievalResult"]
+__all__ = ["Retriever", "ChunkRetrievalResult"]

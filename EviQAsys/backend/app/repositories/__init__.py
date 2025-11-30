@@ -1,6 +1,8 @@
 from .collections_repo import CollectionsRepository
 from .documents_repo import DocumentsRepository
 from .elements_repo import ElementsRepository
+from .chunks_repo import ChunksRepository
+from .page_text_chunks_repo import PageTextChunksRepository
 from .chats_repo import ChatsRepository
 from .turns_repo import TurnsRepository
 from .turn2element_repo import Turn2ElementRepository
@@ -13,6 +15,8 @@ __all__ = [
     "CollectionsRepository",
     "DocumentsRepository",
     "ElementsRepository",
+    "ChunksRepository",
+    "PageTextChunksRepository",
     "ChatsRepository",
     "TurnsRepository",
     "Turn2ElementRepository",

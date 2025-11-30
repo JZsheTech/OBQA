@@ -16,6 +16,8 @@ DEFAULT_PURGE_ORDER: tuple[str, ...] = (
     "turn2element",
     "turns",
     "chats",
+    "chunks",
+    "page_text_chunks",
     "elements",
     "documents",
     "collections",

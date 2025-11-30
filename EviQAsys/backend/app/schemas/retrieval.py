@@ -3,20 +3,23 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
-class RetrievalCandidate(BaseModel):
-    element_id: int
+class ChunkRetrievalCandidate(BaseModel):
+    chunk_id: int
     doc_id: int
     collection_id: int
-    page_no: int | None = None
-    bbox: list[float] | None = None
-    elem_type: str
+    order: int | None = None
+    level_nav: str | None = None
+    chunk_type: str
+    page_start: int | None = None
+    page_end: int | None = None
+    elem_ids: list[int]
     score: float
-    text_content: str | None = None
+    chunk_text_main: str | None = None
 
 
 class RetrievalEnvelope(BaseModel):
     code: str = "OK"
-    data: list[RetrievalCandidate]
+    data: list[ChunkRetrievalCandidate]
 
 
-__all__ = ["RetrievalCandidate", "RetrievalEnvelope"]
+__all__ = ["ChunkRetrievalCandidate", "RetrievalEnvelope"]

@@ -46,6 +46,31 @@ def _get_env(name: str, default: str | None = None) -> str | None:
         return default
     return str(value)
 
+def _get_bool_env(name: str, default: bool) -> bool:
+    raw_value = get_config(name, default)
+    if raw_value is None or raw_value == "":
+        return default
+    if isinstance(raw_value, bool):
+        return raw_value
+    lowered = str(raw_value).strip().lower()
+    return lowered in {"1", "true", "yes", "y", "on"}
+
+
+def _get_elem_types_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = get_config(name, ",".join(default))
+    if isinstance(raw_value, (list, tuple)):
+        raw_list = ",".join(str(entry) for entry in raw_value)
+    else:
+        raw_list = raw_value if raw_value is not None and raw_value != "" else ",".join(default)
+    normalized: list[str] = []
+    for entry in raw_list.split(","):
+        trimmed = entry.strip().lower()
+        if not trimmed or trimmed in normalized:
+            continue
+        normalized.append(trimmed)
+    return tuple(normalized) if normalized else default
+
+
 
 def _get_int_env(name: str, default: int) -> int:
     raw_value = get_config(name, default)
@@ -65,6 +90,21 @@ def _get_float_env(name: str, default: float) -> float:
         return float(raw_value)
     except (ValueError, TypeError) as exc:  # pragma: no cover - defensive guard rails
         raise ValueError(f"Invalid float for {name}: {raw_value}") from exc
+
+
+def _get_str_tuple_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
+    raw_value = get_config(name, ",".join(default))
+    if isinstance(raw_value, (list, tuple)):
+        raw_list = [str(entry) for entry in raw_value]
+    else:
+        raw_list = str(raw_value or "").split(",")
+    normalized: list[str] = []
+    for entry in raw_list:
+        trimmed = entry.strip()
+        if not trimmed or trimmed in normalized:
+            continue
+        normalized.append(trimmed)
+    return tuple(normalized) if normalized else default
 
 
 @dataclass(frozen=True)
@@ -91,6 +131,16 @@ OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://open
 DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4.1-fast")
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
 DEFAULT_VLSION_MODEL = _get_env("DEFAULT_VLSION_MODEL", "x-ai/grok-4-fast")
+MIN_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MIN_CHARACTOR_CHUNK_SIZE", 480)
+MAX_ELEM_CHUNK_SIZE: int = _get_int_env("MAX_ELEM_CHUNK_SIZE", 6)
+CHUNK_SKIP_PATTERNS: tuple[str, ...] = _get_str_tuple_env(
+    "CHUNK_SKIP_PATTERNS",
+    (r"^\s*$", r"^[\u0000-\u001f\u007f]+$"),
+)
+RETRIEVAL_TOPK_CHUNK: int = _get_int_env("RETRIEVAL_TOPK_CHUNK", 6)
+RETRIEVAL_TOPK_PAGE: int = _get_int_env("RETRIEVAL_TOPK_PAGE", 3)
+ENABLE_PAGE_CHUNK_RETRIEVAL: bool = _get_bool_env("ENABLE_PAGE_CHUNK_RETRIEVAL", False)
+ENABLE_PAGE_TEXT_CHUNKS: bool = _get_bool_env("ENABLE_PAGE_TEXT_CHUNKS", True)
 
 @dataclass(frozen=True)
 class MinerUSettings:
@@ -139,30 +189,6 @@ class VisionVQASettings:
     max_tokens: int = _get_int_env("VISION_VQA_MAX_TOKENS", 400)
 
 
-def _get_bool_env(name: str, default: bool) -> bool:
-    raw_value = get_config(name, default)
-    if raw_value is None or raw_value == "":
-        return default
-    if isinstance(raw_value, bool):
-        return raw_value
-    lowered = str(raw_value).strip().lower()
-    return lowered in {"1", "true", "yes", "y", "on"}
-
-
-def _get_elem_types_env(name: str, default: tuple[str, ...]) -> tuple[str, ...]:
-    raw_value = get_config(name, ",".join(default))
-    if isinstance(raw_value, (list, tuple)):
-        raw_list = ",".join(str(entry) for entry in raw_value)
-    else:
-        raw_list = raw_value if raw_value is not None and raw_value != "" else ",".join(default)
-    normalized: list[str] = []
-    for entry in raw_list.split(","):
-        trimmed = entry.strip().lower()
-        if not trimmed or trimmed in normalized:
-            continue
-        normalized.append(trimmed)
-    return tuple(normalized) if normalized else default
-
 
 DEFAULT_QA_ELEM_TYPES: tuple[str, ...] = ("text", "header", "table", "image")
 
@@ -177,6 +203,10 @@ class QAFlowSettings:
     default_retrieval_mode: str = _get_env("QA_DEFAULT_RETRIEVAL_MODE", "auto")
     default_search_mode: str = _get_env("QA_DEFAULT_SEARCH_MODE", "hybrid")
     default_elem_types: tuple[str, ...] = _get_elem_types_env("QA_DEFAULT_ELEM_TYPES", DEFAULT_QA_ELEM_TYPES)
+    retrieval_topk_chunk: int = RETRIEVAL_TOPK_CHUNK
+    retrieval_topk_page: int = RETRIEVAL_TOPK_PAGE
+    enable_page_chunk_retrieval: bool = ENABLE_PAGE_CHUNK_RETRIEVAL
+    enable_page_text_chunks: bool = ENABLE_PAGE_TEXT_CHUNKS
 
 
 @lru_cache(maxsize=1)
@@ -226,6 +256,9 @@ __all__ = [
     "VECTOR_DIM",
     "INGEST_BATCH_SIZE",
     "ELEMENT_CONTEXT_OVERLAP",
+    "MIN_CHARACTOR_CHUNK_SIZE",
+    "MAX_ELEM_CHUNK_SIZE",
+    "CHUNK_SKIP_PATTERNS",
     "EVIDENCE_PROMPT_CHAR_LIMIT",
     "OLLAMA_PROTOCOL",
     "OLLAMA_HOST",
@@ -234,6 +267,10 @@ __all__ = [
     "OLLAMA_OPENAI_BASE_URL",
     "OPENROUTER_API_BASE_URL",
     "DEFAULT_TEXT_LLM_MODEL",
+    "RETRIEVAL_TOPK_CHUNK",
+    "RETRIEVAL_TOPK_PAGE",
+    "ENABLE_PAGE_CHUNK_RETRIEVAL",
+    "ENABLE_PAGE_TEXT_CHUNKS",
     "OceanBaseSettings",
     "MinerUSettings",
     "UploadSettings",

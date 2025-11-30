@@ -16,7 +16,7 @@ from ..integrations import VisionVQAClient, VisionVQAError
 from ..llm import AnswerComposer, ImageQuestionGenerator, QueryRewriter, RetrievalDecider
 from ..mapping import evidence_mapper
 from ..memory import MemoryService
-from ..retrieval import Retriever
+from ..retrieval import ChunkRetrievalResult, Retriever
 from .history_loader import format_history_text
 from .models import EvidenceText, QATurnResult
 
@@ -41,6 +41,9 @@ class QAFlowConfig:
     retrieval_mode: str = "auto"
     search_mode: str = "hybrid"
     elem_types: tuple[str, ...] | None = ("text", "header", "table", "image")
+    chunk_top_k: int = 8
+    page_top_k: int = 3
+    enable_page_filter: bool = False
 
     def __post_init__(self) -> None:
         self.max_history_turns = max(0, int(self.max_history_turns))
@@ -51,6 +54,9 @@ class QAFlowConfig:
         self.retrieval_mode = self._normalize_retrieval_mode(self.retrieval_mode) or "auto"
         self.search_mode = self._normalize_search_mode(self.search_mode) or "hybrid"
         self.elem_types = self._normalize_elem_types(self.elem_types) or None
+        self.chunk_top_k = max(1, int(self.chunk_top_k))
+        self.page_top_k = max(1, int(self.page_top_k))
+        self.enable_page_filter = bool(self.enable_page_filter)
 
     @classmethod
     def from_settings(cls, settings: QAFlowSettings | None = None) -> "QAFlowConfig":
@@ -64,6 +70,9 @@ class QAFlowConfig:
             retrieval_mode=settings.default_retrieval_mode,
             search_mode=settings.default_search_mode,
             elem_types=settings.default_elem_types,
+            chunk_top_k=settings.retrieval_topk_chunk,
+            page_top_k=settings.retrieval_topk_page,
+            enable_page_filter=settings.enable_page_chunk_retrieval,
         )
 
     def with_overrides(
@@ -77,6 +86,9 @@ class QAFlowConfig:
         retrieval_mode: str | None = None,
         search_mode: str | None = None,
         elem_types: Iterable[str] | None = None,
+        chunk_top_k: int | None = None,
+        page_top_k: int | None = None,
+        enable_page_filter: bool | None = None,
     ) -> "QAFlowConfig":
         return QAFlowConfig(
             max_history_turns=self._normalize_int(max_history_turns, fallback=self.max_history_turns),
@@ -87,6 +99,9 @@ class QAFlowConfig:
             retrieval_mode=self._normalize_retrieval_mode(retrieval_mode) or self.retrieval_mode,
             search_mode=self._normalize_search_mode(search_mode) or self.search_mode,
             elem_types=self._normalize_elem_types(elem_types) if elem_types is not None else self.elem_types,
+            chunk_top_k=self._normalize_int(chunk_top_k, fallback=self.chunk_top_k, min_value=1),
+            page_top_k=self._normalize_int(page_top_k, fallback=self.page_top_k, min_value=1),
+            enable_page_filter=self._normalize_bool(enable_page_filter, fallback=self.enable_page_filter),
         )
 
     @staticmethod
@@ -187,6 +202,8 @@ class QAOrchestrator:
         enable_memory_summarizer: bool | None = None,
         text_evidence_limit: int | None = None,
         image_evidence_limit: int | None = None,
+        enable_page_filter: bool | None = None,
+        page_top_k: int | None = None,
     ) -> QATurnResult:
         question_text = (question or "").strip()
         if not question_text:
@@ -206,6 +223,9 @@ class QAOrchestrator:
             retrieval_mode=retrieval_mode,
             search_mode=search_mode,
             elem_types=requested_elem_types if elem_types is not None else None,
+            chunk_top_k=top_k,
+            page_top_k=page_top_k,
+            enable_page_filter=enable_page_filter,
         )
         history_text = format_history_text(history_turns, max_turns=config.max_history_turns)
         memory_summary = history_text
@@ -244,39 +264,40 @@ class QAOrchestrator:
         )
         text_evidences: list[EvidenceText] = []
         image_candidates: list[dict[str, object]] = []
+        chunk_results: list[ChunkRetrievalResult] = []
+        element_map: dict[int, dict[str, object]] = {}
         if need_retrieve:
             search_query = self._query_rewriter.rewrite(question_text, memory_summary) or question_text
             try:
-                results = self._retriever.retrieve_topk(
+                chunk_results = self._retriever.retrieve_topk(
                     collection_id=collection_id,
                     doc_id=document_id,
                     query_text=search_query,
-                    top_k=max(1, min(top_k, 20)),
-                    elem_types=elem_types_for_retrieval,
+                    top_k=config.chunk_top_k,
+                    chunk_types=self._map_chunk_types(elem_types_for_retrieval),
                     search_mode=config.search_mode,
+                    enable_page_filter=config.enable_page_filter,
+                    page_top_k=config.page_top_k,
                 )
+                expanded_elements = self._retriever.expand_chunks_to_elements(chunk_results)
+                element_map = {
+                    int(row["element_id"]): row
+                    for row in expanded_elements
+                    if row.get("element_id") is not None
+                }
             except Exception as exc:  # pragma: no cover - runtime guard
                 logger.warning("Retriever failed for chat %s: %s", chat_id, exc)
-                results = []
-            for row in results:
-                elem_id = int(row["element_id"])
-                elem_type = (row.get("elem_type") or "").lower()
-                text_content = (row.get("text_content") or "").strip()
-                if elem_type == "image":
-                    image_candidates.append(row)
-                    continue
-                if not text_content:
-                    continue
-                if len(text_evidences) >= config.text_evidence_limit:
-                    continue
-                text_evidences.append(
-                    EvidenceText(
-                        element_id=elem_id,
-                        elem_type=elem_type or "text",
-                        text_content=text_content,
-                        score=float(row.get("score") or 0.0),
-                    ),
-                )
+                chunk_results = []
+                element_map = {}
+            text_evidences = self._build_text_evidences_from_chunks(
+                chunks=chunk_results,
+                element_map=element_map,
+                evidence_limit=config.text_evidence_limit,
+            )
+            image_candidates = self._collect_image_candidates(
+                chunks=chunk_results,
+                element_map=element_map,
+            )
 
         vision_client = self._vision_client if config.enable_image_vqa else None
         if config.enable_image_vqa and vision_client is None:
@@ -344,6 +365,103 @@ class QAOrchestrator:
             evidences=evidences,
         )
 
+    def _build_text_evidences_from_chunks(
+        self,
+        *,
+        chunks: Iterable[ChunkRetrievalResult],
+        element_map: dict[int, dict[str, object]],
+        evidence_limit: int,
+    ) -> list[EvidenceText]:
+        evidences: list[EvidenceText] = []
+        used_element_ids: set[int] = set()
+        for chunk in chunks:
+            if len(evidences) >= evidence_limit:
+                break
+            chunk_type = (chunk.get("chunk_type") or "").lower()
+            if chunk_type == "image":
+                continue
+            context_text = self._compose_chunk_context(
+                chunk=chunk,
+                element_map=element_map,
+                used_element_ids=used_element_ids,
+            )
+            if not context_text:
+                continue
+            main_elem_id = next(
+                (elem_id for elem_id in chunk.get("elem_ids") or [] if elem_id in element_map),
+                None,
+            )
+            if main_elem_id is None:
+                continue
+            evidences.append(
+                EvidenceText(
+                    element_id=int(main_elem_id),
+                    elem_type=chunk_type or "text",
+                    text_content=context_text,
+                    score=float(chunk.get("score") or 0.0),
+                ),
+            )
+        return evidences
+
+    def _collect_image_candidates(
+        self,
+        *,
+        chunks: Iterable[ChunkRetrievalResult],
+        element_map: dict[int, dict[str, object]],
+    ) -> list[dict[str, object]]:
+        candidates: list[dict[str, object]] = []
+        for chunk in chunks:
+            chunk_type = (chunk.get("chunk_type") or "").lower()
+            if chunk_type != "image":
+                continue
+            elem_ids = chunk.get("elem_ids") or []
+            if not elem_ids:
+                continue
+            elem_id = int(elem_ids[0])
+            element = element_map.get(elem_id)
+            caption = ""
+            if element:
+                caption = (
+                    element.get("text_caption")
+                    or element.get("raw_text_content")
+                    or ""
+                )
+            chunk_caption = caption or (chunk.get("chunk_text_main") or "")
+            payload = {
+                "element_id": elem_id,
+                "elem_type": "image",
+                "text_content": (f"[Elem#{elem_id}] {chunk_caption}".strip() if chunk_caption else None),
+                "score": float(chunk.get("score") or 0.0),
+            }
+            candidates.append(payload)
+        return candidates
+
+    def _compose_chunk_context(
+        self,
+        *,
+        chunk: ChunkRetrievalResult,
+        element_map: dict[int, dict[str, object]],
+        used_element_ids: set[int],
+    ) -> str:
+        parts: list[str] = []
+        for elem_id in chunk.get("elem_ids") or []:
+            if elem_id in used_element_ids:
+                continue
+            element = element_map.get(int(elem_id))
+            if not element:
+                continue
+            text = (
+                element.get("raw_text_content")
+                or element.get("text_caption")
+                or ""
+            )
+            snippet = (text or "").strip()
+            if not snippet:
+                continue
+            parts.append(f"[Elem#{elem_id}] {snippet}")
+            used_element_ids.add(int(elem_id))
+        return "\n".join(parts).strip()
+
     def _build_image_evidences(
         self,
         *,
@@ -392,6 +510,20 @@ class QAOrchestrator:
             )
         return evidences
 
+    @staticmethod
+    def _map_chunk_types(elem_types: Iterable[str] | None) -> set[str] | None:
+        if not elem_types:
+            return None
+        normalized = {entry.strip().lower() for entry in elem_types if entry}
+        chunk_types: set[str] = set()
+        if any(entry in normalized for entry in {"text", "header", "equation"}):
+            chunk_types.add("text")
+        if "table" in normalized:
+            chunk_types.add("table")
+        if "image" in normalized:
+            chunk_types.add("image")
+        return chunk_types or None
+
     def _load_elements_for_ids(self, element_ids: Iterable[int]) -> dict[int, dict[str, object]]:
         rows = self._elements_repo.list_by_ids(element_ids)
         mapping: dict[int, dict[str, object]] = {}
@@ -402,7 +534,8 @@ class QAOrchestrator:
                 "page_no": row.get("page_no"),
                 "bbox": row.get("bbox"),
                 "elem_type": row.get("elem_type"),
-                "text_content": row.get("text_content"),
+                "text_content": row.get("text_content") or row.get("raw_text_content"),
+                "raw_text_content": row.get("raw_text_content"),
                 "text_caption": row.get("text_caption"),
                 "level_nav": row.get("level_nav"),
             }
@@ -448,6 +581,8 @@ def run_qa_turn(
     enable_memory_summarizer: bool | None = None,
     text_evidence_limit: int | None = None,
     image_evidence_limit: int | None = None,
+    enable_page_filter: bool | None = None,
+    page_top_k: int | None = None,
 ) -> QATurnResult:
     settings = get_qa_flow_settings()
     orchestrator = QAOrchestrator(
@@ -466,6 +601,8 @@ def run_qa_turn(
         max_history_turns=max_history_turns,
         text_evidence_limit=text_evidence_limit,
         image_evidence_limit=image_evidence_limit,
+        enable_page_filter=enable_page_filter,
+        page_top_k=page_top_k,
     )
 
 

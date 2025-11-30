@@ -13,7 +13,7 @@ from fastapi import UploadFile
 from ...env_setting import ELEMENT_CONTEXT_OVERLAP, INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
 from ...repositories import CollectionsRepository, DocumentsRepository, ElementsRepository, db_connection
 from ..integrations import MinerUAdapter
-from ..parser import normalize_element, preprocess_headers, tfidf_summary
+from ..parser import normalize_element, preprocess_headers
 from ..parser.unifier import ROOT_LEVEL_NAV
 
 logger = logging.getLogger(__name__)
@@ -165,7 +165,6 @@ class DocumentIngestor:
             if document_title != document.get("title"):
                 self._documents_repo.update_document(document["id"], title=document_title)
             document["title"] = document_title
-            self._attach_header_summaries(processed_items)
             normalized = [
                 normalize_element(item, images=parse_result.images) for item in processed_items
             ]
@@ -173,10 +172,7 @@ class DocumentIngestor:
                 row["doc_id"] = document["id"]
                 row["order"] = idx
             abstract_text = self._extract_abstract_text(normalized)
-            self._inject_contextual_text_content(
-                normalized,
-                document_title=document_title,
-            )
+            self._inject_contextual_text_content(normalized)
             element_count = len(normalized)
             num_pages = self._calculate_num_pages(normalized)
             self._write_elements_and_finalize(
@@ -198,48 +194,6 @@ class DocumentIngestor:
             logger.exception("Failed to ingest document %s", document.get("id"))
             self._documents_repo.delete_document(document["id"])
             raise
-
-    def _attach_header_summaries(self, items: list[dict[str, Any]]) -> None:
-        for item in items:
-            if item.get("elem_type") != "header":
-                continue
-            start = item.get("order_start")
-            end = item.get("order_end")
-            section_text = self._collect_section_text(items, start, end)
-            item["section_summary"] = tfidf_summary(section_text)
-
-    def _collect_section_text(self, items: list[dict[str, Any]], start: Any, end: Any) -> str:
-        chunks: list[str] = []
-        for element in items:
-            order = element.get("order")
-            if order is None:
-                continue
-            if start is not None and order < start:
-                continue
-            if end is not None and order > end:
-                continue
-            if order == start and element.get("elem_type") == "header":
-                continue
-            elem_type = element.get("elem_type")
-            if elem_type == "text":
-                chunks.append(element.get("text") or "")
-            elif elem_type == "table":
-                captions = element.get("table_caption") or []
-                if isinstance(captions, list):
-                    chunks.append(" ".join(captions))
-                elif isinstance(captions, str):
-                    chunks.append(captions)
-                if element.get("table_body"):
-                    chunks.append(element["table_body"])
-            elif elem_type == "equation":
-                chunks.append(element.get("text") or "")
-            elif elem_type == "image":
-                captions = element.get("image_caption") or []
-                if isinstance(captions, list):
-                    chunks.append(" ".join(captions))
-                elif isinstance(captions, str):
-                    chunks.append(captions)
-        return "\n".join(part for part in chunks if part)
 
     def _filter_noise_entries(self, content_list: Any) -> list[dict[str, Any]]:
         """Drop MinerU items that contain only '#' and whitespace."""
@@ -377,60 +331,14 @@ class DocumentIngestor:
         stop_tokens = ("abstract", "introduction", "table of contents", "contents", "keywords")
         return any(token in lowered for token in stop_tokens)
 
-    def _inject_contextual_text_content(
-        self,
-        elements: list[dict[str, Any]],
-        *,
-        document_title: str,
-    ) -> None:
+    def _inject_contextual_text_content(self, elements: list[dict[str, Any]]) -> None:
         if not elements:
             return
-        nav_to_indexes: dict[str, list[int]] = {}
-        for idx, row in enumerate(elements):
+        for row in elements:
             nav_key = self._clean_metadata_text(row.get("level_nav")) or ROOT_LEVEL_NAV
             row["level_nav"] = nav_key
             row["raw_text_content"] = self._clean_body_text(row.get("raw_text_content"))
-            nav_to_indexes.setdefault(nav_key, []).append(idx)
-        index_positions: dict[int, int] = {}
-        for indexes in nav_to_indexes.values():
-            for position, index in enumerate(indexes):
-                index_positions[index] = position
-        overlap = max(0, self._context_overlap)
-        prefix_title = self._clean_metadata_text(document_title) or "untitled"
-        for idx, row in enumerate(elements):
-            nav_key = row["level_nav"]
-            siblings = nav_to_indexes.get(nav_key, [])
-            position = index_positions.get(idx, 0)
-            elem_type = row.get("elem_type")
-            use_overlap = overlap and elem_type not in {"image", "table"}
-            if use_overlap:
-                prev_slice = siblings[max(0, position - overlap) : position]
-                next_slice = siblings[position + 1 : position + 1 + overlap]
-            else:
-                prev_slice = []
-                next_slice = []
-            prev_texts = [
-                elements[ref]["raw_text_content"]
-                for ref in prev_slice
-                if elements[ref]["raw_text_content"]
-            ]
-            next_texts = [
-                elements[ref]["raw_text_content"]
-                for ref in next_slice
-                if elements[ref]["raw_text_content"]
-            ]
-            current_text = self._resolve_current_text(row)
-            prefix = self._format_text_prefix(
-                document_title=prefix_title,
-                page_no=row.get("page_no"),
-                level_nav=nav_key,
-            )
-            body = self._compose_context_body(
-                curr=current_text,
-                prev_entries=prev_texts,
-                next_entries=next_texts,
-            )
-            row["text_content"] = f"{prefix} {body}".strip()
+            row["text_content"] = row["raw_text_content"]
 
     @staticmethod
     def _clean_metadata_text(value: Any) -> str:
@@ -454,44 +362,6 @@ class DocumentIngestor:
         if "#" not in text_str:
             return False
         return text_str.replace("#", "").strip() == ""
-
-    def _format_text_prefix(
-        self,
-        *,
-        document_title: str,
-        page_no: int | None,
-        level_nav: str | None,
-    ) -> str:
-        nav_label = self._clean_metadata_text(level_nav) or ROOT_LEVEL_NAV
-        page_label = str(page_no) if page_no is not None else "unknown"
-        title_label = document_title or "untitled"
-        return f"[doc={title_label}] [page_no={page_label}] [nav={nav_label}]"
-
-    @staticmethod
-    def _compose_context_body(
-        *,
-        curr: str,
-        prev_entries: list[str],
-        next_entries: list[str],
-    ) -> str:
-        blocks: list[str] = []
-        if prev_entries:
-            blocks.append("[PREV_CTX]")
-            blocks.append("\n\n".join(prev_entries))
-        blocks.append("[CURR]")
-        if curr:
-            blocks.append(curr)
-        if next_entries:
-            blocks.append("[NEXT_CTX]")
-            blocks.append("\n\n".join(next_entries))
-        return "\n".join(block for block in blocks if block).strip()
-
-    def _resolve_current_text(self, row: dict[str, Any]) -> str:
-        if row.get("elem_type") == "header":
-            summary = self._clean_body_text(row.get("section_summary"))
-            if summary:
-                return summary
-        return row["raw_text_content"]
 
     def _extract_abstract_text(self, elements: list[dict[str, Any]]) -> str | None:
         if not elements:

@@ -109,6 +109,7 @@ def build_evidences_payload(
 def _select_snippet(element: Mapping[str, object], limit: int) -> str | None:
     text_fields = [
         element.get("text_content"),
+        element.get("raw_text_content"),
         element.get("text_caption"),
     ]
     for field in text_fields:

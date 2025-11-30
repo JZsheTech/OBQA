@@ -125,6 +125,77 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+CREATE TABLE IF NOT EXISTS chunks (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  doc_id BIGINT NOT NULL,
+  collection_id BIGINT NOT NULL,
+  `order` INT NOT NULL,
+  level_nav VARCHAR(1024),
+  chunk_type VARCHAR(32) NOT NULL CHECK (chunk_type IN ('text','image','table')),
+  chunk_text_main MEDIUMTEXT,
+  elem_ids JSON,
+  page_start INT,
+  page_end INT,
+  vec_embedding VECTOR({{VECTOR_DIM}}) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_chunks_document
+    FOREIGN KEY (doc_id) REFERENCES documents(id)
+    ON DELETE CASCADE
+);
+
+SET @missing_chunks_doc_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chunks' AND INDEX_NAME = 'idx_chunks_doc_order'
+);
+SET @sql := IF(@missing_chunks_doc_idx = 0, 'CREATE INDEX idx_chunks_doc_order ON chunks (doc_id, `order`)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_chunks_collection_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chunks' AND INDEX_NAME = 'idx_chunks_collection'
+);
+SET @sql := IF(@missing_chunks_collection_idx = 0, 'CREATE INDEX idx_chunks_collection ON chunks (collection_id, `order`)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+CREATE TABLE IF NOT EXISTS page_text_chunks (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  doc_id BIGINT NOT NULL,
+  collection_id BIGINT NOT NULL,
+  chunk_text_main MEDIUMTEXT,
+  elem_ids JSON,
+  page_no INT,
+  chunk_type VARCHAR(32) NOT NULL DEFAULT 'text' CHECK (chunk_type IN ('text')),
+  vec_embedding VECTOR({{VECTOR_DIM}}) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  CONSTRAINT fk_page_text_chunks_document
+    FOREIGN KEY (doc_id) REFERENCES documents(id)
+    ON DELETE CASCADE
+);
+
+SET @missing_page_chunks_doc_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'page_text_chunks' AND INDEX_NAME = 'idx_page_text_chunks_doc_page'
+);
+SET @sql := IF(@missing_page_chunks_doc_idx = 0, 'CREATE INDEX idx_page_text_chunks_doc_page ON page_text_chunks (doc_id, page_no)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_page_chunks_collection_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'page_text_chunks' AND INDEX_NAME = 'idx_page_text_chunks_collection'
+);
+SET @sql := IF(@missing_page_chunks_collection_idx = 0, 'CREATE INDEX idx_page_text_chunks_collection ON page_text_chunks (collection_id, page_no)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 CREATE TABLE IF NOT EXISTS chats (
   id BIGINT NOT NULL AUTO_INCREMENT,
   collection_id BIGINT,

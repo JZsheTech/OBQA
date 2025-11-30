@@ -246,6 +246,8 @@ export async function createTurn(
         maxHistoryTurns,
         enableImageVqa,
         enableMemorySummarizer,
+        pageTopK,
+        enablePageFilter,
     } = {},
 ) {
     const trimmedQuestion = (question ?? "").trim()
@@ -276,6 +278,15 @@ export async function createTurn(
         if (Number.isFinite(numericHistory)) {
             body.max_history_turns = numericHistory
         }
+    }
+    if (pageTopK !== undefined && pageTopK !== null) {
+        const numericPageTopK = Number(pageTopK)
+        if (Number.isFinite(numericPageTopK)) {
+            body.page_top_k = numericPageTopK
+        }
+    }
+    if (enablePageFilter !== undefined) {
+        body.enable_page_filter = Boolean(enablePageFilter)
     }
     if (enableImageVqa !== undefined) {
         body.enable_image_vqa = Boolean(enableImageVqa)

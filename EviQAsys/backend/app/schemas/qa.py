@@ -12,7 +12,7 @@ class TurnCreateRequest(BaseModel):
         default=None,
         ge=1,
         le=30,
-        description="Optional override for retrieval TopK.",
+        description="Optional override for chunk-level retrieval TopK.",
     )
     retrieval_mode: Literal["auto", "force", "skip"] | None = Field(
         default=None,
@@ -25,6 +25,16 @@ class TurnCreateRequest(BaseModel):
     search_mode: Literal["vector", "fulltext", "hybrid"] | None = Field(
         default=None,
         description="Search backend selection for this turn (vector/fulltext/hybrid).",
+    )
+    page_top_k: int | None = Field(
+        default=None,
+        ge=1,
+        le=50,
+        description="Optional override for page-level topK when page-chunk filter is enabled.",
+    )
+    enable_page_filter: bool | None = Field(
+        default=None,
+        description="Enable two-stage retrieval: page_text_chunks then chunk search.",
     )
     max_history_turns: int | None = Field(
         default=None,

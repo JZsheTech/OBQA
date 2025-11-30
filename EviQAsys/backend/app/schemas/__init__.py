@@ -12,7 +12,7 @@ from .arxiv import (
     ArxivImportRequest,
     ArxivImportResponse,
 )
-from .retrieval import RetrievalCandidate, RetrievalEnvelope
+from .retrieval import ChunkRetrievalCandidate, RetrievalEnvelope
 from .qa import (
     TurnCreateRequest,
     EvidenceItem,
@@ -50,7 +50,7 @@ __all__ = [
     "ChatRead",
     "CollectionChatHistory",
     "DocumentChatHistory",
-    "RetrievalCandidate",
+    "ChunkRetrievalCandidate",
     "RetrievalEnvelope",
     "TurnCreateRequest",
     "EvidenceItem",

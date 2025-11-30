@@ -283,6 +283,8 @@ def create_turn(
             max_history_turns=payload.max_history_turns,
             enable_image_vqa=payload.enable_image_vqa,
             enable_memory_summarizer=payload.enable_memory_summarizer,
+            enable_page_filter=payload.enable_page_filter,
+            page_top_k=payload.page_top_k,
         )
     except ChatNotFoundError as exc:
         raise HTTPException(

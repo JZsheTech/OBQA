@@ -20,7 +20,8 @@ class EvidenceText:
         if len(snippet) > EVIDENCE_PROMPT_CHAR_LIMIT:
             snippet = f"{snippet[:EVIDENCE_PROMPT_CHAR_LIMIT]}..."
         score_hint = f" score={self.score:.4f}" if self.score is not None else ""
-        return f"id={self.element_id} type={self.elem_type}{score_hint}\n{snippet}"
+        prefix = f"[Elem#{self.element_id}] ({self.elem_type}){score_hint}"
+        return f"{prefix}\n{snippet}"
 
 
 @dataclass(slots=True)

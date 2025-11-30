@@ -28,17 +28,16 @@ import { useToast } from "../components/ui/Toast"
 const DEFAULT_RETRIEVAL_MODE = "auto"
 const DEFAULT_SEARCH_MODE = "hybrid"
 const DEFAULT_MAX_HISTORY_TURNS = "8"
-const DEFAULT_ELEM_TYPES = ["text", "header", "table", "image"]
+const DEFAULT_ELEM_TYPES = ["text", "image", "table"]
 const DEFAULT_TOP_K = "8"
+const DEFAULT_PAGE_TOP_K = ""
 const DEFAULT_CHAT_PANEL_RATIO = 0.55
 const MIN_PANEL_RATIO = 0.32
 const MAX_PANEL_RATIO = 0.68
 const ELEMENT_TYPE_OPTIONS = [
     { value: "text", label: "Text" },
-    { value: "header", label: "Header" },
-    { value: "table", label: "Table" },
     { value: "image", label: "Image" },
-    { value: "equation", label: "Equation" },
+    { value: "table", label: "Table" },
 ]
 
 function formatDateTime(value) {
@@ -336,8 +335,10 @@ export default function DocumentChat() {
     const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
     const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
     const [topK, setTopK] = useState(DEFAULT_TOP_K)
+    const [pageTopK, setPageTopK] = useState(DEFAULT_PAGE_TOP_K)
     const [elemTypes, setElemTypes] = useState(DEFAULT_ELEM_TYPES)
     const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
+    const [enablePageFilter, setEnablePageFilter] = useState(false)
     const [enableImageVqa, setEnableImageVqa] = useState(false)
     const [enableMemorySummarizer, setEnableMemorySummarizer] = useState(false)
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
@@ -487,8 +488,10 @@ export default function DocumentChat() {
         setRetrievalMode(DEFAULT_RETRIEVAL_MODE)
         setSearchMode(DEFAULT_SEARCH_MODE)
         setTopK(DEFAULT_TOP_K)
+        setPageTopK(DEFAULT_PAGE_TOP_K)
         setElemTypes([...DEFAULT_ELEM_TYPES])
         setMaxHistoryTurns(DEFAULT_MAX_HISTORY_TURNS)
+        setEnablePageFilter(false)
         setEnableImageVqa(false)
         setEnableMemorySummarizer(false)
     }
@@ -640,8 +643,16 @@ export default function DocumentChat() {
             parsedHistory === undefined || Number.isNaN(parsedHistory)
                 ? undefined
                 : Math.max(0, Math.floor(parsedHistory))
+        const parsedPageTopK = pageTopK === "" ? undefined : Number(pageTopK)
+        const normalizedPageTopK =
+            parsedPageTopK === undefined || Number.isNaN(parsedPageTopK)
+                ? undefined
+                : Math.min(50, Math.max(1, Math.floor(parsedPageTopK)))
         if (normalizedTopK !== undefined) {
             setTopK(String(normalizedTopK))
+        }
+        if (normalizedPageTopK !== undefined) {
+            setPageTopK(String(normalizedPageTopK))
         }
         setSending(true)
         try {
@@ -650,6 +661,8 @@ export default function DocumentChat() {
                 retrievalMode,
                 searchMode,
                 topK: normalizedTopK,
+                pageTopK: normalizedPageTopK,
+                enablePageFilter,
                 elemTypes,
                 maxHistoryTurns: normalizedHistory,
                 enableImageVqa,
@@ -915,7 +928,7 @@ export default function DocumentChat() {
                             <div className="stack" style={{ gap: "4px" }}>
                                 <strong>QA 控制面板</strong>
                                 <span className="caption muted">
-                                    默认遵循 env_setting，可按需强制/跳过检索，切换混合/向量/全文、调整 TopK 与元素类型。
+                                    默认遵循 env_setting，可按需强制/跳过检索，切换混合/向量/全文、调整 Chunk/Page TopK 与 chunk 类型。
                                 </span>
                             </div>
                             <Button variant="ghost" onClick={resetQaControls} type="button">
@@ -962,7 +975,7 @@ export default function DocumentChat() {
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="topk-input">
-                                    TopK
+                                    Chunk TopK
                                 </label>
                                 <input
                                     id="topk-input"
@@ -972,9 +985,9 @@ export default function DocumentChat() {
                                     max="30"
                                     value={topK}
                                     onChange={(event) => setTopK(event.target.value)}
-                                    placeholder="默认 8"
+                                    placeholder="默认跟随后端"
                                 />
-                                <span className="caption muted">用于问答检索的返回条数。</span>
+                                <span className="caption muted">chunk 检索返回条数（空则使用后端默认）。</span>
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="history-turns-input">
@@ -991,10 +1004,33 @@ export default function DocumentChat() {
                                 />
                                 <span className="caption muted">设为 0 表示不带入历史轮次。</span>
                             </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="page-topk-input">
+                                    Page TopK
+                                </label>
+                                <input
+                                    id="page-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="50"
+                                    value={pageTopK}
+                                    onChange={(event) => setPageTopK(event.target.value)}
+                                    placeholder="页级二段过滤 topK（空则默认）"
+                                />
+                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={enablePageFilter}
+                                        onChange={(event) => setEnablePageFilter(event.target.checked)}
+                                    />
+                                    <span className="caption">启用 Page-Chunk 二级检索</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div className="stack" style={{ gap: "6px", marginTop: "10px" }}>
-                            <span className="caption">元素类型过滤</span>
+                            <span className="caption">Chunk 类型过滤</span>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                                 {ELEMENT_TYPE_OPTIONS.map((option) => (
                                     <label

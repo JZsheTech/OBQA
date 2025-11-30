@@ -8,33 +8,28 @@ from typing import Any, Callable, ContextManager, Iterable, Mapping, Sequence
 from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Connection
 
-from .base import RepositoryResult, dict_to_insert, dict_to_update, row_to_dict, rows_to_dicts
+from .base import RepositoryResult, dict_to_update, row_to_dict, rows_to_dicts
 from .db import db_connection
 from ..env_setting import VECTOR_DIM
 
 logger = logging.getLogger(__name__)
 
 
-class ElementsRepository:
-    """Direct SQL helpers for the elements table."""
+class ChunksRepository:
+    """Gateway for the chunk-level index table."""
 
-    table_name = "elements"
+    table_name = "chunks"
     writable_fields: set[str] = {
         "doc_id",
+        "collection_id",
         "order",
-        "elem_type",
-        "header_name",
-        "header_level",
         "level_nav",
-        "text_content",
-        "raw_text_content",
-        "text_caption",
-        "image_base64",
-        "bbox_json",
-        "page_no",
+        "chunk_type",
+        "chunk_text_main",
+        "elem_ids",
+        "page_start",
+        "page_end",
         "vec_embedding",
-        "order_start",
-        "order_end",
     }
 
     def __init__(
@@ -43,37 +38,26 @@ class ElementsRepository:
     ) -> None:
         self._connection_provider = connection_provider
 
-    def create_element(self, data: dict[str, Any]) -> dict[str, Any]:
-        payload = {key: data[key] for key in data if key in self.writable_fields}
-        if "doc_id" not in payload:
-            raise ValueError("doc_id is required to create an element.")
-        sql, params = dict_to_insert(self.table_name, payload)
-        with self._connection_provider() as connection:
-            result = connection.execute(text(sql), params)
-            element_id = result.lastrowid
-            fetched = connection.execute(
-                text("SELECT * FROM elements WHERE id = :id"),
-                {"id": element_id},
-            )
-            row = row_to_dict(fetched)
-        return row or {}
-
     def batch_insert(self, records: Iterable[dict[str, Any]], *, batch_size: int = 32) -> RepositoryResult:
         rows: list[dict[str, Any]] = []
         for record in records:
             payload = {key: record.get(key) for key in self.writable_fields}
+            payload["chunk_type"] = (payload.get("chunk_type") or "").lower() or None
+            payload["elem_ids"] = self._serialize_elem_ids(record.get("elem_ids"))
             if payload.get("doc_id") is None:
-                raise ValueError("doc_id is required for element rows.")
+                raise ValueError("doc_id is required for chunk rows.")
+            if payload.get("collection_id") is None:
+                raise ValueError("collection_id is required for chunk rows.")
             if payload.get("order") is None:
-                raise ValueError("order is required for element rows.")
-            if payload.get("elem_type") is None:
-                raise ValueError("elem_type is required for element rows.")
+                raise ValueError("order is required for chunk rows.")
+            if payload.get("chunk_type") not in {"text", "image", "table"}:
+                raise ValueError(f"Unsupported chunk_type: {payload.get('chunk_type')}")
             rows.append(payload)
         if not rows:
             return RepositoryResult(rows=None, rowcount=0)
 
         inserted = 0
-        columns = sorted({column for row in rows for column in row.keys() if row[column] is not None or column in {"doc_id", "order", "elem_type"}})
+        columns = sorted({column for row in rows for column in row.keys() if row[column] is not None or column in {"doc_id", "collection_id", "order", "chunk_type"}})
         placeholders = ", ".join(f":{column}" for column in columns)
         columns_clause = ", ".join(f"`{column}`" for column in columns)
         sql = f"INSERT INTO {self.table_name} ({columns_clause}) VALUES ({placeholders})"
@@ -90,57 +74,40 @@ class ElementsRepository:
 
         return RepositoryResult(rows=None, rowcount=inserted)
 
-    def get_by_id(self, element_id: int) -> dict[str, Any] | None:
+    def delete_by_document(self, doc_id: int) -> RepositoryResult:
         with self._connection_provider() as connection:
             result = connection.execute(
-                text("SELECT * FROM elements WHERE id = :id"),
-                {"id": element_id},
+                text(f"DELETE FROM {self.table_name} WHERE doc_id = :doc_id"),
+                {"doc_id": doc_id},
             )
-            return row_to_dict(result)
+        return RepositoryResult(rows=None, rowcount=result.rowcount)
 
     def list_by_document(self, doc_id: int) -> list[dict[str, Any]]:
         with self._connection_provider() as connection:
             result = connection.execute(
                 text(
-                    "SELECT * FROM elements WHERE doc_id = :doc_id "
-                    "ORDER BY `order` ASC",
+                    f"SELECT * FROM {self.table_name} WHERE doc_id = :doc_id ORDER BY `order` ASC",
                 ),
                 {"doc_id": doc_id},
             )
-            return rows_to_dicts(result)
+            rows = rows_to_dicts(result)
+        for row in rows:
+            row["elem_ids"] = self._deserialize_elem_ids(row.get("elem_ids"))
+        return rows
 
-    def list_by_ids(self, element_ids: Iterable[int]) -> list[dict[str, Any]]:
-        normalized = [int(elem_id) for elem_id in dict.fromkeys(element_ids) if elem_id is not None]
+    def list_by_ids(self, chunk_ids: Iterable[int]) -> list[dict[str, Any]]:
+        normalized = [int(chunk_id) for chunk_id in dict.fromkeys(chunk_ids) if chunk_id is not None]
         if not normalized:
             return []
         query = text(
-            "SELECT id, doc_id, page_no, bbox_json, elem_type, text_content, raw_text_content, text_caption, image_base64, level_nav "
-            "FROM elements WHERE id IN :ids",
+            f"SELECT * FROM {self.table_name} WHERE id IN :ids",
         ).bindparams(bindparam("ids", expanding=True))
         with self._connection_provider() as connection:
             result = connection.execute(query, {"ids": normalized})
             rows = rows_to_dicts(result)
         for row in rows:
-            row["bbox"] = self._safe_json_loads(row.pop("bbox_json", None))
+            row["elem_ids"] = self._deserialize_elem_ids(row.get("elem_ids"))
         return rows
-
-    def update_element(self, element_id: int, **fields: Any) -> RepositoryResult:
-        payload = {key: value for key, value in fields.items() if key in self.writable_fields}
-        if not payload:
-            return RepositoryResult(rows=[], rowcount=0)
-        sql, params = dict_to_update(self.table_name, payload, "id = :target_id")
-        params["target_id"] = element_id
-        with self._connection_provider() as connection:
-            result = connection.execute(text(sql), params)
-        return RepositoryResult(rows=None, rowcount=result.rowcount)
-
-    def delete_by_document(self, doc_id: int) -> RepositoryResult:
-        with self._connection_provider() as connection:
-            result = connection.execute(
-                text("DELETE FROM elements WHERE doc_id = :doc_id"),
-                {"doc_id": doc_id},
-            )
-        return RepositoryResult(rows=None, rowcount=result.rowcount)
 
     def list_unembedded(
         self,
@@ -148,46 +115,51 @@ class ElementsRepository:
         limit: int = 100,
         collection_id: int | None = None,
         doc_id: int | None = None,
+        chunk_types: set[str] | None = None,
     ) -> list[dict[str, Any]]:
         sql = [
-            "SELECT e.id, e.doc_id, e.elem_type, e.text_content, e.text_caption, e.image_base64 ",
-            "FROM elements e ",
-            "JOIN documents d ON e.doc_id = d.id ",
-            "WHERE e.vec_embedding IS NULL",
+            "SELECT id, doc_id, collection_id, chunk_type, chunk_text_main, elem_ids, page_start, page_end ",
+            f"FROM {self.table_name} ",
+            "WHERE vec_embedding IS NULL",
         ]
         params: dict[str, Any] = {"limit": limit}
         if collection_id is not None:
-            sql.append(" AND d.collection_id = :collection_id")
+            sql.append(" AND collection_id = :collection_id")
             params["collection_id"] = collection_id
         if doc_id is not None:
-            sql.append(" AND e.doc_id = :doc_id")
+            sql.append(" AND doc_id = :doc_id")
             params["doc_id"] = doc_id
-        sql.append(" ORDER BY e.doc_id ASC, e.`order` ASC LIMIT :limit")
+        if chunk_types:
+            sql.append(" AND chunk_type IN :chunk_types")
+            params["chunk_types"] = tuple(chunk_types)
+        sql.append(" ORDER BY doc_id ASC, `order` ASC LIMIT :limit")
         query = "".join(sql)
         with self._connection_provider() as connection:
             result = connection.execute(text(query), params)
-        return rows_to_dicts(result)
+            rows = rows_to_dicts(result)
+        for row in rows:
+            row["elem_ids"] = self._deserialize_elem_ids(row.get("elem_ids"))
+        return rows
 
     def update_embeddings(self, embeddings: Mapping[int, Sequence[float]]) -> RepositoryResult:
         if not embeddings:
             return RepositoryResult(rows=None, rowcount=0)
-        for element_id, vector in embeddings.items():
+        for chunk_id, vector in embeddings.items():
             if len(vector) != VECTOR_DIM:
                 raise ValueError(
-                    f"Embedding dimension mismatch for element {element_id}: "
-                    f"{len(vector)} != {VECTOR_DIM}",
+                    f"Embedding dimension mismatch for chunk {chunk_id}: {len(vector)} != {VECTOR_DIM}",
                 )
         sql = text(
             f"UPDATE {self.table_name} "
             f"SET vec_embedding = :vec_embedding "
-            "WHERE id = :element_id",
+            "WHERE id = :chunk_id",
         )
         payloads = [
             {
                 "vec_embedding": self._serialize_vector(vector),
-                "element_id": element_id,
+                "chunk_id": chunk_id,
             }
-            for element_id, vector in embeddings.items()
+            for chunk_id, vector in embeddings.items()
         ]
         with self._connection_provider() as connection:
             result = connection.execute(sql, payloads)
@@ -200,7 +172,8 @@ class ElementsRepository:
         query_vec: Sequence[float],
         k: int = 5,
         doc_id: int | None = None,
-        elem_types: set[str] | None = None,
+        chunk_types: set[str] | None = None,
+        page_filters: Sequence[tuple[int, int]] | None = None,
         max_candidates: int | None = 2000,
     ) -> list[dict[str, Any]]:
         if len(query_vec) != VECTOR_DIM:
@@ -211,11 +184,13 @@ class ElementsRepository:
             require_vector=True,
             limit=max_candidates,
         )
-        normalized_types = {entry.lower() for entry in elem_types} if elem_types else None
-        scored: list[dict[str, Any]] = []
+        normalized_types = {entry.lower() for entry in chunk_types} if chunk_types else None
+        results: list[dict[str, Any]] = []
         for row in candidates:
-            elem_type = (row.get("elem_type") or "").lower()
-            if normalized_types and elem_type not in normalized_types:
+            chunk_type = (row.get("chunk_type") or "").lower()
+            if normalized_types and chunk_type not in normalized_types:
+                continue
+            if page_filters and not self._match_page_filters(row, page_filters):
                 continue
             vector = self._deserialize_vector(row.get("vec_embedding"))
             if not vector or len(vector) != len(query_vec):
@@ -223,20 +198,9 @@ class ElementsRepository:
             score = self._cosine_similarity(query_vec, vector)
             if score is None:
                 continue
-            scored.append(
-                {
-                    "element_id": row["id"],
-                    "doc_id": row["doc_id"],
-                    "collection_id": row["collection_id"],
-                    "page_no": row.get("page_no"),
-                    "bbox": self._safe_json_loads(row.get("bbox_json")),
-                    "elem_type": elem_type,
-                    "score": score,
-                    "text_content": row.get("text_content"),
-                },
-            )
-        scored.sort(key=lambda item: item["score"], reverse=True)
-        return scored[:k]
+            results.append(self._format_row(row, score=score))
+        results.sort(key=lambda item: item["score"], reverse=True)
+        return results[:k]
 
     def search_fulltext(
         self,
@@ -245,7 +209,8 @@ class ElementsRepository:
         query: str,
         k: int = 5,
         doc_id: int | None = None,
-        elem_types: set[str] | None = None,
+        chunk_types: set[str] | None = None,
+        page_filters: Sequence[tuple[int, int]] | None = None,
         max_candidates: int | None = 1000,
     ) -> list[dict[str, Any]]:
         query = (query or "").strip()
@@ -258,37 +223,21 @@ class ElementsRepository:
             require_vector=False,
             limit=max_candidates,
         )
-        normalized_types = {entry.lower() for entry in elem_types} if elem_types else None
+        normalized_types = {entry.lower() for entry in chunk_types} if chunk_types else None
         matches: list[dict[str, Any]] = []
         for row in candidates:
-            elem_type = (row.get("elem_type") or "").lower()
-            if normalized_types and elem_type not in normalized_types:
+            chunk_type = (row.get("chunk_type") or "").lower()
+            if normalized_types and chunk_type not in normalized_types:
                 continue
-            text_blob = " ".join(
-                part.strip()
-                for part in [
-                    row.get("text_content") or "",
-                    row.get("text_caption") or "",
-                ]
-                if part
-            )
+            if page_filters and not self._match_page_filters(row, page_filters):
+                continue
+            text_blob = (row.get("chunk_text_main") or "").strip()
             lowered = text_blob.lower()
             count = lowered.count(normalized_query)
             if count <= 0:
                 continue
             score = count / max(1, len(lowered))
-            matches.append(
-                {
-                    "element_id": row["id"],
-                    "doc_id": row["doc_id"],
-                    "collection_id": row["collection_id"],
-                    "page_no": row.get("page_no"),
-                    "bbox": self._safe_json_loads(row.get("bbox_json")),
-                    "elem_type": elem_type,
-                    "score": float(score),
-                    "text_content": row.get("text_content"),
-                },
-            )
+            matches.append(self._format_row(row, score=float(score)))
         matches.sort(key=lambda item: item["score"], reverse=True)
         return matches[:k]
 
@@ -300,7 +249,8 @@ class ElementsRepository:
         query_vec: Sequence[float],
         k: int = 5,
         doc_id: int | None = None,
-        elem_types: set[str] | None = None,
+        chunk_types: set[str] | None = None,
+        page_filters: Sequence[tuple[int, int]] | None = None,
         vector_weight: float = 0.65,
         fulltext_weight: float = 0.35,
         max_candidates: int | None = 200,
@@ -316,7 +266,8 @@ class ElementsRepository:
             query_vec=query_vec,
             k=candidate_limit,
             doc_id=doc_id,
-            elem_types=elem_types,
+            chunk_types=chunk_types,
+            page_filters=page_filters,
             max_candidates=max_candidates,
         )
         fulltext_rows = self.search_fulltext(
@@ -324,22 +275,23 @@ class ElementsRepository:
             query=query,
             k=candidate_limit,
             doc_id=doc_id,
-            elem_types=elem_types,
+            chunk_types=chunk_types,
+            page_filters=page_filters,
             max_candidates=max_candidates,
         )
         max_fulltext_score = max((float(row.get("score") or 0.0) for row in fulltext_rows), default=0.0)
-        vector_map = {int(row["element_id"]): row for row in vector_rows}
-        fulltext_map = {int(row["element_id"]): row for row in fulltext_rows}
+        vector_map = {int(row["chunk_id"]): row for row in vector_rows}
+        fulltext_map = {int(row["chunk_id"]): row for row in fulltext_rows}
         combined: dict[int, dict[str, Any]] = {}
-        for elem_id, row in vector_map.items():
-            combined[elem_id] = {
+        for chunk_id, row in vector_map.items():
+            combined[chunk_id] = {
                 **row,
                 "vector_score": float(row.get("score") or 0.0),
             }
-        for elem_id, row in fulltext_map.items():
-            payload = combined.get(elem_id, {**row})
+        for chunk_id, row in fulltext_map.items():
+            payload = combined.get(chunk_id, {**row})
             payload["fulltext_score"] = float(row.get("score") or 0.0)
-            combined[elem_id] = payload
+            combined[chunk_id] = payload
 
         def _normalize_vector_score(score: float | None) -> float | None:
             if score is None:
@@ -356,7 +308,6 @@ class ElementsRepository:
 
         def _blend_scores(vector_score: float | None, text_score: float | None) -> float | None:
             weights = []
-            total = 0.0
             blended = 0.0
             if vector_score is not None:
                 weights.append(vector_weight)
@@ -370,7 +321,7 @@ class ElementsRepository:
             return blended / total
 
         scored_results: list[dict[str, Any]] = []
-        for elem_id, payload in combined.items():
+        for chunk_id, payload in combined.items():
             vector_score = _normalize_vector_score(payload.get("vector_score"))
             text_score = _normalize_fulltext_score(payload.get("fulltext_score"), max_score=max_fulltext_score)
             blended_score = _blend_scores(vector_score, text_score)
@@ -391,26 +342,25 @@ class ElementsRepository:
         limit: int | None,
     ) -> list[dict[str, Any]]:
         sql_parts = [
-            "SELECT e.id, e.doc_id, d.collection_id, e.page_no, e.bbox_json, ",
-            "e.elem_type, e.text_content, e.text_caption, e.image_base64, e.vec_embedding ",
-            "FROM elements e ",
-            "JOIN documents d ON e.doc_id = d.id ",
-            "WHERE d.collection_id = :collection_id",
+            "SELECT * FROM chunks WHERE collection_id = :collection_id",
         ]
         params: dict[str, Any] = {"collection_id": collection_id}
         if doc_id is not None:
-            sql_parts.append(" AND e.doc_id = :doc_id")
+            sql_parts.append(" AND doc_id = :doc_id")
             params["doc_id"] = doc_id
         if require_vector:
-            sql_parts.append(" AND e.vec_embedding IS NOT NULL")
-        sql_parts.append(" ORDER BY e.doc_id ASC, e.`order` ASC")
+            sql_parts.append(" AND vec_embedding IS NOT NULL")
+        sql_parts.append(" ORDER BY doc_id ASC, `order` ASC")
         if limit is not None:
             sql_parts.append(" LIMIT :limit")
             params["limit"] = limit
         query = "".join(sql_parts)
         with self._connection_provider() as connection:
             result = connection.execute(text(query), params)
-        return rows_to_dicts(result)
+        rows = rows_to_dicts(result)
+        for row in rows:
+            row["elem_ids"] = self._deserialize_elem_ids(row.get("elem_ids"))
+        return rows
 
     @staticmethod
     def _serialize_vector(vector: Sequence[float]) -> str:
@@ -432,6 +382,35 @@ class ElementsRepository:
         if not isinstance(parsed, list):
             return None
         return [float(value) for value in parsed]
+
+    @staticmethod
+    def _serialize_elem_ids(elem_ids: Any) -> str | None:
+        if elem_ids is None:
+            return None
+        if isinstance(elem_ids, str):
+            return elem_ids
+        if not isinstance(elem_ids, Iterable):
+            return None
+        normalized = [int(elem_id) for elem_id in dict.fromkeys(elem_ids) if elem_id is not None]
+        if not normalized:
+            return None
+        return json.dumps(normalized, separators=(",", ":"))
+
+    @staticmethod
+    def _deserialize_elem_ids(raw_value: Any) -> list[int]:
+        if raw_value is None:
+            return []
+        if isinstance(raw_value, (list, tuple)):
+            return [int(value) for value in raw_value if value is not None]
+        if isinstance(raw_value, (bytes, bytearray)):
+            raw_value = raw_value.decode("utf-8")
+        try:
+            parsed = json.loads(raw_value)
+        except (TypeError, json.JSONDecodeError):
+            return []
+        if not isinstance(parsed, list):
+            return []
+        return [int(value) for value in parsed if value is not None]
 
     @staticmethod
     def _safe_json_loads(raw_value: Any) -> Any:
@@ -458,3 +437,35 @@ class ElementsRepository:
         if norm_a == 0.0 or norm_b == 0.0:
             return None
         return dot / math.sqrt(norm_a * norm_b)
+
+    def _match_page_filters(self, row: Mapping[str, Any], filters: Sequence[tuple[int, int]]) -> bool:
+        if not filters:
+            return True
+        doc_id = int(row.get("doc_id") or 0)
+        page_start = row.get("page_start")
+        page_end = row.get("page_end")
+        for filter_doc, page_no in filters:
+            if filter_doc != doc_id:
+                continue
+            if page_start is not None and page_end is not None:
+                if int(page_start) <= page_no <= int(page_end):
+                    return True
+        return False
+
+    def _format_row(self, row: Mapping[str, Any], *, score: float) -> dict[str, Any]:
+        return {
+            "chunk_id": int(row["id"]),
+            "doc_id": int(row["doc_id"]),
+            "collection_id": int(row["collection_id"]),
+            "order": row.get("order"),
+            "level_nav": row.get("level_nav"),
+            "chunk_type": (row.get("chunk_type") or "").lower(),
+            "chunk_text_main": row.get("chunk_text_main"),
+            "elem_ids": self._deserialize_elem_ids(row.get("elem_ids")),
+            "page_start": row.get("page_start"),
+            "page_end": row.get("page_end"),
+            "score": float(score),
+        }
+
+
+__all__ = ["ChunksRepository"]
