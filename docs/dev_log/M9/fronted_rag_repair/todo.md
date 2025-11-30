@@ -1,0 +1,3 @@
+当前Page-Chunk的2级检索逻辑修改基本正确。
+但原有版本的Document页面和Collection页面检索是针对element的，但是现有系统已经把检索对象改成了Chunk，检索接口直接返回的内容是Chunk，不是element，所以这2部分的接口也要做相应的调整，主要是前端应该改为显示Chunk。
+请你按照上述要求进行修改。

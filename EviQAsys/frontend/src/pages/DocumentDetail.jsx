@@ -45,6 +45,20 @@ function truncate(text, max = 160) {
     return text.length > max ? `${text.slice(0, max)}...` : text
 }
 
+function formatScore(score, fractionDigits = 3) {
+    const value = Number(score)
+    return Number.isFinite(value) ? value.toFixed(fractionDigits) : "--"
+}
+
+function formatPageLabel(start, end) {
+    if (start == null && end == null) return ""
+    const startPage = start ?? end
+    const endPage = end ?? start
+    if (startPage == null && endPage == null) return ""
+    if (startPage === endPage) return `p${startPage}`
+    return `p${startPage}-${endPage}`
+}
+
 export default function DocumentDetail() {
     const { documentId, collectionId: collectionIdFromRoute } = useParams()
     const navigate = useNavigate()
@@ -217,6 +231,13 @@ export default function DocumentDetail() {
             : "Document 元信息、Abstract 展示、聊天历史与 Document-RAG"
     const parseStatus = document?.parse_status ?? ((document?.element_count || 0) > 0 ? "parsed" : "uploaded")
     const metaInfoText = document?.meta_info ? JSON.stringify(document.meta_info) : "暂无 meta_info"
+    const selectedChunkText = selectedResult?.chunk_text_main ?? selectedResult?.text_content ?? ""
+    const selectedPageLabel = selectedResult
+        ? formatPageLabel(selectedResult.page_start, selectedResult.page_end)
+        : ""
+    const selectedChunkType = selectedResult?.chunk_type ?? selectedResult?.elem_type ?? "chunk"
+    const selectedChunkId = selectedResult?.chunk_id ?? selectedResult?.element_id
+    const selectedElemCount = Array.isArray(selectedResult?.elem_ids) ? selectedResult.elem_ids.length : 0
 
     return (
         <>
@@ -333,7 +354,7 @@ export default function DocumentDetail() {
                                 rows={3}
                                 value={ragQuery}
                                 onChange={(event) => setRagQuery(event.target.value)}
-                                placeholder="输入关键词或问题，检索当前 document 的元素"
+                                placeholder="输入关键词或问题，检索当前 document 的 chunk"
                             ></textarea>
                             <div className="segmented-control">
                                 {retrievalModes.map((mode) => (
@@ -368,25 +389,39 @@ export default function DocumentDetail() {
                                 <div className="empty-state">输入关键词后展示文档级检索结果。</div>
                             ) : (
                                 <div className="list">
-                                    {ragResults.map((item) => (
-                                        <div key={`${item.element_id}-${item.doc_id}`} className="list-item rag-item">
-                                            <div className="rag-item__meta">
-                                                <span className="pill muted">Elem #{item.element_id}</span>
-                                                <span className="pill muted">Doc #{item.doc_id}</span>
-                                                <span className="pill muted">{item.elem_type}</span>
-                                                <span className="pill muted">score {item.score.toFixed(3)}</span>
+                                    {ragResults.map((item, index) => {
+                                        const chunkId = item.chunk_id ?? item.element_id ?? item.id ?? index
+                                        const chunkType = item.chunk_type ?? item.elem_type ?? "chunk"
+                                        const chunkText = item.chunk_text_main ?? item.text_content ?? ""
+                                        const pageLabel = formatPageLabel(item.page_start, item.page_end)
+                                        const elemCount = Array.isArray(item.elem_ids) ? item.elem_ids.length : 0
+                                        return (
+                                            <div
+                                                key={`${chunkId ?? index}-${item.doc_id ?? "doc"}`}
+                                                className="list-item rag-item"
+                                            >
+                                                <div className="rag-item__meta">
+                                                    <span className="pill muted">Chunk #{chunkId}</span>
+                                                    <span className="pill muted">Doc #{item.doc_id ?? "--"}</span>
+                                                    <span className="pill muted">{chunkType}</span>
+                                                    {pageLabel && <span className="pill muted">{pageLabel}</span>}
+                                                    {elemCount ? (
+                                                        <span className="pill muted">{elemCount} elems</span>
+                                                    ) : null}
+                                                    <span className="pill muted">score {formatScore(item.score)}</span>
+                                                </div>
+                                                <p className="caption">{truncate(chunkText, 220) || "无文本内容"}</p>
+                                                <div className="rag-item__actions">
+                                                    <Button variant="ghost" onClick={() => setSelectedResult(item)}>
+                                                        查看全文
+                                                    </Button>
+                                                    <Button variant="ghost" onClick={() => handleCopy(chunkText)}>
+                                                        复制
+                                                    </Button>
+                                                </div>
                                             </div>
-                                            <p className="caption">{truncate(item.text_content, 220) || "无文本内容"}</p>
-                                            <div className="rag-item__actions">
-                                                <Button variant="ghost" onClick={() => setSelectedResult(item)}>
-                                                    查看全文
-                                                </Button>
-                                                <Button variant="ghost" onClick={() => handleCopy(item.text_content)}>
-                                                    复制
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -460,23 +495,41 @@ export default function DocumentDetail() {
                 {selectedResult && (
                     <div className="stack">
                         <div className="inline-kv">
-                            <strong>Element</strong>
-                            <span className="caption">#{selectedResult.element_id}</span>
+                            <strong>Chunk</strong>
+                            <span className="caption">#{selectedChunkId ?? "--"}</span>
                         </div>
                         <div className="inline-kv">
                             <strong>Document</strong>
-                            <span className="caption">#{selectedResult.doc_id}</span>
+                            <span className="caption">#{selectedResult.doc_id ?? "--"}</span>
                         </div>
                         <div className="inline-kv">
                             <strong>Score</strong>
-                            <span className="caption">{selectedResult.score?.toFixed(4)}</span>
+                            <span className="caption">{formatScore(selectedResult.score, 4)}</span>
                         </div>
                         <div className="inline-kv">
                             <strong>类型</strong>
-                            <span className="caption">{selectedResult.elem_type}</span>
+                            <span className="caption">{selectedChunkType}</span>
                         </div>
-                        <div className="code-block">{selectedResult.text_content || "无文本内容"}</div>
-                        <Button onClick={() => handleCopy(selectedResult.text_content)}>复制文本</Button>
+                        {selectedPageLabel && (
+                            <div className="inline-kv">
+                                <strong>页码</strong>
+                                <span className="caption">{selectedPageLabel}</span>
+                            </div>
+                        )}
+                        {selectedResult.level_nav && (
+                            <div className="inline-kv">
+                                <strong>导航</strong>
+                                <span className="caption">{selectedResult.level_nav}</span>
+                            </div>
+                        )}
+                        {selectedElemCount ? (
+                            <div className="inline-kv">
+                                <strong>关联元素</strong>
+                                <span className="caption">{selectedElemCount} 个元素</span>
+                            </div>
+                        ) : null}
+                        <div className="code-block">{selectedChunkText || "无文本内容"}</div>
+                        <Button onClick={() => handleCopy(selectedChunkText)}>复制文本</Button>
                     </div>
                 )}
             </Drawer>
