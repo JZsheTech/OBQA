@@ -120,7 +120,6 @@ class OceanBaseSettings:
 DB_CHARSET: str = _get_env("DB_CHARSET", "utf8mb4")
 VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 2048)
 INGEST_BATCH_SIZE: int = _get_int_env("BATCH_SIZE", 32)
-ELEMENT_CONTEXT_OVERLAP: int = _get_int_env("ELEMENT_CONTEXT_OVERLAP", 1)
 EVIDENCE_PROMPT_CHAR_LIMIT: int = _get_int_env("EVIDENCE_PROMPT_CHAR_LIMIT", 2560)
 OLLAMA_PROTOCOL: str = _get_env("OLLAMA_PROTOCOL", "http")
 OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
@@ -132,6 +131,7 @@ DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4.1-
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
 DEFAULT_VLSION_MODEL = _get_env("DEFAULT_VLSION_MODEL", "x-ai/grok-4-fast")
 MIN_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MIN_CHARACTOR_CHUNK_SIZE", 480)
+MAX_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MAX_CHARACTOR_CHUNK_SIZE", 1200)
 MAX_ELEM_CHUNK_SIZE: int = _get_int_env("MAX_ELEM_CHUNK_SIZE", 6)
 CHUNK_SKIP_PATTERNS: tuple[str, ...] = _get_str_tuple_env(
     "CHUNK_SKIP_PATTERNS",
@@ -255,8 +255,8 @@ __all__ = [
     "DB_CHARSET",
     "VECTOR_DIM",
     "INGEST_BATCH_SIZE",
-    "ELEMENT_CONTEXT_OVERLAP",
     "MIN_CHARACTOR_CHUNK_SIZE",
+    "MAX_CHARACTOR_CHUNK_SIZE",
     "MAX_ELEM_CHUNK_SIZE",
     "CHUNK_SKIP_PATTERNS",
     "EVIDENCE_PROMPT_CHAR_LIMIT",

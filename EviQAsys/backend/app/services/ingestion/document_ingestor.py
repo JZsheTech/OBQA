@@ -10,7 +10,7 @@ from typing import Any, BinaryIO
 
 from fastapi import UploadFile
 
-from ...env_setting import ELEMENT_CONTEXT_OVERLAP, INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
+from ...env_setting import  INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
 from ...repositories import CollectionsRepository, DocumentsRepository, ElementsRepository, db_connection
 from ..integrations import MinerUAdapter
 from ..parser import normalize_element, preprocess_headers
@@ -42,8 +42,7 @@ class DocumentIngestor:
         elements_repo: ElementsRepository | None = None,
         collections_repo: CollectionsRepository | None = None,
         mineru_adapter: MinerUAdapter | None = None,
-        batch_size: int = INGEST_BATCH_SIZE,
-        element_context_overlap: int | None = None,
+        batch_size: int = INGEST_BATCH_SIZE
     ) -> None:
         self._upload_settings = upload_settings or get_upload_settings()
         self._documents_repo = documents_repo or DocumentsRepository()
@@ -51,8 +50,7 @@ class DocumentIngestor:
         self._collections_repo = collections_repo or CollectionsRepository()
         self._mineru_adapter = mineru_adapter or MinerUAdapter()
         self._batch_size = max(1, batch_size)
-        overlap = element_context_overlap if element_context_overlap is not None else ELEMENT_CONTEXT_OVERLAP
-        self._context_overlap = max(0, overlap)
+
         self._upload_root = Path(self._upload_settings.root_dir)
         self._upload_root.mkdir(parents=True, exist_ok=True)
 

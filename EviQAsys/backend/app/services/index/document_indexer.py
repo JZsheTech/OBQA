@@ -125,18 +125,19 @@ class DocumentIndexer:
             for row in pending:
                 chunk_type = (row.get("chunk_type") or "text").lower()
                 elem_ids = row.get("elem_ids") or []
-                text = (row.get("chunk_text_main") or "").strip()
+                raw_text = (row.get("chunk_text_main") or "").strip()
+                text = raw_text
                 image_payload = None
+                element: dict[str, Any] | None = None
                 if chunk_type in {"image", "table"} and elem_ids:
                     element = element_map.get(int(elem_ids[0]))
                     if element:
                         image_payload = element.get("image_base64")
-                        if not text:
-                            text = (
-                                element.get("text_caption")
-                                or element.get("raw_text_content")
-                                or ""
-                            )
+                    text = self._compose_multimodal_text(
+                        chunk_type=chunk_type,
+                        chunk_text=raw_text,
+                        element=element,
+                    )
                 try:
                     if chunk_type in {"image", "table"}:
                         if not text and not image_payload:
@@ -207,6 +208,40 @@ class DocumentIndexer:
             if len(pending) < chunk_size:
                 break
         return total
+
+    @staticmethod
+    def _compose_multimodal_text(
+        *,
+        chunk_type: str,
+        chunk_text: str,
+        element: dict[str, Any] | None,
+    ) -> str:
+        parts: list[str] = []
+        seen: set[str] = set()
+
+        def _add(value: Any) -> None:
+            text = (value or "").strip()
+            if not text:
+                return
+            if text in seen:
+                return
+            seen.add(text)
+            parts.append(text)
+
+        _add(chunk_text)
+        if element:
+            lowered = (chunk_type or "").lower()
+            if lowered == "image":
+                _add(element.get("text_caption"))
+                _add(element.get("raw_text_content"))
+                _add(element.get("text_content"))
+            elif lowered == "table":
+                _add(element.get("text_content"))
+                _add(element.get("raw_text_content"))
+                _add(element.get("text_caption"))
+            else:
+                _add(element.get("raw_text_content"))
+        return " ".join(parts).strip()
 
 
 __all__ = ["DocumentIndexer"]
