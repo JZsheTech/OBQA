@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any, Iterable, Mapping, Sequence
 
 from ...env_setting import CHUNK_SKIP_PATTERNS, MAX_CHARACTOR_CHUNK_SIZE, MIN_CHARACTOR_CHUNK_SIZE
+
+logger = logging.getLogger(__name__)
 
 
 class ChunkBuilder:
@@ -37,6 +40,7 @@ class ChunkBuilder:
         chunk_order = 0
         current_nav: str | None = None
         media_queue: list[dict[str, Any]] = []
+        trimmed_text_chunks = 0
 
         def _reset_text_state() -> None:
             nonlocal buffer_elements, buffer_texts, buffer_pages, running_chars
@@ -46,8 +50,13 @@ class ChunkBuilder:
             running_chars = 0
 
         def _append_text_chunk() -> None:
-            nonlocal chunk_order
+            nonlocal chunk_order, trimmed_text_chunks
             if not buffer_texts:
+                _reset_text_state()
+                return
+            chunk_text_main = "\n\n".join(buffer_texts).strip()
+            if len(chunk_text_main) < self._min_chars:
+                trimmed_text_chunks += 1
                 _reset_text_state()
                 return
             chunk_order += 1
@@ -60,7 +69,7 @@ class ChunkBuilder:
                     "order": chunk_order,
                     "level_nav": current_nav,
                     "chunk_type": "text",
-                    "chunk_text_main": "\n\n".join(buffer_texts).strip(),
+                    "chunk_text_main": chunk_text_main,
                     "elem_ids": elem_ids,
                     "page_start": page_start,
                     "page_end": page_end,
@@ -168,7 +177,21 @@ class ChunkBuilder:
 
         if current_nav is not None:
             _finish_section()
-        return [record for record in records if record.get("chunk_text_main") or record.get("chunk_type") in {"image", "table"}]
+        filtered_records = [
+            record
+            for record in records
+            if record.get("chunk_type") in {"image", "table"}
+            or len(record.get("chunk_text_main") or "") >= self._min_chars
+        ]
+        trimmed_total = trimmed_text_chunks + (len(records) - len(filtered_records))
+        if trimmed_total:
+            logger.info(
+                "Dropped %s text chunks below MIN_CHARACTOR_CHUNK_SIZE=%s for doc_id=%s",
+                trimmed_total,
+                self._min_chars,
+                doc_id,
+            )
+        return filtered_records
 
     def build_page_chunks(
         self,
