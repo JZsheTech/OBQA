@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import secrets
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -17,6 +18,11 @@ from ..parser import normalize_element, preprocess_headers
 from ..parser.unifier import ROOT_LEVEL_NAV
 
 logger = logging.getLogger(__name__)
+
+INLINE_ABSTRACT_PREFIX = re.compile(
+    "^\\s*abstract\\b[\\s:\\uFF1A\\-\\u2013\\u2014\\u2015\\.]+(.+)$",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass(slots=True)
@@ -364,6 +370,12 @@ class DocumentIngestor:
     def _extract_abstract_text(self, elements: list[dict[str, Any]]) -> str | None:
         if not elements:
             return None
+        header_abstract = self._extract_header_abstract(elements)
+        if header_abstract:
+            return header_abstract
+        return self._extract_inline_abstract(elements)
+
+    def _extract_header_abstract(self, elements: list[dict[str, Any]]) -> str | None:
         for idx, row in enumerate(elements):
             if row.get("elem_type") != "header":
                 continue
@@ -380,6 +392,33 @@ class DocumentIngestor:
                     return abstract_text
             return None
         return None
+
+    def _extract_inline_abstract(self, elements: list[dict[str, Any]]) -> str | None:
+        for row in elements:
+            if row.get("elem_type") != "text":
+                continue
+            page_idx = self._resolve_page_index(row)
+            if page_idx is not None and page_idx > 1:
+                # Abstracts appear at the very start; ignore later pages to avoid false positives.
+                continue
+            text_value = self._clean_body_text(
+                row.get("raw_text_content") or row.get("text_content"),
+            )
+            if not text_value:
+                continue
+            abstract_text = self._parse_inline_abstract(text_value)
+            if abstract_text:
+                return abstract_text
+        return None
+
+    def _parse_inline_abstract(self, text_value: str) -> str | None:
+        match = INLINE_ABSTRACT_PREFIX.match(text_value)
+        if not match:
+            return None
+        abstract_body = match.group(1).strip()
+        if not abstract_body:
+            return None
+        return abstract_body or None
 
 
 __all__ = ["DocumentIngestor", "DuplicateDocumentError"]
