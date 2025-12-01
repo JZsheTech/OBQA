@@ -23,6 +23,7 @@ INLINE_ABSTRACT_PREFIX = re.compile(
     "^\\s*abstract\\b[\\s:\\uFF1A\\-\\u2013\\u2014\\u2015\\.]+(.+)$",
     re.IGNORECASE | re.DOTALL,
 )
+ALLOWED_MINERU_TYPES = {"text", "image", "table", "equation"}
 
 
 @dataclass(slots=True)
@@ -200,19 +201,25 @@ class DocumentIngestor:
             raise
 
     def _filter_noise_entries(self, content_list: Any) -> list[dict[str, Any]]:
-        """Drop MinerU items that contain only '#' and whitespace."""
+        """Drop MinerU items that contain only '#' or unsupported types."""
         cleaned: list[dict[str, Any]] = []
-        skipped = 0
+        skipped_hash = 0
+        skipped_type = 0
         for entry in list(content_list or []):
             if not isinstance(entry, dict):
-                cleaned.append(entry)
+                continue
+            elem_type = (entry.get("type") or "").lower()
+            if elem_type not in ALLOWED_MINERU_TYPES:
+                skipped_type += 1
                 continue
             if self._is_hash_placeholder(entry.get("text")):
-                skipped += 1
+                skipped_hash += 1
                 continue
             cleaned.append(entry)
-        if skipped:
-            logger.info("Filtered %d MinerU items consisting of hash-only text.", skipped)
+        if skipped_type:
+            logger.info("Filtered %d MinerU items with unsupported type.", skipped_type)
+        if skipped_hash:
+            logger.info("Filtered %d MinerU items consisting of hash-only text.", skipped_hash)
         return cleaned
 
     def _calculate_num_pages(self, elements: list[dict[str, Any]]) -> int | None:
