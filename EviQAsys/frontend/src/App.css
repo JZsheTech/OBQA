@@ -1031,6 +1031,130 @@
   color: var(--color-ink);
 }
 
+.markdown-body {
+  color: var(--color-ink);
+  line-height: 1.65;
+  display: grid;
+  gap: 10px;
+  word-break: break-word;
+}
+
+.markdown-heading {
+  margin: 0;
+  color: var(--color-ink-strong);
+  letter-spacing: -0.01em;
+}
+
+.markdown-paragraph {
+  margin: 0;
+  color: inherit;
+}
+
+.markdown-list {
+  margin: 0 0 6px 1.1em;
+  padding-left: 1em;
+  display: grid;
+  gap: 6px;
+  color: inherit;
+  list-style: disc;
+}
+
+.markdown-list.ordered {
+  list-style: decimal;
+}
+
+.markdown-list__item {
+  margin-left: 2px;
+}
+
+.markdown-quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.03);
+  color: var(--color-ink-subtle);
+}
+
+.markdown-code-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--color-surface-muted);
+  border: 1px solid rgba(31, 91, 255, 0.12);
+  font-family: "SFMono-Regular", Consolas, Monaco, "Ubuntu Mono", monospace;
+  font-size: 0.95em;
+}
+
+.markdown-code-block {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow-x: auto;
+  border: 1px solid rgba(31, 91, 255, 0.18);
+}
+
+.markdown-code-block code {
+  font-family: "SFMono-Regular", Consolas, Monaco, "Ubuntu Mono", monospace;
+}
+
+.markdown-link {
+  color: var(--color-brand-strong);
+  font-weight: 700;
+}
+
+.markdown-link:hover {
+  color: #0f3fb6;
+}
+
+.markdown-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: white;
+}
+
+.markdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 360px;
+}
+
+.markdown-table__cell {
+  border: 1px solid var(--color-border);
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--color-ink);
+}
+
+.markdown-table__cell.head {
+  background: rgba(31, 91, 255, 0.04);
+  font-weight: 700;
+}
+
+.markdown-fallback {
+  margin: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-border);
+  white-space: pre-wrap;
+}
+
+.markdown-body .katex-display {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.markdown-body .evidence-tag {
+  margin: 0 4px 2px 0;
+}
+
 .evidence-tag {
   display: inline-flex;
   align-items: center;

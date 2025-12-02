@@ -10,6 +10,7 @@
 !EviQAsys/frontend/**
 !EviQAsys/backend/app/template_config.yaml
 !docs/dev_log/M2/ref_data_format/**
+!docs/dev_log/M11/M11_dev_result
 !*.sql
 !dependency/frontUI_design/**
 

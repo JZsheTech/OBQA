@@ -101,3 +101,9 @@ function remarkEvidenceTokenizer(options) {
 ### 10. 特殊事项
 - 根据系统情况自行决定 `react-markdown`、`remark` 的确切版本号及 tokenizer 接口差异需要在安装时确认。
 - 不需要在 `DocumentChat` / `CollectionChat` 之外暴露 MarkdownRenderer 供其他页面复用。
+
+### 11. 实现摘要（M11）
+- 采用 `react-markdown@10` + `remark-gfm/remark-math/remark-breaks` + `rehype-katex` 渲染，新增 `MarkdownRenderer` 组件作为唯一入口，引入 KaTeX 样式并作用域化 Markdown 样式。
+- 自定义 remark tokenizer（`evidenceReference`）识别 `Evidence #n` 与 `Elem#n`，通过 element_id→evidence_no 映射后渲染为胶囊组件；无映射时回退为普通文本。
+- `DocumentChat` / `CollectionChat` 均由 `MarkdownRenderer` 替换旧版 `EvidenceText`，复用 `handleEvidenceSelect` 高亮流程；长文本、表格、代码块均增加滚动与对比度处理。
+- 清理 `PdfHighlightDemo` 路由与页面，避免与正式聊天入口混用。
