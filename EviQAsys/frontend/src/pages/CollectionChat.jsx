@@ -363,6 +363,7 @@ export default function CollectionChat() {
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
     const [isResizing, setIsResizing] = useState(false)
     const layoutRef = useRef(null)
+    const qaDefaultsSignatureRef = useRef(null)
 
     const navigationPlugin = pageNavigationPlugin()
     const { jumpToPage } = navigationPlugin
@@ -504,9 +505,40 @@ export default function CollectionChat() {
         setShowEvidencePopover(false)
     }, [selectedDocId])
 
+    // Preserve user-tuned QA controls across turns; only re-apply when defaults actually change or chat switches.
     useEffect(() => {
+        if (!chatId) {
+            qaDefaultsSignatureRef.current = null
+            return
+        }
         const defaults = chatDetail?.qa_config_defaults
-        if (!defaults) {
+        const defaultsSignature = defaults
+            ? [
+                  defaults.use_image,
+                  defaults.text_retrieve_topk,
+                  defaults.image_retrieve_topk,
+                  defaults.text_memory_topk,
+                  defaults.image_memory_topk,
+                  defaults.use_page_in_text_retrieve,
+                  defaults.page_retrieve_topk,
+                  defaults.text_search_mode,
+              ]
+                  .map((value) => (value === undefined || value === null ? "null" : String(value)))
+                  .join("|")
+            : "no-defaults"
+        const signature = `${chatId}:${defaultsSignature}`
+        if (qaDefaultsSignatureRef.current === signature) return
+
+        if (defaults) {
+            setUseImage(Boolean(defaults.use_image))
+            setTextRetrieveTopk(String(defaults.text_retrieve_topk ?? DEFAULT_TEXT_RETRIEVE_TOPK))
+            setImageRetrieveTopk(String(defaults.image_retrieve_topk ?? DEFAULT_IMAGE_RETRIEVE_TOPK))
+            setTextMemoryTopk(String(defaults.text_memory_topk ?? DEFAULT_TEXT_MEMORY_TOPK))
+            setImageMemoryTopk(String(defaults.image_memory_topk ?? DEFAULT_IMAGE_MEMORY_TOPK))
+            setUsePageInTextRetrieve(Boolean(defaults.use_page_in_text_retrieve))
+            setPageRetrieveTopk(String(defaults.page_retrieve_topk ?? DEFAULT_PAGE_RETRIEVE_TOPK))
+            setTextSearchMode(defaults.text_search_mode || DEFAULT_TEXT_SEARCH_MODE)
+        } else {
             setUseImage(DEFAULT_USE_IMAGE)
             setTextRetrieveTopk(DEFAULT_TEXT_RETRIEVE_TOPK)
             setImageRetrieveTopk(DEFAULT_IMAGE_RETRIEVE_TOPK)
@@ -515,17 +547,9 @@ export default function CollectionChat() {
             setUsePageInTextRetrieve(DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE)
             setPageRetrieveTopk(DEFAULT_PAGE_RETRIEVE_TOPK)
             setTextSearchMode(DEFAULT_TEXT_SEARCH_MODE)
-            return
         }
-        setUseImage(Boolean(defaults.use_image))
-        setTextRetrieveTopk(String(defaults.text_retrieve_topk ?? DEFAULT_TEXT_RETRIEVE_TOPK))
-        setImageRetrieveTopk(String(defaults.image_retrieve_topk ?? DEFAULT_IMAGE_RETRIEVE_TOPK))
-        setTextMemoryTopk(String(defaults.text_memory_topk ?? DEFAULT_TEXT_MEMORY_TOPK))
-        setImageMemoryTopk(String(defaults.image_memory_topk ?? DEFAULT_IMAGE_MEMORY_TOPK))
-        setUsePageInTextRetrieve(Boolean(defaults.use_page_in_text_retrieve))
-        setPageRetrieveTopk(String(defaults.page_retrieve_topk ?? DEFAULT_PAGE_RETRIEVE_TOPK))
-        setTextSearchMode(defaults.text_search_mode || DEFAULT_TEXT_SEARCH_MODE)
-    }, [chatDetail?.qa_config_defaults])
+        qaDefaultsSignatureRef.current = signature
+    }, [chatDetail, chatId])
 
     function resetQaControls() {
         const defaults = chatDetail?.qa_config_defaults
@@ -983,23 +1007,54 @@ export default function CollectionChat() {
                         <div
                             style={{
                                 display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
                                 gap: "12px",
+                                alignItems: "start",
                             }}
                         >
                             <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="use-image-switch">
-                                    启用图片路径
-                                </label>
-                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                                <label
+                                    className="inline-kv"
+                                    style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                                >
                                     <input
                                         id="use-image-switch"
                                         type="checkbox"
                                         checked={useImage}
                                         onChange={(event) => setUseImage(event.target.checked)}
                                     />
-                                    <span className="caption">use_image</span>
+                                    <span className="caption">启用图片路径</span>
                                 </label>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label
+                                    className="caption"
+                                    htmlFor="page-toggle"
+                                    style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}
+                                >
+                                    <span>页级过滤</span>
+                                    <input
+                                        id="page-toggle"
+                                        type="checkbox"
+                                        checked={usePageInTextRetrieve}
+                                        onChange={(event) => setUsePageInTextRetrieve(event.target.checked)}
+                                    />
+                                </label>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="page-topk-input">
+                                    按页检索topk-page-chunk
+                                </label>
+                                <input
+                                    id="page-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={pageRetrieveTopk}
+                                    onChange={(event) => setPageRetrieveTopk(event.target.value)}
+                                    placeholder="按页检索topk-page-chunk"
+                                />
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="search-mode-select">
@@ -1017,32 +1072,8 @@ export default function CollectionChat() {
                                 </select>
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="page-toggle">
-                                    页级过滤
-                                </label>
-                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                                    <input
-                                        id="page-toggle"
-                                        type="checkbox"
-                                        checked={usePageInTextRetrieve}
-                                        onChange={(event) => setUsePageInTextRetrieve(event.target.checked)}
-                                    />
-                                    <span className="caption">use_page_in_text_retrieve</span>
-                                </label>
-                                <input
-                                    id="page-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={pageRetrieveTopk}
-                                    onChange={(event) => setPageRetrieveTopk(event.target.value)}
-                                    placeholder="Page TopK（空则使用后端默认）"
-                                />
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="text-retrieve-topk-input">
-                                    文本检索 TopK
+                                    文本检索topK-chunk
                                 </label>
                                 <input
                                     id="text-retrieve-topk-input"
@@ -1057,7 +1088,7 @@ export default function CollectionChat() {
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="image-retrieve-topk-input">
-                                    图片检索 TopK
+                                    图片检索topK-chunk
                                 </label>
                                 <input
                                     id="image-retrieve-topk-input"
@@ -1070,9 +1101,19 @@ export default function CollectionChat() {
                                     placeholder="默认 2"
                                 />
                             </div>
+                        </div>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                                gap: "12px",
+                                alignItems: "start",
+                                marginTop: "8px",
+                            }}
+                        >
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="text-memory-topk-input">
-                                    记忆文本 TopK
+                                    记忆文本topK-element
                                 </label>
                                 <input
                                     id="text-memory-topk-input"
@@ -1087,7 +1128,7 @@ export default function CollectionChat() {
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="image-memory-topk-input">
-                                    记忆图片 TopK
+                                    记忆图片topK-element
                                 </label>
                                 <input
                                     id="image-memory-topk-input"
