@@ -1,0 +1,2 @@
+- 调整 AnswerAgent 提示词：`EviQAsys/backend/app/services/qa_flow/qa_orchestrator.py` 的 system/user prompt 增加严格引用格式（单个 `[Elem#id]`、多元素 `[Elem#id_1, Elem#id_2]`，禁止区间写法）和 Markdown/数学公式输出要求（$...$ / $$...$$）。涉及 TEXT/VISION system prompt 与文本/多模态 user prompt 片段。
+- 同步提示词文档：`docs/zh/工程细节/M10/文本answerAgent提示词.md`、`docs/zh/工程细节/M10/多模态answerAgent提示词.md` 补充相同的引用格式与 Markdown/公式规范说明，确保文档与实现一致。

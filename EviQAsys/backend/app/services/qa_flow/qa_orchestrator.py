@@ -331,21 +331,27 @@ class AnswerAgent:
         "You are AnswerAgent in an evidence-based QA system.\n\n"
         "RULES:\n"
         "1. Only answer using the provided text evidence elements.\n"
-        "2. Every evidence citation MUST use the exact format: [Elem#<id>]\n"
+        "2. Every evidence citation MUST use the exact format: [Elem#<id>]. When citing multiple elements together, use "
+        "[Elem#id_1, Elem#id_2] and NEVER use ranges like [Elem#id_0-id_3].\n"
         "3. Do NOT fabricate element_ids or content not provided.\n"
-        "4. If the question cannot be answered from provided text, say so clearly."
+        "4. If the question cannot be answered from provided text, say so clearly.\n"
+        "5. Write the final answer in Markdown; avoid formatting that conflicts with Markdown. Use $...$ for inline math "
+        "and $$...$$ for block math."
     )
 
     VISION_SYSTEM_PROMPT = (
         "You are AnswerAgent in a multimodal evidence-based QA system.\n\n"
         "RULES:\n"
         "1. Only answer using the provided evidence elements.\n"
-        "2. Every evidence citation MUST use the exact format: [Elem#<id>]\n"
+        "2. Every evidence citation MUST use the exact format: [Elem#<id>]. When citing multiple elements together, use "
+        "[Elem#id_1, Elem#id_2] and NEVER use ranges like [Elem#id_0-id_3].\n"
         "3. Do NOT fabricate element_ids or content not provided.\n"
         "4. Text and image elements are provided separately.\n"
         "5. The order of images EXACTLY matches the order of the image list the system sends to the model.\n"
         "6. When an element is relevant, cite it explicitly using [Elem#id]. Irrelevant elements should be ignored.\n"
-        "7. If the question cannot be answered from provided elements, say so clearly."
+        "7. If the question cannot be answered from provided elements, say so clearly.\n"
+        "8. Write the final answer in Markdown; avoid formatting that conflicts with Markdown. Use $...$ for inline math "
+        "and $$...$$ for block math."
     )
 
     def __init__(
@@ -449,7 +455,8 @@ class AnswerAgent:
             "# TEXT ELEMENTS\n"
             "Each text element has:\n- ElemID: [Elem#<id>]\n- Content: <text>\n\n"
             f"{text_serialized}\n\n"
-            "Please answer the question using only the provided text elements. "
+            "Please answer the question using only the provided text elements. Keep citations exact: [Elem#id] or "
+            "[Elem#id_1, Elem#id_2] (no ranges). Use Markdown formatting, $...$ for inline math, $$...$$ for block math. "
             "If the evidence is insufficient, say so clearly while keeping the [Elem#id] references accurate."
         )
 
@@ -472,7 +479,8 @@ class AnswerAgent:
             "The following list defines the EXACT order of image inputs passed to the model.\n"
             "For each image element:\n- ElemID: [Elem#<id>]\n- ImageIndex: <1-based index>\n- Caption: <caption if exists>\n\n"
             f"{image_serialized}\n\n"
-            "Please answer the question following all rules in the system message."
+            "Please answer the question following all rules in the system message. Keep citations exact: [Elem#id] or "
+            "[Elem#id_1, Elem#id_2] (no ranges). Use Markdown formatting, $...$ for inline math, $$...$$ for block math."
         )
 
     def _serialize_text_elements(self, text_elements: Sequence[CandidateElement]) -> str:
