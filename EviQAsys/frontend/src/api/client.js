@@ -12,8 +12,24 @@ export class ApiError extends Error {
 }
 
 async function parseJsonSafely(response) {
+    if (response.status === 204 || response.status === 205) {
+        return null
+    }
+
+    let rawText
     try {
-        return await response.json()
+        rawText = await response.text()
+    } catch (error) {
+        console.warn("Response is not JSON", error)
+        return null
+    }
+
+    if (!rawText) {
+        return null
+    }
+
+    try {
+        return JSON.parse(rawText)
     } catch (error) {
         console.warn("Response is not JSON", error)
         return null

@@ -99,7 +99,9 @@ function EvidenceCapsule({ evidenceNo, onSelectEvidence }) {
             type="button"
             className="evidence-tag"
             aria-label={`Evidence #${evidenceNo}`}
-            onClick={() => {
+            onClick={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
                 if (onSelectEvidence) onSelectEvidence(evidenceNo)
             }}
         >

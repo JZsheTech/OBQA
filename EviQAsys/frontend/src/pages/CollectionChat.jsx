@@ -266,6 +266,7 @@ export default function CollectionChat() {
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
     const [isResizing, setIsResizing] = useState(false)
     const layoutRef = useRef(null)
+    const chatMessagesRef = useRef(null)
     const qaDefaultsSignatureRef = useRef(null)
 
     const navigationPlugin = pageNavigationPlugin()
@@ -495,6 +496,25 @@ export default function CollectionChat() {
     const viewerKey = selectedDocId ? `doc-${selectedDocId}` : "no-doc"
     const selectedDocUrl = selectedDocId ? buildDocumentFileUrl(selectedDocId) : null
 
+    const preserveChatScroll = useCallback(() => {
+        const chatEl = chatMessagesRef.current
+        const chatScrollTop = chatEl?.scrollTop ?? null
+        const chatScrollLeft = chatEl?.scrollLeft ?? null
+        const windowScrollX = typeof window !== "undefined" ? window.scrollX : null
+        const windowScrollY = typeof window !== "undefined" ? window.scrollY : null
+        return () => {
+            if (chatEl && chatScrollTop !== null) {
+                chatEl.scrollTop = chatScrollTop
+                if (chatScrollLeft !== null) {
+                    chatEl.scrollLeft = chatScrollLeft
+                }
+            }
+            if (windowScrollX !== null && windowScrollY !== null) {
+                window.scrollTo(windowScrollX, windowScrollY)
+            }
+        }
+    }, [])
+
     async function loadCollectionDetail(targetId = collectionId) {
         if (!targetId) return
         if (collectionDetail?.id && Number(collectionDetail.id) === Number(targetId)) return
@@ -672,36 +692,44 @@ export default function CollectionChat() {
     }
 
     async function handleEvidenceSelect(evNo, turn) {
-        if (!evNo || !turn) return
-        let targetEvidence =
-            turn.evidences?.find((item) => item.evidence_no === evNo) || turn.evidences?.[0]
-        if (!targetEvidence) {
-            try {
-                const data = await getTurnEvidences(turn.id)
-                targetEvidence =
-                    data?.evidences?.find((item) => item.evidence_no === evNo) ||
-                    data?.evidences?.[0]
-            } catch (error) {
-                addToast({ type: "error", title: "拉取证据失败", message: error.message })
+        const restoreScroll = preserveChatScroll()
+        try {
+            if (!evNo || !turn) return
+            let targetEvidence =
+                turn.evidences?.find((item) => item.evidence_no === evNo) || turn.evidences?.[0]
+            if (!targetEvidence) {
+                try {
+                    const data = await getTurnEvidences(turn.id)
+                    targetEvidence =
+                        data?.evidences?.find((item) => item.evidence_no === evNo) ||
+                        data?.evidences?.[0]
+                } catch (error) {
+                    addToast({ type: "error", title: "拉取证据失败", message: error.message })
+                    return
+                }
+            }
+            if (!targetEvidence) {
+                addToast({ type: "info", title: "未找到证据", message: "该标签缺少对应的 element" })
                 return
             }
+            setSelectedEvidence(targetEvidence)
+            if (targetEvidence.document_id) {
+                setSelectedDocId(Number(targetEvidence.document_id))
+            }
+            if (targetEvidence.page_index !== null && targetEvidence.page_index !== undefined) {
+                const pageIndex = Math.max(0, Number(targetEvidence.page_index) - 1)
+                setPageForHighlight(pageIndex)
+                jumpToPage(pageIndex)
+            } else {
+                setPageForHighlight(null)
+            }
+            setShowEvidencePopover(false)
+        } finally {
+            const schedule = typeof requestAnimationFrame === "function" ? requestAnimationFrame : setTimeout
+            schedule(() => {
+                restoreScroll()
+            })
         }
-        if (!targetEvidence) {
-            addToast({ type: "info", title: "未找到证据", message: "该标签缺少对应的 element" })
-            return
-        }
-        setSelectedEvidence(targetEvidence)
-        if (targetEvidence.document_id) {
-            setSelectedDocId(Number(targetEvidence.document_id))
-        }
-        if (targetEvidence.page_index !== null && targetEvidence.page_index !== undefined) {
-            const pageIndex = Math.max(0, Number(targetEvidence.page_index) - 1)
-            setPageForHighlight(pageIndex)
-            jumpToPage(pageIndex)
-        } else {
-            setPageForHighlight(null)
-        }
-        setShowEvidencePopover(false)
     }
 
     const chatTitle = useMemo(() => {
@@ -1047,7 +1075,7 @@ export default function CollectionChat() {
                         </div>
                     </div>
 
-                    <div className="chat-messages">
+                    <div className="chat-messages" ref={chatMessagesRef}>
                         {loadingChat ? (
                             <div className="empty-state">加载聊天记录...</div>
                         ) : turns.length === 0 ? (
