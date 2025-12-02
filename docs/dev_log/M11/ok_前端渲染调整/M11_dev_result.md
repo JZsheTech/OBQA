@@ -1,5 +1,6 @@
 # M11 前端 Markdown 渲染增强交付结果
 
+已经完成并经过验收。
 ## 开发内容
 - 新增 `src/components/MarkdownRenderer.jsx`，基于 `react-markdown` + `remark-gfm/remark-math/remark-breaks/rehype-katex` 渲染 Markdown 与公式，并内置自定义 remark tokenizer，将 `Evidence #<no>` / `Elem#<id>` 解析为可点击的胶囊节点，缺失映射时降级为纯文本。
 - 调整样式（`App.css`）以作用域化 Markdown 标题、列表、代码块、表格和胶囊间距，引入 KaTeX 样式并对块级公式、表格滚动做兼容。
