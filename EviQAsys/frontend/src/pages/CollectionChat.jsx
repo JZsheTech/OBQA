@@ -263,6 +263,8 @@ export default function CollectionChat() {
     const [usePageInTextRetrieve, setUsePageInTextRetrieve] = useState(DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE)
     const [pageRetrieveTopk, setPageRetrieveTopk] = useState(DEFAULT_PAGE_RETRIEVE_TOPK)
     const [textSearchMode, setTextSearchMode] = useState(DEFAULT_TEXT_SEARCH_MODE)
+    const [qaPanelCollapsed, setQaPanelCollapsed] = useState(false)
+    const [evidenceExpanded, setEvidenceExpanded] = useState({})
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
     const [isResizing, setIsResizing] = useState(false)
     const layoutRef = useRef(null)
@@ -347,6 +349,8 @@ export default function CollectionChat() {
         setPageForHighlight(null)
         setDraftQuestion("")
         setShowEvidencePopover(false)
+        setEvidenceExpanded({})
+        setQaPanelCollapsed(false)
     }, [chatId, collectionId])
 
     useEffect(() => {
@@ -732,6 +736,14 @@ export default function CollectionChat() {
         }
     }
 
+    const toggleEvidenceVisibility = useCallback((turnId) => {
+        if (!turnId) return
+        setEvidenceExpanded((prev) => ({
+            ...prev,
+            [turnId]: !prev[turnId],
+        }))
+    }, [])
+
     const chatTitle = useMemo(() => {
         if (chatDetail?.title) return chatDetail.title
         if (chatId) return `Chat #${chatId}`
@@ -905,172 +917,153 @@ export default function CollectionChat() {
                         <span className="pill muted">{loadingChat ? "加载中..." : "M5e ready"}</span>
                     </div>
 
-                    <div
-                        className="qa-control-panel"
-                        style={{
-                            margin: "0 0 12px",
-                            padding: "12px",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            background: "#f8fafc",
-                        }}
-                    >
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "12px",
-                                marginBottom: "8px",
-                            }}
-                        >
+                    <div className={`qa-control-panel collapsible${qaPanelCollapsed ? " is-collapsed" : ""}`}>
+                        <div className="collapsible__header">
                             <div className="stack" style={{ gap: "4px" }}>
                                 <strong>QA 控制面板</strong>
                                 <span className="caption muted">
                                     仅保留检索/记忆相关可调参数：文本/图片检索 TopK、记忆 TopK、是否页级过滤与搜索模式。
                                 </span>
                             </div>
-                            <Button variant="ghost" onClick={resetQaControls} type="button">
-                                重置为默认
-                            </Button>
+                            <div className="collapsible__actions">
+                                <Button
+                                    variant="ghost"
+                                    type="button"
+                                    onClick={() => setQaPanelCollapsed((prev) => !prev)}
+                                    aria-expanded={!qaPanelCollapsed}
+                                    aria-controls="collection-qa-control-panel-body"
+                                >
+                                    {qaPanelCollapsed ? "展开" : "收起"}
+                                </Button>
+                                <Button variant="ghost" onClick={resetQaControls} type="button">
+                                    重置为默认
+                                </Button>
+                            </div>
                         </div>
 
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                                gap: "12px",
-                                alignItems: "start",
-                            }}
-                        >
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label
-                                    className="inline-kv"
-                                    style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                                >
+                        <div className="collapsible__body" id="collection-qa-control-panel-body">
+                            <div className="qa-control-panel__grid">
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label
+                                        className="inline-kv"
+                                        style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
+                                    >
+                                        <input
+                                            id="use-image-switch"
+                                            type="checkbox"
+                                            checked={useImage}
+                                            onChange={(event) => setUseImage(event.target.checked)}
+                                        />
+                                        <span className="caption">启用图片路径</span>
+                                    </label>
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label
+                                        className="caption"
+                                        htmlFor="page-toggle"
+                                        style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}
+                                    >
+                                        <span>页级过滤</span>
+                                        <input
+                                            id="page-toggle"
+                                            type="checkbox"
+                                            checked={usePageInTextRetrieve}
+                                            onChange={(event) => setUsePageInTextRetrieve(event.target.checked)}
+                                        />
+                                    </label>
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="page-topk-input">
+                                        按页检索topk-page-chunk
+                                    </label>
                                     <input
-                                        id="use-image-switch"
-                                        type="checkbox"
-                                        checked={useImage}
-                                        onChange={(event) => setUseImage(event.target.checked)}
+                                        id="page-topk-input"
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={pageRetrieveTopk}
+                                        onChange={(event) => setPageRetrieveTopk(event.target.value)}
+                                        placeholder="按页检索topk-page-chunk"
                                     />
-                                    <span className="caption">启用图片路径</span>
-                                </label>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label
-                                    className="caption"
-                                    htmlFor="page-toggle"
-                                    style={{ display: "flex", alignItems: "center", gap: "8px", margin: 0 }}
-                                >
-                                    <span>页级过滤</span>
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="search-mode-select">
+                                        文本检索模式
+                                    </label>
+                                    <select
+                                        id="search-mode-select"
+                                        className="search-bar__select"
+                                        value={textSearchMode}
+                                        onChange={(event) => setTextSearchMode(event.target.value)}
+                                    >
+                                        <option value="hybrid">混合</option>
+                                        <option value="vector">向量</option>
+                                        <option value="fulltext">全文</option>
+                                    </select>
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="text-retrieve-topk-input">
+                                        文本检索topK-chunk
+                                    </label>
                                     <input
-                                        id="page-toggle"
-                                        type="checkbox"
-                                        checked={usePageInTextRetrieve}
-                                        onChange={(event) => setUsePageInTextRetrieve(event.target.checked)}
+                                        id="text-retrieve-topk-input"
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={textRetrieveTopk}
+                                        onChange={(event) => setTextRetrieveTopk(event.target.value)}
+                                        placeholder="默认 8"
                                     />
-                                </label>
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="image-retrieve-topk-input">
+                                        图片检索topK-chunk
+                                    </label>
+                                    <input
+                                        id="image-retrieve-topk-input"
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={imageRetrieveTopk}
+                                        onChange={(event) => setImageRetrieveTopk(event.target.value)}
+                                        placeholder="默认 2"
+                                    />
+                                </div>
                             </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="page-topk-input">
-                                    按页检索topk-page-chunk
-                                </label>
-                                <input
-                                    id="page-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={pageRetrieveTopk}
-                                    onChange={(event) => setPageRetrieveTopk(event.target.value)}
-                                    placeholder="按页检索topk-page-chunk"
-                                />
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="search-mode-select">
-                                    文本检索模式
-                                </label>
-                                <select
-                                    id="search-mode-select"
-                                    className="search-bar__select"
-                                    value={textSearchMode}
-                                    onChange={(event) => setTextSearchMode(event.target.value)}
-                                >
-                                    <option value="hybrid">混合</option>
-                                    <option value="vector">向量</option>
-                                    <option value="fulltext">全文</option>
-                                </select>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="text-retrieve-topk-input">
-                                    文本检索topK-chunk
-                                </label>
-                                <input
-                                    id="text-retrieve-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={textRetrieveTopk}
-                                    onChange={(event) => setTextRetrieveTopk(event.target.value)}
-                                    placeholder="默认 8"
-                                />
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="image-retrieve-topk-input">
-                                    图片检索topK-chunk
-                                </label>
-                                <input
-                                    id="image-retrieve-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={imageRetrieveTopk}
-                                    onChange={(event) => setImageRetrieveTopk(event.target.value)}
-                                    placeholder="默认 2"
-                                />
-                            </div>
-                        </div>
-                        <div
-                            style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                                gap: "12px",
-                                alignItems: "start",
-                                marginTop: "8px",
-                            }}
-                        >
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="text-memory-topk-input">
-                                    记忆文本topK-element
-                                </label>
-                                <input
-                                    id="text-memory-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={textMemoryTopk}
-                                    onChange={(event) => setTextMemoryTopk(event.target.value)}
-                                    placeholder="默认 4"
-                                />
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="image-memory-topk-input">
-                                    记忆图片topK-element
-                                </label>
-                                <input
-                                    id="image-memory-topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={imageMemoryTopk}
-                                    onChange={(event) => setImageMemoryTopk(event.target.value)}
-                                    placeholder="默认 1"
-                                />
+                            <div className="qa-control-panel__grid qa-control-panel__grid--wide">
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="text-memory-topk-input">
+                                        记忆文本topK-element
+                                    </label>
+                                    <input
+                                        id="text-memory-topk-input"
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={textMemoryTopk}
+                                        onChange={(event) => setTextMemoryTopk(event.target.value)}
+                                        placeholder="默认 4"
+                                    />
+                                </div>
+                                <div className="stack" style={{ gap: "4px" }}>
+                                    <label className="caption" htmlFor="image-memory-topk-input">
+                                        记忆图片topK-element
+                                    </label>
+                                    <input
+                                        id="image-memory-topk-input"
+                                        className="input"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={imageMemoryTopk}
+                                        onChange={(event) => setImageMemoryTopk(event.target.value)}
+                                        placeholder="默认 1"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1081,54 +1074,82 @@ export default function CollectionChat() {
                         ) : turns.length === 0 ? (
                             <div className="empty-state">暂无历史，输入问题开始对话。</div>
                         ) : (
-                            turns.map((turn) => (
-                                <div key={turn.id} className="turn-block">
-                                    <div className="message message-user">
-                                        <div className="message__meta">
-                                            <span className="pill muted">User</span>
-                                            <span className="caption">
-                                                #{turn.order ?? "-"} · {formatDateTime(turn.created_at)}
-                                            </span>
+                            turns.map((turn) => {
+                                const evidenceList = turn.evidences ?? []
+                                const isEvidenceOpen = evidenceExpanded[turn.id] ?? false
+
+                                return (
+                                    <div key={turn.id} className="turn-block">
+                                        <div className="message message-user">
+                                            <div className="message__meta">
+                                                <span className="pill muted">User</span>
+                                                <span className="caption">
+                                                    #{turn.order ?? "-"} · {formatDateTime(turn.created_at)}
+                                                </span>
+                                            </div>
+                                            <div className="message__bubble">{turn.user_question}</div>
                                         </div>
-                                        <div className="message__bubble">{turn.user_question}</div>
-                                    </div>
-                                    <div className="message message-assistant">
-                                        <div className="message__meta">
-                                            <span className="pill">Assistant</span>
-                                            <span className="caption">
-                                                {turn.evidences?.length || 0} evidences
-                                            </span>
-                                        </div>
-                                        <div className="message__bubble">
-                                            <MarkdownRenderer
-                                                content={turn.answer_with_evidence || turn.answer_text}
-                                                evidences={turn.evidences}
-                                                onSelectEvidence={(evNo) => handleEvidenceSelect(evNo, turn)}
-                                            />
-                                            <div className="evidence-chip-row">
-                                                {(turn.evidences ?? []).map((ev) => (
-                                                    <button
-                                                        key={`${turn.id}-${ev.element_id}`}
-                                                        type="button"
-                                                        className="evidence-chip"
-                                                        onClick={() =>
-                                                            handleEvidenceSelect(ev.evidence_no, turn)
-                                                        }
-                                                    >
-                                                        <span className="pill muted">
-                                                            Evidence #{ev.evidence_no ?? "-"}
-                                                        </span>
-                                                        <span className="caption">
-                                                            Doc {ev.document_id ?? "-"} · Page{" "}
-                                                            {ev.page_index ?? "-"}
-                                                        </span>
-                                                    </button>
-                                                ))}
+                                        <div className="message message-assistant">
+                                            <div className="message__meta">
+                                                <span className="pill">Assistant</span>
+                                                <span className="caption">
+                                                    {evidenceList.length || 0} evidences
+                                                </span>
+                                            </div>
+                                            <div className="message__bubble">
+                                                <MarkdownRenderer
+                                                    content={turn.answer_with_evidence || turn.answer_text}
+                                                    evidences={evidenceList}
+                                                    onSelectEvidence={(evNo) => handleEvidenceSelect(evNo, turn)}
+                                                />
+                                                {evidenceList.length > 0 ? (
+                                                    <>
+                                                        <div className="evidence-toggle">
+                                                            <span className="caption muted">
+                                                                Evidence 列表 · {evidenceList.length} 条
+                                                            </span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                type="button"
+                                                                onClick={() => toggleEvidenceVisibility(turn.id)}
+                                                                aria-expanded={isEvidenceOpen}
+                                                            >
+                                                                {isEvidenceOpen ? "收起" : "展开"}
+                                                            </Button>
+                                                        </div>
+                                                        {isEvidenceOpen && (
+                                                            <div className="evidence-chip-row">
+                                                                {evidenceList.map((ev) => (
+                                                                    <button
+                                                                        key={`${turn.id}-${ev.element_id}`}
+                                                                        type="button"
+                                                                        className="evidence-chip"
+                                                                        onClick={() =>
+                                                                            handleEvidenceSelect(ev.evidence_no, turn)
+                                                                        }
+                                                                    >
+                                                                        <span className="pill muted">
+                                                                            Evidence #{ev.evidence_no ?? "-"}
+                                                                        </span>
+                                                                        <span className="caption">
+                                                                            Doc {ev.document_id ?? "-"} · Page{" "}
+                                                                            {ev.page_index ?? "-"}
+                                                                        </span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <div className="caption muted" style={{ marginTop: "8px" }}>
+                                                        暂无 Evidence
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                )
+                            })
                         )}
                     </div>
 
