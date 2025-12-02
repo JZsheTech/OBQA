@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom"
 import {
     buildDocumentFileUrl,
     createDocumentChat,
+    deleteChat,
     getCollectionDetail,
     getDocumentDetail,
     listDocumentChats,
@@ -72,6 +73,7 @@ export default function DocumentDetail() {
     const [chats, setChats] = useState([])
     const [loadingChats, setLoadingChats] = useState(false)
     const [creatingChat, setCreatingChat] = useState(false)
+    const [deletingChatIds, setDeletingChatIds] = useState(new Set())
 
     const [ragQuery, setRagQuery] = useState("")
     const [ragMode, setRagMode] = useState("hybrid")
@@ -211,6 +213,30 @@ export default function DocumentDetail() {
             addToast({ type: "error", title: "检索失败", message: error.message })
         } finally {
             setRagLoading(false)
+        }
+    }
+
+    async function handleDeleteChat(chatId) {
+        if (!chatId) return
+        const confirmed = window.confirm("确定删除该聊天记录吗？聊天内容将被清除。")
+        if (!confirmed) return
+        setDeletingChatIds((prev) => {
+            const next = new Set(prev)
+            next.add(chatId)
+            return next
+        })
+        try {
+            await deleteChat(chatId)
+            addToast({ type: "success", title: "已删除聊天", message: `Chat #${chatId}` })
+            await loadChats()
+        } catch (error) {
+            addToast({ type: "error", title: "删除聊天失败", message: error.message })
+        } finally {
+            setDeletingChatIds((prev) => {
+                const next = new Set(prev)
+                next.delete(chatId)
+                return next
+            })
         }
     }
 
@@ -455,20 +481,51 @@ export default function DocumentDetail() {
                             </div>
                         ) : (
                             <div className="list">
-                                {chats.map((chat) => (
-                                    <button
-                                        key={chat.id}
-                                        type="button"
-                                        className="list-item"
-                                        onClick={() => navigate(`/documents/${documentId}/chat/${chat.id}`)}
-                                    >
-                                        <div>
-                                            <strong>{chat.title || `Chat #${chat.id}`}</strong>
-                                            <p className="caption">{formatDateTime(chat.created_at)}</p>
+                                {chats.map((chat) => {
+                                    const isDeleting = deletingChatIds.has(chat.id)
+                                    const handleNavigate = () => {
+                                        if (isDeleting) return
+                                        navigate(`/documents/${documentId}/chat/${chat.id}`)
+                                    }
+                                    const handleKeyDown = (event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault()
+                                            handleNavigate()
+                                        }
+                                    }
+                                    return (
+                                        <div
+                                            key={chat.id}
+                                            role="button"
+                                            tabIndex={isDeleting ? -1 : 0}
+                                            className="list-item list-item--interactive"
+                                            aria-disabled={isDeleting}
+                                            onClick={handleNavigate}
+                                            onKeyDown={handleKeyDown}
+                                        >
+                                            <div>
+                                                <strong>{chat.title || `Chat #${chat.id}`}</strong>
+                                                <p className="caption">{formatDateTime(chat.created_at)}</p>
+                                            </div>
+                                            <div className="list-item__meta">
+                                                <span className="pill muted">{chat.type || "Document"}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    className="danger-link"
+                                                    style={{ color: "var(--color-danger)" }}
+                                                    disabled={isDeleting}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        if (isDeleting) return
+                                                        handleDeleteChat(chat.id)
+                                                    }}
+                                                >
+                                                    {isDeleting ? "删除中..." : "删除"}
+                                                </Button>
+                                            </div>
                                         </div>
-                                        <span className="pill muted">{chat.type}</span>
-                                    </button>
-                                ))}
+                                    )
+                                })}
                             </div>
                         )}
                     </div>

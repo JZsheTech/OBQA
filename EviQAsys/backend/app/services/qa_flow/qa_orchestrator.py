@@ -327,6 +327,9 @@ class MemoryAgent:
 class AnswerAgent:
     """OpenAI text/vision wrapper following the M10 AnswerAgent prompts."""
 
+    _COMPACT_ELEM_LIST_RE = re.compile(
+        r"\[(?:\s*)Elem#(?P<ids>[0-9A-Za-z_-]+(?:\s*[,，、]\s*[0-9A-Za-z_-]+)+)\s*\]"
+    )
     TEXT_SYSTEM_PROMPT = (
         "You are AnswerAgent in an evidence-based QA system.\n\n"
         "RULES:\n"
@@ -414,6 +417,7 @@ class AnswerAgent:
             len(usable_images),
         )
         answer_text = self._generate(messages=messages, settings=settings, client=client)
+        answer_text = self._normalize_citations(answer_text)
         element_ids = evidence_mapper.extract_element_ids_from_answer(answer_text)
         return answer_text, element_ids, settings.model
 
@@ -522,6 +526,19 @@ class AnswerAgent:
         if len(cleaned) > PER_EVIDENCE_ELEM_CHAR_LIMIT:
             return f"{cleaned[:PER_EVIDENCE_ELEM_CHAR_LIMIT]}..."
         return cleaned
+
+    def _normalize_citations(self, answer_text: str) -> str:
+        """Expand compact multi-citations like [Elem#1,2,3] into [Elem#1, Elem#2, Elem#3]."""
+
+        def _expand(match: re.Match[str]) -> str:
+            raw_ids = match.group("ids") or ""
+            parts = [part.strip() for part in re.split(r"[,，、]", raw_ids) if part.strip()]
+            if not parts or any("#" in part for part in parts):
+                return match.group(0)
+            normalized = ", ".join(f"Elem#{part}" for part in parts)
+            return f"[{normalized}]"
+
+        return self._COMPACT_ELEM_LIST_RE.sub(_expand, answer_text or "")
 
     @staticmethod
     def _init_client(settings: LLMSettings | VisionLLMSettings) -> OpenAI:
