@@ -120,7 +120,7 @@ class OceanBaseSettings:
 DB_CHARSET: str = _get_env("DB_CHARSET", "utf8mb4")
 VECTOR_DIM: int = _get_int_env("VECTOR_DIM", 2048)
 INGEST_BATCH_SIZE: int = _get_int_env("BATCH_SIZE", 32)
-EVIDENCE_PROMPT_CHAR_LIMIT: int = _get_int_env("EVIDENCE_PROMPT_CHAR_LIMIT", 2560)
+PER_EVIDENCE_ELEM_CHAR_LIMIT: int = _get_int_env("PER_EVIDENCE_ELEM_CHAR_LIMIT", 3600)
 OLLAMA_PROTOCOL: str = _get_env("OLLAMA_PROTOCOL", "http")
 OLLAMA_HOST: str = _get_env("OLLAMA_HOST", "localhost")
 OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
@@ -176,7 +176,7 @@ class LLMSettings:
     api_key: str = _get_env("LLM_API_KEY", OPENROUTER_API_KEY)
     api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
     temperature: float = _get_float_env("LLM_TEMPERATURE", 0.2)
-    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 16000)
+    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 30000)
 
 
 @dataclass(frozen=True)
@@ -254,7 +254,7 @@ __all__ = [
     "MAX_CHARACTOR_CHUNK_SIZE",
     "MAX_ELEM_CHUNK_SIZE",
     "CHUNK_SKIP_PATTERNS",
-    "EVIDENCE_PROMPT_CHAR_LIMIT",
+    "PER_EVIDENCE_ELEM_CHAR_LIMIT",
     "OLLAMA_PROTOCOL",
     "OLLAMA_HOST",
     "OLLAMA_PORT",

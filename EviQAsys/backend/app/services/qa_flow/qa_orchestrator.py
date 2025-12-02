@@ -7,7 +7,7 @@ from typing import Iterable, Mapping, Sequence
 
 from openai import OpenAI
 
-from ...env_setting import EVIDENCE_PROMPT_CHAR_LIMIT, LLMSettings, QAFlowSettings, get_llm_settings, get_qa_flow_settings
+from ...env_setting import PER_EVIDENCE_ELEM_CHAR_LIMIT, LLMSettings, QAFlowSettings, get_llm_settings, get_qa_flow_settings
 from ...repositories import ChatsRepository, DocumentsRepository, ElementsRepository, TurnsRepository
 from ..llm import DSPyPredictorFactory, QueryRewriter
 from ..mapping import evidence_mapper
@@ -428,8 +428,8 @@ class AnswerAgent:
         cleaned = (text or "").strip()
         if not cleaned:
             return ""
-        if len(cleaned) > EVIDENCE_PROMPT_CHAR_LIMIT:
-            return f"{cleaned[:EVIDENCE_PROMPT_CHAR_LIMIT]}..."
+        if len(cleaned) > PER_EVIDENCE_ELEM_CHAR_LIMIT:
+            return f"{cleaned[:PER_EVIDENCE_ELEM_CHAR_LIMIT]}..."
         return cleaned
 
     @staticmethod
