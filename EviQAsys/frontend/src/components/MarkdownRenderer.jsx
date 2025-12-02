@@ -19,7 +19,7 @@ function normalizeMathDelimiters(value) {
 
 function remarkEvidencePlugin(options = {}) {
     const { resolveElementToEvidence } = options
-    const shouldSkipType = (type) => type === "code" || type === "inlineCode" || type === "math"
+    const shouldSkipType = (type) => type === "code" || type === "inlineCode" || type === "math" || type === "inlineMath"
 
     return function transformer(tree) {
         if (!tree || !Array.isArray(tree.children)) return
@@ -141,8 +141,8 @@ export default function MarkdownRenderer({ content, evidences, onSelectEvidence,
     )
 
     const remarkPlugins = useMemo(
-        // Run evidence transform first to avoid later remark plugins changing node shapes.
-        () => [[remarkEvidencePlugin, { resolveElementToEvidence }], remarkGfm, remarkMath, remarkBreaks],
+        // Parse math first, then inject evidence references so math nodes stay intact.
+        () => [remarkGfm, remarkMath, remarkBreaks, [remarkEvidencePlugin, { resolveElementToEvidence }]],
         [resolveElementToEvidence],
     )
 
