@@ -23,6 +23,7 @@ from .qa import (
     ChatDetailEnvelope,
     TurnEvidencesResponse,
     TurnEvidencesEnvelope,
+    QAConfigDefaults,
 )
 
 __all__ = [
@@ -61,4 +62,5 @@ __all__ = [
     "ChatDetailEnvelope",
     "TurnEvidencesResponse",
     "TurnEvidencesEnvelope",
+    "QAConfigDefaults",
 ]

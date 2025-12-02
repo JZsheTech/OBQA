@@ -1,6 +1,6 @@
 
 """
-Added a scripts/reset_database.py CLI that mirrors the proven --reset-db/--clear-uploads behaviors: it wires up repository helpers, initializes the DB, clears tables (optionally a subset), and wipes/recreates the upload directory. Use it via python scripts/reset_database.py with optional flags --skip-db, --skip-uploads, --no-recreate-uploads, or --tables turn2element turns ... for targeted clears.
+Added a scripts/reset_database.py CLI that mirrors the proven --reset-db/--clear-uploads behaviors: it wires up repository helpers, initializes the DB, clears tables (optionally a subset), and wipes/recreates the upload directory. Use it via python scripts/reset_database.py with optional flags --skip-db, --skip-uploads, --no-recreate-uploads, or --tables turns chats ... for targeted clears.
 
 Next steps: run python scripts/reset_database.py before local QA runs to start from a clean slate.
 """

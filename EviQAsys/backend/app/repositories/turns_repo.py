@@ -28,6 +28,7 @@ class TurnsRepository:
         user_question: str,
         llm_answer_text: str | None = None,
         llm_thought_text: str | None = None,
+        memory: str | None = None,
         response_tokens: int | None = None,
         used_llm_model: str | None = None,
     ) -> dict[str, Any]:
@@ -37,6 +38,7 @@ class TurnsRepository:
             "user_question": user_question,
             "llm_answer_text": llm_answer_text,
             "llm_thought_text": llm_thought_text,
+            "memory": memory,
             "response_tokens": response_tokens,
             "used_llm_model": used_llm_model,
         }
@@ -76,6 +78,7 @@ class TurnsRepository:
             "user_question",
             "llm_answer_text",
             "llm_thought_text",
+            "memory",
             "response_tokens",
             "used_llm_model",
         }

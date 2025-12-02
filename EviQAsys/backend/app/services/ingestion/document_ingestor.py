@@ -11,9 +11,9 @@ from typing import Any, BinaryIO
 
 from fastapi import UploadFile
 
-from ...env_setting import  INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
+from ...env_setting import INGEST_BATCH_SIZE, UploadSettings, get_upload_settings
 from ...repositories import CollectionsRepository, DocumentsRepository, ElementsRepository, db_connection
-from ..integrations import MinerUAdapter
+from ..integrations.mineru_adapter import MinerUAdapter
 from ..parser import normalize_element, preprocess_headers
 from ..parser.unifier import ROOT_LEVEL_NAV
 

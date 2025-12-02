@@ -8,46 +8,16 @@ from pydantic import BaseModel, Field
 
 class TurnCreateRequest(BaseModel):
     question: str = Field(..., min_length=1, description="User question text.")
-    top_k: int | None = Field(
+    use_image: bool | None = Field(default=None, description="Enable image retrieval + multimodal answer.")
+    text_retrieve_topk: int | None = Field(default=None, ge=1, le=20, description="Text chunk retrieval TopK.")
+    image_retrieve_topk: int | None = Field(default=None, ge=1, le=20, description="Image chunk retrieval TopK.")
+    text_memory_topk: int | None = Field(default=None, ge=1, le=20, description="Memory text elements TopK.")
+    image_memory_topk: int | None = Field(default=None, ge=1, le=20, description="Memory image elements TopK.")
+    use_page_in_text_retrieve: bool | None = Field(default=None, description="Enable page-level filter for text retrieval.")
+    page_retrieve_topk: int | None = Field(default=None, ge=1, le=20, description="Page-level TopK when filter is enabled.")
+    text_search_mode: Literal["vector", "fulltext", "hybrid"] | None = Field(
         default=None,
-        ge=1,
-        le=30,
-        description="Optional override for chunk-level retrieval TopK.",
-    )
-    retrieval_mode: Literal["auto", "force", "skip"] | None = Field(
-        default=None,
-        description="Per-turn retrieval mode (auto uses decider; force/skip override).",
-    )
-    elem_types: list[str] | None = Field(
-        default=None,
-        description="Optional element type filters (e.g., text/header/table/image/equation).",
-    )
-    search_mode: Literal["vector", "fulltext", "hybrid"] | None = Field(
-        default=None,
-        description="Search backend selection for this turn (vector/fulltext/hybrid).",
-    )
-    page_top_k: int | None = Field(
-        default=None,
-        ge=1,
-        le=50,
-        description="Optional override for page-level topK when page-chunk filter is enabled.",
-    )
-    enable_page_filter: bool | None = Field(
-        default=None,
-        description="Enable two-stage retrieval: page_text_chunks then chunk search.",
-    )
-    max_history_turns: int | None = Field(
-        default=None,
-        ge=0,
-        description="Override how many previous turns participate in memory/history.",
-    )
-    enable_image_vqa: bool | None = Field(
-        default=None,
-        description="Enable expensive visual question answering path.",
-    )
-    enable_memory_summarizer: bool | None = Field(
-        default=None,
-        description="Enable DSPy MemorySummarizer; default uses raw recent history.",
+        description="Search backend selection for text retrieval (vector/fulltext/hybrid).",
     )
 
 
@@ -68,6 +38,7 @@ class TurnResponse(BaseModel):
     chat_id: int
     answer_text: str
     evidences: list[EvidenceItem]
+    evidence_map: dict[str, int] | None = None
     answer_with_evidence: str | None = None
 
 
@@ -87,6 +58,17 @@ class TurnWithEvidence(BaseModel):
     evidences: list[EvidenceItem]
 
 
+class QAConfigDefaults(BaseModel):
+    use_image: bool
+    text_retrieve_topk: int
+    image_retrieve_topk: int
+    text_memory_topk: int
+    image_memory_topk: int
+    use_page_in_text_retrieve: bool
+    page_retrieve_topk: int
+    text_search_mode: Literal["vector", "fulltext", "hybrid"]
+
+
 class ChatDetail(BaseModel):
     id: int
     collection_id: int | None = None
@@ -97,6 +79,7 @@ class ChatDetail(BaseModel):
     created_at: datetime
     turns: list[TurnWithEvidence]
     evidence_no_mapping: dict[int, int]
+    qa_config_defaults: QAConfigDefaults | None = None
 
 
 class ChatDetailEnvelope(BaseModel):
@@ -126,4 +109,5 @@ __all__ = [
     "ChatDetailEnvelope",
     "TurnEvidencesResponse",
     "TurnEvidencesEnvelope",
+    "QAConfigDefaults",
 ]

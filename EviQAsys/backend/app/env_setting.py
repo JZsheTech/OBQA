@@ -127,11 +127,11 @@ OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
 OLLAMA_BASE_URL: str = f"{OLLAMA_PROTOCOL}://{OLLAMA_HOST}:{OLLAMA_PORT}"
 OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
-DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4.1-fast")
+DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4-fast")
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
 DEFAULT_VLSION_MODEL = _get_env("DEFAULT_VLSION_MODEL", "x-ai/grok-4-fast")
 MIN_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MIN_CHARACTOR_CHUNK_SIZE", 256)
-MAX_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MAX_CHARACTOR_CHUNK_SIZE", 2000)
+MAX_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MAX_CHARACTOR_CHUNK_SIZE", 3200)
 MAX_ELEM_CHUNK_SIZE: int = _get_int_env("MAX_ELEM_CHUNK_SIZE", 6)
 CHUNK_SKIP_PATTERNS: tuple[str, ...] = _get_str_tuple_env(
     "CHUNK_SKIP_PATTERNS",
@@ -190,23 +190,18 @@ class VisionVQASettings:
 
 
 
-DEFAULT_QA_ELEM_TYPES: tuple[str, ...] = ("text", "header", "table", "image")
-
-
 @dataclass(frozen=True)
 class QAFlowSettings:
-    max_history_turns: int = _get_int_env("QA_MAX_HISTORY_TURNS", 8)
-    text_evidence_limit: int = _get_int_env("QA_TEXT_EVIDENCE_LIMIT", 8)
-    image_evidence_limit: int = _get_int_env("QA_IMAGE_EVIDENCE_LIMIT", 4)
-    enable_memory_summarizer: bool = _get_bool_env("QA_ENABLE_MEMORY_SUMMARIZER", False)
-    enable_image_vqa: bool = _get_bool_env("QA_ENABLE_IMAGE_VQA", False)
-    default_retrieval_mode: str = _get_env("QA_DEFAULT_RETRIEVAL_MODE", "auto")
-    default_search_mode: str = _get_env("QA_DEFAULT_SEARCH_MODE", "hybrid")
-    default_elem_types: tuple[str, ...] = _get_elem_types_env("QA_DEFAULT_ELEM_TYPES", DEFAULT_QA_ELEM_TYPES)
-    retrieval_topk_chunk: int = RETRIEVAL_TOPK_CHUNK
-    retrieval_topk_page: int = RETRIEVAL_TOPK_PAGE
-    enable_page_chunk_retrieval: bool = ENABLE_PAGE_CHUNK_RETRIEVAL
-    enable_page_text_chunks: bool = ENABLE_PAGE_TEXT_CHUNKS
+    default_use_image: bool = _get_bool_env("QA_USE_IMAGE_DEFAULT", False)
+    default_text_retrieve_topk: int = _get_int_env("QA_TEXT_RETRIEVE_TOPK_DEFAULT", 8)
+    default_image_retrieve_topk: int = _get_int_env("QA_IMAGE_RETRIEVE_TOPK_DEFAULT", 2)
+    default_text_memory_topk: int = _get_int_env("QA_TEXT_MEMORY_TOPK_DEFAULT", 4)
+    default_image_memory_topk: int = _get_int_env("QA_IMAGE_MEMORY_TOPK_DEFAULT", 1)
+    default_use_page_in_text_retrieve: bool = _get_bool_env("QA_USE_PAGE_IN_TEXT_RETRIEVE_DEFAULT", False)
+    default_page_retrieve_topk: int = _get_int_env("QA_PAGE_RETRIEVE_TOPK_DEFAULT", 4)
+    default_text_search_mode: str = _get_env("QA_TEXT_SEARCH_MODE_DEFAULT", "hybrid")
+    memory_max_length: int = _get_int_env("QA_MEMORY_MAX_LENGTH", 4000)
+    max_summary_memory_length: int = _get_int_env("QA_MAX_SUMMARY_MEMORY_LENGTH", 1000)
 
 
 @lru_cache(maxsize=1)

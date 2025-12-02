@@ -1,26 +1,23 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Sequence
 
-from ...env_setting import QAFlowSettings, get_qa_flow_settings
-from ...repositories import (
-    ChatsRepository,
-    DocumentsRepository,
-    ElementsRepository,
-    Turn2ElementRepository,
-    TurnsRepository,
-)
-from ..integrations import VisionVQAClient, VisionVQAError
-from ..llm import AnswerComposer, ImageQuestionGenerator, QueryRewriter, RetrievalDecider
+from openai import OpenAI
+
+from ...env_setting import EVIDENCE_PROMPT_CHAR_LIMIT, LLMSettings, QAFlowSettings, get_llm_settings, get_qa_flow_settings
+from ...repositories import ChatsRepository, DocumentsRepository, ElementsRepository, TurnsRepository
+from ..llm import DSPyPredictorFactory, QueryRewriter
 from ..mapping import evidence_mapper
-from ..memory import MemoryService
 from ..retrieval import ChunkRetrievalResult, Retriever
-from .history_loader import format_history_text
-from .models import EvidenceText, QATurnResult
+from .models import CandidateElement, QATurnResult
 
 logger = logging.getLogger(__name__)
+
+_ELEM_TAG_RE = re.compile(r"\[Elem#(?P<id>[0-9A-Za-z_-]+)\]")
+_TEXT_CHUNK_TYPES = {"text", "table"}
 
 
 class QAFlowError(RuntimeError):
@@ -33,126 +30,421 @@ class ChatNotFoundError(QAFlowError):
 
 @dataclass
 class QAFlowConfig:
-    max_history_turns: int = 8
-    text_evidence_limit: int = 8
-    image_evidence_limit: int = 4
-    enable_memory_summarizer: bool = False
-    enable_image_vqa: bool = False
-    retrieval_mode: str = "auto"
-    search_mode: str = "hybrid"
-    elem_types: tuple[str, ...] | None = ("text", "header", "table", "image")
-    chunk_top_k: int = 8
-    page_top_k: int = 3
-    enable_page_filter: bool = False
-
-    def __post_init__(self) -> None:
-        self.max_history_turns = max(0, int(self.max_history_turns))
-        self.text_evidence_limit = max(0, int(self.text_evidence_limit))
-        self.image_evidence_limit = max(0, int(self.image_evidence_limit))
-        self.enable_memory_summarizer = bool(self.enable_memory_summarizer)
-        self.enable_image_vqa = bool(self.enable_image_vqa)
-        self.retrieval_mode = self._normalize_retrieval_mode(self.retrieval_mode) or "auto"
-        self.search_mode = self._normalize_search_mode(self.search_mode) or "hybrid"
-        self.elem_types = self._normalize_elem_types(self.elem_types) or None
-        self.chunk_top_k = max(1, int(self.chunk_top_k))
-        self.page_top_k = max(1, int(self.page_top_k))
-        self.enable_page_filter = bool(self.enable_page_filter)
+    use_image: bool = False
+    text_retrieve_topk: int = 8
+    image_retrieve_topk: int = 2
+    text_memory_topk: int = 4
+    image_memory_topk: int = 1
+    use_page_in_text_retrieve: bool = False
+    page_retrieve_topk: int = 4
+    text_search_mode: str = "hybrid"
+    memory_max_length: int = 4000
+    max_summary_memory_length: int = 1000
 
     @classmethod
     def from_settings(cls, settings: QAFlowSettings | None = None) -> "QAFlowConfig":
         settings = settings or get_qa_flow_settings()
         return cls(
-            max_history_turns=settings.max_history_turns,
-            text_evidence_limit=settings.text_evidence_limit,
-            image_evidence_limit=settings.image_evidence_limit,
-            enable_memory_summarizer=settings.enable_memory_summarizer,
-            enable_image_vqa=settings.enable_image_vqa,
-            retrieval_mode=settings.default_retrieval_mode,
-            search_mode=settings.default_search_mode,
-            elem_types=settings.default_elem_types,
-            chunk_top_k=settings.retrieval_topk_chunk,
-            page_top_k=settings.retrieval_topk_page,
-            enable_page_filter=settings.enable_page_chunk_retrieval,
+            use_image=bool(settings.default_use_image),
+            text_retrieve_topk=max(1, int(settings.default_text_retrieve_topk)),
+            image_retrieve_topk=max(1, int(settings.default_image_retrieve_topk)),
+            text_memory_topk=max(1, int(settings.default_text_memory_topk)),
+            image_memory_topk=max(1, int(settings.default_image_memory_topk)),
+            use_page_in_text_retrieve=bool(settings.default_use_page_in_text_retrieve),
+            page_retrieve_topk=max(1, int(settings.default_page_retrieve_topk)),
+            text_search_mode=_normalize_search_mode(settings.default_text_search_mode) or "hybrid",
+            memory_max_length=max(500, int(settings.memory_max_length)),
+            max_summary_memory_length=max(200, int(settings.max_summary_memory_length)),
         )
 
     def with_overrides(
         self,
         *,
-        max_history_turns: int | None = None,
-        text_evidence_limit: int | None = None,
-        image_evidence_limit: int | None = None,
-        enable_memory_summarizer: bool | None = None,
-        enable_image_vqa: bool | None = None,
-        retrieval_mode: str | None = None,
-        search_mode: str | None = None,
-        elem_types: Iterable[str] | None = None,
-        chunk_top_k: int | None = None,
-        page_top_k: int | None = None,
-        enable_page_filter: bool | None = None,
+        use_image: bool | None = None,
+        text_retrieve_topk: int | None = None,
+        image_retrieve_topk: int | None = None,
+        text_memory_topk: int | None = None,
+        image_memory_topk: int | None = None,
+        use_page_in_text_retrieve: bool | None = None,
+        page_retrieve_topk: int | None = None,
+        text_search_mode: str | None = None,
     ) -> "QAFlowConfig":
         return QAFlowConfig(
-            max_history_turns=self._normalize_int(max_history_turns, fallback=self.max_history_turns),
-            text_evidence_limit=self._normalize_int(text_evidence_limit, fallback=self.text_evidence_limit),
-            image_evidence_limit=self._normalize_int(image_evidence_limit, fallback=self.image_evidence_limit),
-            enable_memory_summarizer=self._normalize_bool(enable_memory_summarizer, fallback=self.enable_memory_summarizer),
-            enable_image_vqa=self._normalize_bool(enable_image_vqa, fallback=self.enable_image_vqa),
-            retrieval_mode=self._normalize_retrieval_mode(retrieval_mode) or self.retrieval_mode,
-            search_mode=self._normalize_search_mode(search_mode) or self.search_mode,
-            elem_types=self._normalize_elem_types(elem_types) if elem_types is not None else self.elem_types,
-            chunk_top_k=self._normalize_int(chunk_top_k, fallback=self.chunk_top_k, min_value=1),
-            page_top_k=self._normalize_int(page_top_k, fallback=self.page_top_k, min_value=1),
-            enable_page_filter=self._normalize_bool(enable_page_filter, fallback=self.enable_page_filter),
+            use_image=self._bool_or_default(use_image, self.use_image),
+            text_retrieve_topk=self._clamp_topk(text_retrieve_topk, self.text_retrieve_topk),
+            image_retrieve_topk=self._clamp_topk(image_retrieve_topk, self.image_retrieve_topk),
+            text_memory_topk=self._clamp_topk(text_memory_topk, self.text_memory_topk),
+            image_memory_topk=self._clamp_topk(image_memory_topk, self.image_memory_topk),
+            use_page_in_text_retrieve=self._bool_or_default(use_page_in_text_retrieve, self.use_page_in_text_retrieve),
+            page_retrieve_topk=self._clamp_topk(page_retrieve_topk, self.page_retrieve_topk),
+            text_search_mode=_normalize_search_mode(text_search_mode) or self.text_search_mode,
+            memory_max_length=self.memory_max_length,
+            max_summary_memory_length=self.max_summary_memory_length,
         )
 
     @staticmethod
-    def _normalize_int(value: int | None, *, fallback: int, min_value: int = 0) -> int:
+    def _bool_or_default(value: bool | None, default: bool) -> bool:
         if value is None:
-            return max(min_value, fallback)
-        try:
-            numeric = int(value)
-        except (TypeError, ValueError):
-            return max(min_value, fallback)
-        return max(min_value, numeric)
-
-    @staticmethod
-    def _normalize_bool(value: bool | None, *, fallback: bool) -> bool:
-        if value is None:
-            return bool(fallback)
+            return default
         return bool(value)
 
     @staticmethod
-    def _normalize_retrieval_mode(value: str | None) -> str | None:
-        if not value:
-            return None
-        lowered = str(value).lower()
-        if lowered in {"auto", "force", "skip"}:
-            return lowered
-        return None
+    def _clamp_topk(value: int | None, default: int) -> int:
+        if value is None:
+            return max(1, min(20, int(default)))
+        try:
+            numeric = int(value)
+        except (TypeError, ValueError):
+            return max(1, min(20, int(default)))
+        return max(1, min(20, numeric))
 
-    @staticmethod
-    def _normalize_search_mode(value: str | None) -> str | None:
-        if not value:
-            return None
-        lowered = str(value).lower()
-        if lowered in {"vector", "fulltext", "hybrid"}:
-            return lowered
-        return None
 
-    @staticmethod
-    def _normalize_elem_types(elem_types: Iterable[str] | None) -> tuple[str, ...] | None:
-        if not elem_types:
-            return None
-        normalized: list[str] = []
-        for entry in elem_types:
-            cleaned = str(entry or "").strip().lower()
-            if not cleaned or cleaned in normalized:
+class TextRetrieveAgent:
+    """Query rewrite + text chunk retrieval pipeline (DSPy-enabled)."""
+
+    def __init__(
+        self,
+        *,
+        retriever: Retriever | None = None,
+        query_rewriter: QueryRewriter | None = None,
+    ) -> None:
+        self._retriever = retriever or Retriever()
+        self._query_rewriter = query_rewriter or QueryRewriter()
+
+    def run(
+        self,
+        *,
+        question: str,
+        last_memory: str,
+        collection_id: int,
+        document_id: int | None,
+        top_k: int,
+        search_mode: str,
+        use_page_filter: bool,
+        page_top_k: int,
+    ) -> list[ChunkRetrievalResult]:
+        search_query = self._query_rewriter.rewrite(question, last_memory) or question
+        logger.info(
+            "TextRetrieveAgent: query='%s' mode=%s top_k=%s use_page=%s page_top_k=%s",
+            search_query,
+            search_mode,
+            top_k,
+            use_page_filter,
+            page_top_k,
+        )
+        return self._retriever.retrieve_topk(
+            collection_id=collection_id,
+            doc_id=document_id,
+            query_text=search_query,
+            top_k=top_k,
+            chunk_types=_TEXT_CHUNK_TYPES,
+            search_mode=search_mode,
+            enable_page_filter=use_page_filter,
+            page_top_k=page_top_k,
+        )
+
+    def expand(self, chunk_results: Sequence[ChunkRetrievalResult]) -> list[CandidateElement]:
+        expanded = self._retriever.expand_chunks_to_elements(chunk_results)
+        return [_row_to_candidate(row) for row in expanded]
+
+
+class ImageRetrieveAgent:
+    """Optional image retrieval path (no DSPy)."""
+
+    def __init__(
+        self,
+        *,
+        retriever: Retriever | None = None,
+        query_rewriter: QueryRewriter | None = None,
+    ) -> None:
+        self._retriever = retriever or Retriever()
+        self._query_rewriter = query_rewriter or QueryRewriter()
+
+    def run(
+        self,
+        *,
+        question: str,
+        last_memory: str,
+        collection_id: int,
+        document_id: int | None,
+        top_k: int,
+    ) -> list[ChunkRetrievalResult]:
+        search_query = self._query_rewriter.rewrite(question, last_memory) or question
+        logger.info("ImageRetrieveAgent: query='%s' top_k=%s", search_query, top_k)
+        return self._retriever.retrieve_topk(
+            collection_id=collection_id,
+            doc_id=document_id,
+            query_text=search_query,
+            top_k=top_k,
+            chunk_types={"image"},
+            search_mode="vector",
+        )
+
+    def expand(self, chunk_results: Sequence[ChunkRetrievalResult]) -> list[CandidateElement]:
+        expanded = self._retriever.expand_chunks_to_elements(chunk_results)
+        return [_row_to_candidate(row) for row in expanded]
+
+
+class MemoryAgent:
+    """Handles memory generation and selection via DSPy with robust fallbacks."""
+
+    def __init__(
+        self,
+        *,
+        predictor_factory: DSPyPredictorFactory | None = None,
+        elements_repo: ElementsRepository | None = None,
+        max_memory_length: int = 4000,
+        max_summary_memory_length: int = 1000,
+    ) -> None:
+        self._predictor_factory = predictor_factory or DSPyPredictorFactory()
+        self._elements_repo = elements_repo or ElementsRepository()
+        self._max_memory_length = max_memory_length
+        self._max_summary_memory_length = max_summary_memory_length
+
+    def generate_memory(self, last_memory: str, question: str, answer: str) -> str:
+        candidate = "\n".join(
+            entry for entry in [last_memory.strip(), f"User: {question}".strip(), f"Assistant: {answer}".strip()] if entry
+        )
+        if len(candidate) <= self._max_memory_length:
+            raw_memory = candidate
+        else:
+            raw_memory = self._summarize(last_memory, question, answer)
+        cleaned = self._clean_invalid_elem_ids(raw_memory)
+        return cleaned.strip()
+
+    def select_elements(
+        self,
+        *,
+        question: str,
+        last_memory: str,
+        use_image: bool,
+        text_topk: int,
+        image_topk: int,
+    ) -> tuple[list[CandidateElement], list[CandidateElement]]:
+        if not last_memory.strip():
+            return [], []
+        predicted_ids = self._predict_elem_ids(question, last_memory)
+        if not predicted_ids:
+            predicted_ids = _extract_elem_ids(last_memory)
+        elements = self._elements_repo.list_by_ids(predicted_ids)
+        mapping = {int(row["id"]): row for row in elements}
+        text_elements: list[CandidateElement] = []
+        image_elements: list[CandidateElement] = []
+        for elem_id in predicted_ids:
+            row = mapping.get(int(elem_id))
+            if not row:
                 continue
-            normalized.append(cleaned)
-        return tuple(normalized) or None
+            candidate = _row_to_candidate(row)
+            if candidate.elem_type == "image":
+                if use_image and len(image_elements) < image_topk:
+                    image_elements.append(candidate)
+            else:
+                if len(text_elements) < text_topk:
+                    text_elements.append(candidate)
+        return text_elements, image_elements
+
+    def _summarize(self, last_memory: str, question: str, answer: str) -> str:
+        predictor = self._predictor_factory.create_predictor(_MemorySummarySignature)
+        if predictor is None:
+            return self._fallback_summary(last_memory, question, answer)
+        prompt = (
+            "Based on the current turn’s question, answer, and the previous turn’s memory,\n"
+            "generate an updated memory summary.\n\n"
+            "Requirements:\n"
+            "1. While compressing the content, you must retain all necessary `[Elem#id]` references from the previous memory. "
+            "Do NOT remove, rename, or alter them.\n"
+            "2. The new summary should be concise and highlight key information, dialog state, and essential evidence references across turns.\n"
+            f"3. The total length should not exceed {self._max_summary_memory_length} characters. "
+            "This is a soft limit; do your best to stay under it.\n"
+            "4. Output only the updated memory text with no extra commentary.\n"
+        )
+        try:
+            result = predictor(
+                question=question,
+                answer=answer,
+                last_turn_memory=last_memory,
+                guidance=prompt,
+            )
+            summary = (getattr(result, "memory_summary", "") or "").strip()
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("Memory summarization failed, falling back: %s", exc)
+            summary = ""
+        return summary or self._fallback_summary(last_memory, question, answer)
+
+    def _fallback_summary(self, last_memory: str, question: str, answer: str) -> str:
+        combined = "\n".join(
+            entry for entry in [last_memory.strip(), f"User: {question}".strip(), f"Assistant: {answer}".strip()] if entry
+        )
+        if len(combined) <= self._max_summary_memory_length:
+            return combined
+        lines = [line for line in combined.splitlines() if line.strip()]
+        return "\n".join(lines[-12:])[-self._max_summary_memory_length :]
+
+    def _predict_elem_ids(self, question: str, memory_text: str) -> list[int]:
+        predictor = self._predictor_factory.create_predictor(_MemorySelectionSignature)
+        if predictor is None:
+            return []
+        try:
+            result = predictor(question=question, last_turn_memory=memory_text)
+            json_text = (getattr(result, "elem_ids_json", "") or "").strip()
+            parsed_ids = _parse_elem_id_list(json_text)
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("Memory selection failed to parse JSON, fallback to regex: %s", exc)
+            parsed_ids = []
+        return parsed_ids
+
+    def _clean_invalid_elem_ids(self, memory_text: str) -> str:
+        elem_tags = list(dict.fromkeys(_ELEM_TAG_RE.findall(memory_text or "")))
+        if not elem_tags:
+            return memory_text
+        numeric_ids: list[int] = []
+        invalid_tokens: list[str] = []
+        for tag in elem_tags:
+            try:
+                numeric_ids.append(int(tag))
+            except ValueError:
+                invalid_tokens.append(tag)
+        existing = {int(row["id"]) for row in self._elements_repo.list_by_ids(numeric_ids)}
+        invalid_numeric = [elem_id for elem_id in numeric_ids if elem_id not in existing]
+        cleaned = memory_text
+        for token in invalid_tokens:
+            cleaned = cleaned.replace(f"[Elem#{token}]", "")
+        for elem_id in invalid_numeric:
+            cleaned = cleaned.replace(f"[Elem#{elem_id}]", "")
+        if invalid_tokens or invalid_numeric:
+            logger.warning("Removed invalid Elem IDs from memory: %s %s", invalid_tokens, invalid_numeric)
+        return cleaned
+
+
+class AnswerAgent:
+    """OpenAI VLM wrapper following the M10 AnswerAgent prompt."""
+
+    SYSTEM_PROMPT = (
+        "You are AnswerAgent in a multimodal evidence-based QA system.\n\n"
+        "RULES:\n"
+        "1. Only answer using the provided evidence elements.\n"
+        "2. Every evidence citation MUST use the exact format: [Elem#<id>]\n"
+        "3. Do NOT fabricate element_ids or content not provided.\n"
+        "4. Text and image elements are provided separately.\n"
+        "5. The order of images EXACTLY matches the order of the image list the system sends to the model.\n"
+        "6. When an element is relevant, cite it explicitly using [Elem#id]. Irrelevant elements should be ignored.\n"
+        "7. If the question cannot be answered from provided elements, say so clearly."
+    )
+
+    def __init__(self, *, llm_settings: LLMSettings | None = None) -> None:
+        self._llm_settings = llm_settings or get_llm_settings()
+        self._client = self._init_client(self._llm_settings)
+
+    def answer(
+        self,
+        *,
+        question: str,
+        memory_summary: str,
+        text_elements: Sequence[CandidateElement],
+        image_elements: Sequence[CandidateElement],
+        use_image: bool,
+    ) -> tuple[str, list[int]]:
+        prompt = self._build_user_prompt(question, memory_summary, text_elements, image_elements if use_image else [])
+        messages = [
+            {"role": "system", "content": [{"type": "text", "text": self.SYSTEM_PROMPT}]},
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": prompt}]
+                + self._build_image_blocks(image_elements if use_image else []),
+            },
+        ]
+        answer_text = self._generate(messages)
+        element_ids = evidence_mapper.extract_element_ids_from_answer(answer_text)
+        return answer_text, element_ids
+
+    def _generate(self, messages: list[dict[str, object]]) -> str:
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._llm_settings.model,
+                messages=messages,
+                max_tokens=self._llm_settings.max_output_tokens,
+                temperature=self._llm_settings.temperature,
+            )
+            content = completion.choices[0].message.content if completion and completion.choices else None
+            if isinstance(content, list):
+                joined = "\n".join(
+                    part.get("text") or "" for part in content if isinstance(part, dict)
+                ).strip()
+                if joined:
+                    return joined
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("AnswerAgent failed, using fallback: %s", exc)
+        return "I could not generate an answer with the provided evidences. Please try again with more context."
+
+    def _build_user_prompt(
+        self,
+        question: str,
+        memory_summary: str,
+        text_elements: Sequence[CandidateElement],
+        image_elements: Sequence[CandidateElement],
+    ) -> str:
+        text_serialized = "\n".join(
+            f"- ElemID: [Elem#{elem.element_id}]\n  Content: {self._truncate(elem.text_content)}"
+            for elem in text_elements
+        ) or "- none"
+        image_serialized = "\n".join(
+            f"- ElemID: [Elem#{elem.element_id}]\n  ImageIndex: {idx + 1}\n  Caption: {self._truncate(elem.text_caption)}"
+            for idx, elem in enumerate(image_elements)
+        ) or "- none"
+        return (
+            f"# USER QUESTION\n{question}\n\n"
+            f"# MEMORY SUMMARY (may contain [Elem#id])\n{memory_summary or 'None'}\n\n"
+            "# TEXT ELEMENTS\n"
+            "Each text element has:\n- ElemID: [Elem#<id>]\n- Content: <text>\n\n"
+            f"{text_serialized}\n\n"
+            "# IMAGE ELEMENTS\n"
+            "The following list defines the EXACT order of image inputs passed to the model.\n"
+            "For each image element:\n- ElemID: [Elem#<id>]\n- ImageIndex: <1-based index>\n- Caption: <caption if exists>\n\n"
+            f"{image_serialized}\n\n"
+            "Please answer the question following all rules in the system message."
+        )
+
+    def _build_image_blocks(self, image_elements: Sequence[CandidateElement]) -> list[dict[str, object]]:
+        blocks: list[dict[str, object]] = []
+        for elem in image_elements:
+            if not elem.image_base64:
+                continue
+            blocks.append(
+                {"type": "image_url", "image_url": {"url": self._ensure_data_uri(elem.image_base64)}},
+            )
+        return blocks
+
+    @staticmethod
+    def _ensure_data_uri(image_b64: str) -> str:
+        data = image_b64.strip()
+        if data.startswith("data:"):
+            return data
+        return f"data:image/png;base64,{data}"
+
+    @staticmethod
+    def _truncate(text: str | None) -> str:
+        cleaned = (text or "").strip()
+        if not cleaned:
+            return ""
+        if len(cleaned) > EVIDENCE_PROMPT_CHAR_LIMIT:
+            return f"{cleaned[:EVIDENCE_PROMPT_CHAR_LIMIT]}..."
+        return cleaned
+
+    @staticmethod
+    def _init_client(settings: LLMSettings) -> OpenAI:
+        client_kwargs: dict[str, object] = {"base_url": settings.api_base, "api_key": settings.api_key}
+        extra_headers: dict[str, str] = {}
+        if settings.api_key and settings.api_key_header.lower() != "authorization":
+            extra_headers[settings.api_key_header] = settings.api_key
+        if extra_headers:
+            client_kwargs["default_headers"] = extra_headers
+        return OpenAI(**client_kwargs)
 
 
 class QAOrchestrator:
-    """Coordinates memory, retrieval, DSPy programs, and persistence."""
+    """Coordinates memory, retrieval, AnswerAgent, and persistence."""
 
     def __init__(
         self,
@@ -160,50 +452,46 @@ class QAOrchestrator:
         chats_repo: ChatsRepository | None = None,
         documents_repo: DocumentsRepository | None = None,
         turns_repo: TurnsRepository | None = None,
-        turn2element_repo: Turn2ElementRepository | None = None,
         elements_repo: ElementsRepository | None = None,
         retriever: Retriever | None = None,
-        memory_service: MemoryService | None = None,
-        retrieval_decider: RetrievalDecider | None = None,
         query_rewriter: QueryRewriter | None = None,
-        answer_composer: AnswerComposer | None = None,
-        image_question_generator: ImageQuestionGenerator | None = None,
-        vision_client: VisionVQAClient | None = None,
         config: QAFlowConfig | None = None,
         qa_settings: QAFlowSettings | None = None,
+        llm_settings: LLMSettings | None = None,
     ) -> None:
         self._qa_settings = qa_settings or get_qa_flow_settings()
+        self._llm_settings = llm_settings or get_llm_settings()
         self._chats_repo = chats_repo or ChatsRepository()
         self._documents_repo = documents_repo or DocumentsRepository()
         self._turns_repo = turns_repo or TurnsRepository()
-        self._turn2element_repo = turn2element_repo or Turn2ElementRepository()
         self._elements_repo = elements_repo or ElementsRepository()
         self._retriever = retriever or Retriever()
-        self._memory_service = memory_service or MemoryService()
-        base_config = config or QAFlowConfig.from_settings(self._qa_settings)
-        self._retrieval_decider = retrieval_decider or RetrievalDecider(default_types=base_config.elem_types)
         self._query_rewriter = query_rewriter or QueryRewriter()
-        self._answer_composer = answer_composer or AnswerComposer()
-        self._image_question_generator = image_question_generator or ImageQuestionGenerator()
-        self._vision_client = vision_client
-        self._config = base_config
+        self._text_agent = TextRetrieveAgent(retriever=self._retriever, query_rewriter=self._query_rewriter)
+        self._image_agent = ImageRetrieveAgent(retriever=self._retriever, query_rewriter=self._query_rewriter)
+        predictor_factory = DSPyPredictorFactory(settings=self._llm_settings)
+        self._memory_agent = MemoryAgent(
+            predictor_factory=predictor_factory,
+            elements_repo=self._elements_repo,
+            max_memory_length=self._qa_settings.memory_max_length,
+            max_summary_memory_length=self._qa_settings.max_summary_memory_length,
+        )
+        self._answer_agent = AnswerAgent(llm_settings=self._llm_settings)
+        self._config = config or QAFlowConfig.from_settings(self._qa_settings)
 
     def run(
         self,
         *,
         chat_id: int,
         question: str,
-        top_k: int = 8,
-        retrieval_mode: str | None = None,
-        elem_types: Iterable[str] | None = None,
-        search_mode: str | None = None,
-        max_history_turns: int | None = None,
-        enable_image_vqa: bool | None = None,
-        enable_memory_summarizer: bool | None = None,
-        text_evidence_limit: int | None = None,
-        image_evidence_limit: int | None = None,
-        enable_page_filter: bool | None = None,
-        page_top_k: int | None = None,
+        use_image: bool | None = None,
+        text_retrieve_topk: int | None = None,
+        image_retrieve_topk: int | None = None,
+        text_memory_topk: int | None = None,
+        image_memory_topk: int | None = None,
+        use_page_in_text_retrieve: bool | None = None,
+        page_retrieve_topk: int | None = None,
+        text_search_mode: str | None = None,
     ) -> QATurnResult:
         question_text = (question or "").strip()
         if not question_text:
@@ -213,143 +501,96 @@ class QAOrchestrator:
             raise ChatNotFoundError(f"Chat {chat_id} not found.")
         collection_id, document_id = self._resolve_chat_scope(chat)
         history_turns = self._turns_repo.list_by_chat(chat_id)
-        requested_elem_types = QAFlowConfig._normalize_elem_types(elem_types) if elem_types is not None else None
+        last_memory = (history_turns[-1].get("memory") or "").strip() if history_turns else ""
         config = self._config.with_overrides(
-            max_history_turns=max_history_turns,
-            text_evidence_limit=text_evidence_limit,
-            image_evidence_limit=image_evidence_limit,
-            enable_memory_summarizer=enable_memory_summarizer,
-            enable_image_vqa=enable_image_vqa,
-            retrieval_mode=retrieval_mode,
-            search_mode=search_mode,
-            elem_types=requested_elem_types if elem_types is not None else None,
-            chunk_top_k=top_k,
-            page_top_k=page_top_k,
-            enable_page_filter=enable_page_filter,
+            use_image=use_image,
+            text_retrieve_topk=text_retrieve_topk,
+            image_retrieve_topk=image_retrieve_topk,
+            text_memory_topk=text_memory_topk,
+            image_memory_topk=image_memory_topk,
+            use_page_in_text_retrieve=use_page_in_text_retrieve,
+            page_retrieve_topk=page_retrieve_topk,
+            text_search_mode=text_search_mode,
         )
-        history_text = format_history_text(history_turns, max_turns=config.max_history_turns)
-        memory_summary = history_text
-        if config.enable_memory_summarizer and history_text:
-            memory_summary = self._memory_service.summarize_history(history_text)
 
-        decision = None
-        need_retrieve = False
-        elem_types_for_retrieval = requested_elem_types or config.elem_types
-        if config.retrieval_mode != "skip":
-            decision = self._retrieval_decider.decide(question_text, memory_summary)
-            if config.retrieval_mode == "force":
-                need_retrieve = True
-            else:
-                need_retrieve = bool(decision.need_retrieve) if decision else False
-            elem_types_for_retrieval = (
-                requested_elem_types
-                or (decision.element_types if decision else None)
-                or config.elem_types
+        text_chunks: list[ChunkRetrievalResult] = []
+        image_chunks: list[ChunkRetrievalResult] = []
+        try:
+            text_chunks = self._text_agent.run(
+                question=question_text,
+                last_memory=last_memory,
+                collection_id=collection_id,
+                document_id=document_id,
+                top_k=config.text_retrieve_topk,
+                search_mode=config.text_search_mode,
+                use_page_filter=config.use_page_in_text_retrieve,
+                page_top_k=config.page_retrieve_topk,
             )
-        logger.info(
-            "QAFlow: chat=%s mode=%s need_retrieve=%s search_mode=%s elem_types=%s",
-            chat_id,
-            config.retrieval_mode,
-            need_retrieve,
-            config.search_mode,
-            elem_types_for_retrieval,
-        )
-        logger.info(
-            "QAFlow limits: max_history=%s text_limit=%s image_limit=%s memory=%s vqa=%s",
-            config.max_history_turns,
-            config.text_evidence_limit,
-            config.image_evidence_limit,
-            config.enable_memory_summarizer,
-            config.enable_image_vqa,
-        )
-        text_evidences: list[EvidenceText] = []
-        image_candidates: list[dict[str, object]] = []
-        chunk_results: list[ChunkRetrievalResult] = []
-        element_map: dict[int, dict[str, object]] = {}
-        if need_retrieve:
-            search_query = self._query_rewriter.rewrite(question_text, memory_summary) or question_text
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("Text retrieval failed: %s", exc)
+        if config.use_image:
             try:
-                chunk_results = self._retriever.retrieve_topk(
+                image_chunks = self._image_agent.run(
+                    question=question_text,
+                    last_memory=last_memory,
                     collection_id=collection_id,
-                    doc_id=document_id,
-                    query_text=search_query,
-                    top_k=config.chunk_top_k,
-                    chunk_types=self._map_chunk_types(elem_types_for_retrieval),
-                    search_mode=config.search_mode,
-                    enable_page_filter=config.enable_page_filter,
-                    page_top_k=config.page_top_k,
+                    document_id=document_id,
+                    top_k=config.image_retrieve_topk,
                 )
-                expanded_elements = self._retriever.expand_chunks_to_elements(chunk_results)
-                element_map = {
-                    int(row["element_id"]): row
-                    for row in expanded_elements
-                    if row.get("element_id") is not None
-                }
             except Exception as exc:  # pragma: no cover - runtime guard
-                logger.warning("Retriever failed for chat %s: %s", chat_id, exc)
-                chunk_results = []
-                element_map = {}
-            text_evidences = self._build_text_evidences_from_chunks(
-                chunks=chunk_results,
-                element_map=element_map,
-                evidence_limit=config.text_evidence_limit,
-            )
-            image_candidates = self._collect_image_candidates(
-                chunks=chunk_results,
-                element_map=element_map,
-            )
+                logger.warning("Image retrieval failed: %s", exc)
 
-        vision_client = self._vision_client if config.enable_image_vqa else None
-        if config.enable_image_vqa and vision_client is None:
-            vision_client = VisionVQAClient()
-            self._vision_client = vision_client
+        text_chunk_elements = self._text_agent.expand(text_chunks)
+        image_chunk_elements = self._image_agent.expand(image_chunks) if config.use_image else []
 
-        image_evidences = self._build_image_evidences(
-            candidates=image_candidates,
+        memory_text_elements, memory_image_elements = self._memory_agent.select_elements(
             question=question_text,
-            memory_summary=memory_summary,
-            enable_image_vqa=config.enable_image_vqa,
-            image_evidence_limit=config.image_evidence_limit,
-            vision_client=vision_client,
+            last_memory=last_memory,
+            use_image=config.use_image,
+            text_topk=config.text_memory_topk,
+            image_topk=config.image_memory_topk,
         )
 
-        answer_text = self._answer_composer.compose(
-            question=question_text,
-            memory_summary=memory_summary,
-            text_evidences=text_evidences,
-            image_evidences=image_evidences,
+        merged_text, merged_image = self._merge_candidates(
+            text_chunk_elements=text_chunk_elements,
+            image_chunk_elements=image_chunk_elements,
+            memory_text_elements=memory_text_elements,
+            memory_image_elements=memory_image_elements,
+            use_image=config.use_image,
         )
 
+        answer_text, used_element_ids = self._answer_agent.answer(
+            question=question_text,
+            memory_summary=last_memory,
+            text_elements=merged_text,
+            image_elements=merged_image,
+            use_image=config.use_image,
+        )
+
+        new_memory = self._memory_agent.generate_memory(last_memory, question_text, answer_text)
         next_order = self._compute_next_order(history_turns, chat)
         turn = self._turns_repo.create_turn(
             chat_id=chat_id,
             order=next_order,
             user_question=question_text,
             llm_answer_text=answer_text,
+            memory=new_memory,
+            used_llm_model=self._llm_settings.model,
         )
         self._chats_repo.update_chat(chat_id, max_turn_order=next_order)
-        used_element_ids = evidence_mapper.extract_element_ids_from_answer(answer_text)
-        if used_element_ids:
-            records = [
-                {
-                    "chat_id": chat_id,
-                    "turn_id": int(turn["id"]),
-                    "turn_order": next_order,
-                    "element_id": elem_id,
-                }
-                for elem_id in used_element_ids
-            ]
-            try:
-                self._turn2element_repo.bulk_bind(records)
-            except Exception as exc:  # pragma: no cover - runtime guard
-                logger.warning("Failed to persist turn2element mappings: %s", exc)
         history_turns.append(turn)
-        history_element_ids = evidence_mapper.collect_element_ids_from_turns(history_turns)
-        mapping = evidence_mapper.build_evidence_no_mapping(history_element_ids)
-        elements = self._load_elements_for_ids(used_element_ids)
+        mapping = evidence_mapper.build_evidence_no_mapping(
+            evidence_mapper.collect_element_ids_from_turns(history_turns),
+        )
+        element_map = self._build_element_map(merged_text, merged_image)
+        missing_ids = [elem_id for elem_id in used_element_ids if elem_id not in element_map]
+        if missing_ids:
+            for row in self._elements_repo.list_by_ids(missing_ids):
+                candidate = _row_to_candidate(row)
+                element_map[candidate.element_id] = candidate.as_answer_dict()
         evidences = evidence_mapper.build_evidences_payload(
             mapping=mapping,
-            elements=elements,
+            elements=element_map,
             used_element_ids=used_element_ids,
         )
         logger.info(
@@ -365,180 +606,50 @@ class QAOrchestrator:
             evidences=evidences,
         )
 
-    def _build_text_evidences_from_chunks(
+    def _merge_candidates(
         self,
         *,
-        chunks: Iterable[ChunkRetrievalResult],
-        element_map: dict[int, dict[str, object]],
-        evidence_limit: int,
-    ) -> list[EvidenceText]:
-        evidences: list[EvidenceText] = []
-        used_element_ids: set[int] = set()
-        for chunk in chunks:
-            if len(evidences) >= evidence_limit:
-                break
-            chunk_type = (chunk.get("chunk_type") or "").lower()
-            if chunk_type == "image":
-                continue
-            context_text = self._compose_chunk_context(
-                chunk=chunk,
-                element_map=element_map,
-                used_element_ids=used_element_ids,
-            )
-            if not context_text:
-                continue
-            main_elem_id = next(
-                (elem_id for elem_id in chunk.get("elem_ids") or [] if elem_id in element_map),
-                None,
-            )
-            if main_elem_id is None:
-                continue
-            evidences.append(
-                EvidenceText(
-                    element_id=int(main_elem_id),
-                    elem_type=chunk_type or "text",
-                    text_content=context_text,
-                    score=float(chunk.get("score") or 0.0),
-                ),
-            )
-        return evidences
+        text_chunk_elements: Sequence[CandidateElement],
+        image_chunk_elements: Sequence[CandidateElement],
+        memory_text_elements: Sequence[CandidateElement],
+        memory_image_elements: Sequence[CandidateElement],
+        use_image: bool,
+    ) -> tuple[list[CandidateElement], list[CandidateElement]]:
+        seen: set[int] = set()
+        merged_text: list[CandidateElement] = []
+        merged_image: list[CandidateElement] = []
 
-    def _collect_image_candidates(
+        for candidate in text_chunk_elements:
+            if candidate.element_id in seen:
+                continue
+            merged_text.append(candidate)
+            seen.add(candidate.element_id)
+        for candidate in memory_text_elements:
+            if candidate.element_id in seen:
+                continue
+            merged_text.append(candidate)
+            seen.add(candidate.element_id)
+        if use_image:
+            for candidate in image_chunk_elements:
+                if candidate.element_id in seen:
+                    continue
+                merged_image.append(candidate)
+                seen.add(candidate.element_id)
+            for candidate in memory_image_elements:
+                if candidate.element_id in seen:
+                    continue
+                merged_image.append(candidate)
+                seen.add(candidate.element_id)
+        return merged_text, merged_image
+
+    def _build_element_map(
         self,
-        *,
-        chunks: Iterable[ChunkRetrievalResult],
-        element_map: dict[int, dict[str, object]],
-    ) -> list[dict[str, object]]:
-        candidates: list[dict[str, object]] = []
-        for chunk in chunks:
-            chunk_type = (chunk.get("chunk_type") or "").lower()
-            if chunk_type != "image":
-                continue
-            elem_ids = chunk.get("elem_ids") or []
-            if not elem_ids:
-                continue
-            elem_id = int(elem_ids[0])
-            element = element_map.get(elem_id)
-            caption = ""
-            if element:
-                caption = (
-                    element.get("text_caption")
-                    or element.get("raw_text_content")
-                    or ""
-                )
-            chunk_caption = caption or (chunk.get("chunk_text_main") or "")
-            payload = {
-                "element_id": elem_id,
-                "elem_type": "image",
-                "text_content": (f"[Elem#{elem_id}] {chunk_caption}".strip() if chunk_caption else None),
-                "score": float(chunk.get("score") or 0.0),
-            }
-            candidates.append(payload)
-        return candidates
-
-    def _compose_chunk_context(
-        self,
-        *,
-        chunk: ChunkRetrievalResult,
-        element_map: dict[int, dict[str, object]],
-        used_element_ids: set[int],
-    ) -> str:
-        parts: list[str] = []
-        for elem_id in chunk.get("elem_ids") or []:
-            if elem_id in used_element_ids:
-                continue
-            element = element_map.get(int(elem_id))
-            if not element:
-                continue
-            text = (
-                element.get("raw_text_content")
-                or element.get("text_caption")
-                or ""
-            )
-            snippet = (text or "").strip()
-            if not snippet:
-                continue
-            parts.append(f"[Elem#{elem_id}] {snippet}")
-            used_element_ids.add(int(elem_id))
-        return "\n".join(parts).strip()
-
-    def _build_image_evidences(
-        self,
-        *,
-        candidates: Iterable[dict[str, object]],
-        question: str,
-        memory_summary: str,
-        enable_image_vqa: bool,
-        image_evidence_limit: int,
-        vision_client: VisionVQAClient | None,
-    ) -> list[EvidenceText]:
-        evidences: list[EvidenceText] = []
-        if not candidates or image_evidence_limit <= 0:
-            return evidences
-        for row in candidates:
-            if len(evidences) >= image_evidence_limit:
-                break
-            elem_id = int(row["element_id"])
-            base_text = (row.get("text_content") or "").strip()
-            merged_text = base_text
-            if enable_image_vqa and vision_client is not None:
-                local_context = base_text
-                derived_question = self._image_question_generator.generate(
-                    question=question,
-                    memory_summary=memory_summary,
-                    local_context=local_context,
-                )
-                try:
-                    vqa_summary = vision_client.summarize(
-                        element_id=elem_id,
-                        derived_question=derived_question,
-                        local_context=local_context,
-                    )
-                    if vqa_summary:
-                        merged_text = f"{base_text}\nVision summary: {vqa_summary}".strip()
-                except VisionVQAError as exc:
-                    logger.warning("Vision VQA failed for element %s: %s", elem_id, exc)
-            if not merged_text:
-                continue
-            evidences.append(
-                EvidenceText(
-                    element_id=elem_id,
-                    elem_type="image",
-                    text_content=merged_text,
-                    score=float(row.get("score") or 0.0),
-                ),
-            )
-        return evidences
-
-    @staticmethod
-    def _map_chunk_types(elem_types: Iterable[str] | None) -> set[str] | None:
-        if not elem_types:
-            return None
-        normalized = {entry.strip().lower() for entry in elem_types if entry}
-        chunk_types: set[str] = set()
-        if any(entry in normalized for entry in {"text", "header", "equation"}):
-            chunk_types.add("text")
-        if "table" in normalized:
-            chunk_types.add("table")
-        if "image" in normalized:
-            chunk_types.add("image")
-        return chunk_types or None
-
-    def _load_elements_for_ids(self, element_ids: Iterable[int]) -> dict[int, dict[str, object]]:
-        rows = self._elements_repo.list_by_ids(element_ids)
-        mapping: dict[int, dict[str, object]] = {}
-        for row in rows:
-            mapping[int(row["id"])] = {
-                "id": row["id"],
-                "doc_id": row["doc_id"],
-                "page_no": row.get("page_no"),
-                "bbox": row.get("bbox"),
-                "elem_type": row.get("elem_type"),
-                "text_content": row.get("text_content") or row.get("raw_text_content"),
-                "raw_text_content": row.get("raw_text_content"),
-                "text_caption": row.get("text_caption"),
-                "level_nav": row.get("level_nav"),
-            }
+        text_elements: Sequence[CandidateElement],
+        image_elements: Sequence[CandidateElement],
+    ) -> dict[int, Mapping[str, object]]:
+        mapping: dict[int, Mapping[str, object]] = {}
+        for elem in list(text_elements) + list(image_elements):
+            mapping[elem.element_id] = elem.as_answer_dict()
         return mapping
 
     @staticmethod
@@ -568,21 +679,115 @@ class QAOrchestrator:
         raise QAFlowError(f"Unsupported chat type: {chat_type}")
 
 
+def _normalize_search_mode(value: str | None) -> str | None:
+    if not value:
+        return None
+    lowered = str(value).lower()
+    if lowered in {"vector", "fulltext", "hybrid"}:
+        return lowered
+    return None
+
+
+def _row_to_candidate(row: Mapping[str, object]) -> CandidateElement:
+    text_content = (row.get("text_content") or row.get("raw_text_content") or "").strip() or None
+    text_caption = (row.get("text_caption") or "").strip() or None
+    bbox = row.get("bbox")
+    if bbox is not None and not isinstance(bbox, list):
+        bbox = None
+    return CandidateElement(
+        element_id=int(row.get("element_id") or row.get("id")),
+        elem_type=str(row.get("elem_type") or row.get("chunk_type") or "text").lower(),
+        doc_id=row.get("doc_id"),
+        page_no=row.get("page_no") or row.get("page_id") or row.get("page_index"),
+        bbox=bbox,
+        text_content=text_content,
+        image_base64=row.get("image_base64"),
+        text_caption=text_caption,
+        level_nav=row.get("level_nav"),
+    )
+
+
+def _extract_elem_ids(text: str) -> list[int]:
+    ids: list[int] = []
+    for match in _ELEM_TAG_RE.finditer(text or ""):
+        try:
+            value = int(match.group("id"))
+        except ValueError:
+            continue
+        if value not in ids:
+            ids.append(value)
+    return ids
+
+
+def _parse_elem_id_list(json_text: str) -> list[int]:
+    import json
+
+    if not json_text:
+        return []
+    try:
+        payload = json.loads(json_text)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(payload, dict):
+        candidate = payload.get("element_ids") or payload.get("elem_ids")
+    else:
+        candidate = payload
+    if not isinstance(candidate, (list, tuple)):
+        return []
+    elem_ids: list[int] = []
+    for entry in candidate:
+        try:
+            elem_id = int(entry)
+        except (TypeError, ValueError):
+            continue
+        if elem_id not in elem_ids:
+            elem_ids.append(elem_id)
+    return elem_ids
+
+
+try:
+    import dspy  # type: ignore
+except ImportError:  # pragma: no cover
+    dspy = None
+
+if dspy is not None:
+
+    class _MemorySummarySignature(dspy.Signature):  # type: ignore[misc]
+        guidance = dspy.InputField(desc="Summarization rules and constraints.")
+        question = dspy.InputField(desc="Current turn question.")
+        answer = dspy.InputField(desc="Current turn answer.")
+        last_turn_memory = dspy.InputField(desc="Last turn memory text.")
+        memory_summary = dspy.OutputField(desc="Updated memory summary containing [Elem#id].")
+
+    class _MemorySelectionSignature(dspy.Signature):  # type: ignore[misc]
+        question = dspy.InputField(desc="Current turn question.")
+        last_turn_memory = dspy.InputField(desc="Last turn memory text containing [Elem#id].")
+        elem_ids_json = dspy.OutputField(
+            desc="JSON array of element ids that are helpful for answering the question, e.g. {\"element_ids\": [1,2]}",
+        )
+
+else:  # pragma: no cover - fallback for static analyzers
+
+    class _MemorySummarySignature:  # type: ignore[too-many-ancestors]
+        pass
+
+    class _MemorySelectionSignature:  # type: ignore[too-many-ancestors]
+        pass
+
+
 def run_qa_turn(
     *,
     chat_id: int,
     question: str,
-    top_k: int = 8,
-    retrieval_mode: str | None = None,
-    elem_types: Iterable[str] | None = None,
-    search_mode: str | None = None,
-    max_history_turns: int | None = None,
-    enable_image_vqa: bool | None = None,
-    enable_memory_summarizer: bool | None = None,
-    text_evidence_limit: int | None = None,
-    image_evidence_limit: int | None = None,
-    enable_page_filter: bool | None = None,
-    page_top_k: int | None = None,
+    use_image: bool | None = None,
+    text_retrieve_topk: int | None = None,
+    image_retrieve_topk: int | None = None,
+    text_memory_topk: int | None = None,
+    image_memory_topk: int | None = None,
+    use_page_in_text_retrieve: bool | None = None,
+    page_retrieve_topk: int | None = None,
+    text_search_mode: str | None = None,
+    **_: object,
 ) -> QATurnResult:
     settings = get_qa_flow_settings()
     orchestrator = QAOrchestrator(
@@ -592,17 +797,14 @@ def run_qa_turn(
     return orchestrator.run(
         chat_id=chat_id,
         question=question,
-        top_k=top_k,
-        enable_image_vqa=enable_image_vqa,
-        enable_memory_summarizer=enable_memory_summarizer,
-        retrieval_mode=retrieval_mode,
-        elem_types=elem_types,
-        search_mode=search_mode,
-        max_history_turns=max_history_turns,
-        text_evidence_limit=text_evidence_limit,
-        image_evidence_limit=image_evidence_limit,
-        enable_page_filter=enable_page_filter,
-        page_top_k=page_top_k,
+        use_image=use_image,
+        text_retrieve_topk=text_retrieve_topk,
+        image_retrieve_topk=image_retrieve_topk,
+        text_memory_topk=text_memory_topk,
+        image_memory_topk=image_memory_topk,
+        use_page_in_text_retrieve=use_page_in_text_retrieve,
+        page_retrieve_topk=page_retrieve_topk,
+        text_search_mode=text_search_mode,
     )
 
 

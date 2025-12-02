@@ -258,6 +258,7 @@ CREATE TABLE IF NOT EXISTS turns (
   user_question MEDIUMTEXT,
   llm_answer_text MEDIUMTEXT,
   llm_thought_text MEDIUMTEXT,
+  memory MEDIUMTEXT,
   response_tokens INT,
   used_llm_model VARCHAR(128),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -267,23 +268,16 @@ CREATE TABLE IF NOT EXISTS turns (
     ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS turn2element (
-  chat_id BIGINT NOT NULL,
-  turn_id BIGINT NOT NULL,
-  turn_order INT NOT NULL,
-  element_id BIGINT NOT NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (chat_id, turn_id, element_id),
-  CONSTRAINT fk_turn2element_chat
-    FOREIGN KEY (chat_id) REFERENCES chats(id)
-    ON DELETE CASCADE,
-  CONSTRAINT fk_turn2element_turn
-    FOREIGN KEY (turn_id) REFERENCES turns(id)
-    ON DELETE CASCADE,
-  CONSTRAINT fk_turn2element_element
-    FOREIGN KEY (element_id) REFERENCES elements(id)
-    ON DELETE CASCADE
+SET @missing_turn_memory := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'turns' AND COLUMN_NAME = 'memory'
 );
+SET @sql := IF(@missing_turn_memory = 0, 'ALTER TABLE turns ADD COLUMN memory MEDIUMTEXT AFTER llm_thought_text', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+DROP TABLE IF EXISTS turn2element;
 
 CREATE TABLE IF NOT EXISTS arxiv_favorite_doc (
   id BIGINT NOT NULL AUTO_INCREMENT,

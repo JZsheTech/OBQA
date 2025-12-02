@@ -239,15 +239,14 @@ export async function createTurn(
     chatId,
     {
         question,
-        topK,
-        retrievalMode,
-        elemTypes,
-        searchMode,
-        maxHistoryTurns,
-        enableImageVqa,
-        enableMemorySummarizer,
-        pageTopK,
-        enablePageFilter,
+        useImage,
+        textRetrieveTopk,
+        imageRetrieveTopk,
+        textMemoryTopk,
+        imageMemoryTopk,
+        usePageInTextRetrieve,
+        pageRetrieveTopk,
+        textSearchMode,
     } = {},
 ) {
     const trimmedQuestion = (question ?? "").trim()
@@ -257,42 +256,41 @@ export async function createTurn(
     if (!trimmedQuestion) {
         throw new Error("Question is required")
     }
-    const numericTopK = topK == null ? undefined : Number(topK)
     const body = {
         question: trimmedQuestion,
     }
-    if (Number.isFinite(numericTopK)) {
-        body.top_k = numericTopK
+    if (useImage !== undefined) {
+        body.use_image = Boolean(useImage)
     }
-    if (retrievalMode) {
-        body.retrieval_mode = retrievalMode
+    const numeric = (value) => {
+        const parsed = Number(value)
+        return Number.isFinite(parsed) ? parsed : undefined
     }
-    if (Array.isArray(elemTypes) && elemTypes.length) {
-        body.elem_types = elemTypes
+    const textTopk = numeric(textRetrieveTopk)
+    if (textTopk !== undefined) {
+        body.text_retrieve_topk = textTopk
     }
-    if (searchMode) {
-        body.search_mode = searchMode
+    const imageTopk = numeric(imageRetrieveTopk)
+    if (imageTopk !== undefined) {
+        body.image_retrieve_topk = imageTopk
     }
-    if (maxHistoryTurns !== undefined && maxHistoryTurns !== null) {
-        const numericHistory = Number(maxHistoryTurns)
-        if (Number.isFinite(numericHistory)) {
-            body.max_history_turns = numericHistory
-        }
+    const textMemTopk = numeric(textMemoryTopk)
+    if (textMemTopk !== undefined) {
+        body.text_memory_topk = textMemTopk
     }
-    if (pageTopK !== undefined && pageTopK !== null) {
-        const numericPageTopK = Number(pageTopK)
-        if (Number.isFinite(numericPageTopK)) {
-            body.page_top_k = numericPageTopK
-        }
+    const imageMemTopk = numeric(imageMemoryTopk)
+    if (imageMemTopk !== undefined) {
+        body.image_memory_topk = imageMemTopk
     }
-    if (enablePageFilter !== undefined) {
-        body.enable_page_filter = Boolean(enablePageFilter)
+    const pageTopk = numeric(pageRetrieveTopk)
+    if (pageTopk !== undefined) {
+        body.page_retrieve_topk = pageTopk
     }
-    if (enableImageVqa !== undefined) {
-        body.enable_image_vqa = Boolean(enableImageVqa)
+    if (usePageInTextRetrieve !== undefined) {
+        body.use_page_in_text_retrieve = Boolean(usePageInTextRetrieve)
     }
-    if (enableMemorySummarizer !== undefined) {
-        body.enable_memory_summarizer = Boolean(enableMemorySummarizer)
+    if (textSearchMode) {
+        body.text_search_mode = textSearchMode
     }
     return request(`/chats/${chatId}/turns`, {
         method: "POST",

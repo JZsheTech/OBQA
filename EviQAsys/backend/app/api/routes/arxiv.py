@@ -20,7 +20,8 @@ from ...schemas import (
 )
 from ...services.index import DocumentIndexer
 from ...services.ingestion import DuplicateDocumentError
-from ...services.integrations import ArxivImportService, ArxivSearchParams, search_arxiv
+from ...services.integrations import ArxivSearchParams, search_arxiv
+from ...services.integrations.arxiv_importer import ArxivImportService
 
 router = APIRouter(tags=["arxiv"])
 logger = logging.getLogger(__name__)

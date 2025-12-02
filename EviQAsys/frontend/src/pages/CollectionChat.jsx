@@ -27,20 +27,17 @@ import Drawer from "../components/ui/Drawer"
 import Modal from "../components/ui/Modal"
 import { useToast } from "../components/ui/Toast"
 
-const DEFAULT_RETRIEVAL_MODE = "auto"
-const DEFAULT_SEARCH_MODE = "hybrid"
-const DEFAULT_MAX_HISTORY_TURNS = "8"
-const DEFAULT_ELEM_TYPES = ["text", "image", "table"]
-const DEFAULT_TOP_K = "8"
-const DEFAULT_PAGE_TOP_K = ""
+const DEFAULT_USE_IMAGE = false
+const DEFAULT_TEXT_RETRIEVE_TOPK = "8"
+const DEFAULT_IMAGE_RETRIEVE_TOPK = "2"
+const DEFAULT_TEXT_MEMORY_TOPK = "4"
+const DEFAULT_IMAGE_MEMORY_TOPK = "1"
+const DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE = false
+const DEFAULT_PAGE_RETRIEVE_TOPK = "4"
+const DEFAULT_TEXT_SEARCH_MODE = "hybrid"
 const DEFAULT_CHAT_PANEL_RATIO = 0.55
 const MIN_PANEL_RATIO = 0.32
 const MAX_PANEL_RATIO = 0.68
-const ELEMENT_TYPE_OPTIONS = [
-    { value: "text", label: "Text" },
-    { value: "image", label: "Image" },
-    { value: "table", label: "Table" },
-]
 
 function formatDateTime(value) {
     if (!value) return "--"
@@ -355,15 +352,14 @@ export default function CollectionChat() {
     const [renameTitle, setRenameTitle] = useState("")
     const [showMetaPanel] = useState(false)
     const [showEvidencePopover, setShowEvidencePopover] = useState(false)
-    const [retrievalMode, setRetrievalMode] = useState(DEFAULT_RETRIEVAL_MODE)
-    const [searchMode, setSearchMode] = useState(DEFAULT_SEARCH_MODE)
-    const [topK, setTopK] = useState(DEFAULT_TOP_K)
-    const [pageTopK, setPageTopK] = useState(DEFAULT_PAGE_TOP_K)
-    const [elemTypes, setElemTypes] = useState(DEFAULT_ELEM_TYPES)
-    const [maxHistoryTurns, setMaxHistoryTurns] = useState(DEFAULT_MAX_HISTORY_TURNS)
-    const [enablePageFilter, setEnablePageFilter] = useState(false)
-    const [enableImageVqa, setEnableImageVqa] = useState(false)
-    const [enableMemorySummarizer, setEnableMemorySummarizer] = useState(false)
+    const [useImage, setUseImage] = useState(DEFAULT_USE_IMAGE)
+    const [textRetrieveTopk, setTextRetrieveTopk] = useState(DEFAULT_TEXT_RETRIEVE_TOPK)
+    const [imageRetrieveTopk, setImageRetrieveTopk] = useState(DEFAULT_IMAGE_RETRIEVE_TOPK)
+    const [textMemoryTopk, setTextMemoryTopk] = useState(DEFAULT_TEXT_MEMORY_TOPK)
+    const [imageMemoryTopk, setImageMemoryTopk] = useState(DEFAULT_IMAGE_MEMORY_TOPK)
+    const [usePageInTextRetrieve, setUsePageInTextRetrieve] = useState(DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE)
+    const [pageRetrieveTopk, setPageRetrieveTopk] = useState(DEFAULT_PAGE_RETRIEVE_TOPK)
+    const [textSearchMode, setTextSearchMode] = useState(DEFAULT_TEXT_SEARCH_MODE)
     const [chatPanelRatio, setChatPanelRatio] = useState(DEFAULT_CHAT_PANEL_RATIO)
     const [isResizing, setIsResizing] = useState(false)
     const layoutRef = useRef(null)
@@ -508,34 +504,50 @@ export default function CollectionChat() {
         setShowEvidencePopover(false)
     }, [selectedDocId])
 
-    const elemTypeSet = useMemo(
-        () => new Set(elemTypes.map((item) => (item || "").toLowerCase())),
-        [elemTypes],
-    )
-
-    function toggleElemType(value) {
-        const normalized = (value || "").toLowerCase()
-        setElemTypes((prev) => {
-            const next = new Set(prev.map((item) => (item || "").toLowerCase()))
-            if (next.has(normalized)) {
-                next.delete(normalized)
-            } else {
-                next.add(normalized)
-            }
-            return ELEMENT_TYPE_OPTIONS.map((option) => option.value).filter((option) => next.has(option))
-        })
-    }
+    useEffect(() => {
+        const defaults = chatDetail?.qa_config_defaults
+        if (!defaults) {
+            setUseImage(DEFAULT_USE_IMAGE)
+            setTextRetrieveTopk(DEFAULT_TEXT_RETRIEVE_TOPK)
+            setImageRetrieveTopk(DEFAULT_IMAGE_RETRIEVE_TOPK)
+            setTextMemoryTopk(DEFAULT_TEXT_MEMORY_TOPK)
+            setImageMemoryTopk(DEFAULT_IMAGE_MEMORY_TOPK)
+            setUsePageInTextRetrieve(DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE)
+            setPageRetrieveTopk(DEFAULT_PAGE_RETRIEVE_TOPK)
+            setTextSearchMode(DEFAULT_TEXT_SEARCH_MODE)
+            return
+        }
+        setUseImage(Boolean(defaults.use_image))
+        setTextRetrieveTopk(String(defaults.text_retrieve_topk ?? DEFAULT_TEXT_RETRIEVE_TOPK))
+        setImageRetrieveTopk(String(defaults.image_retrieve_topk ?? DEFAULT_IMAGE_RETRIEVE_TOPK))
+        setTextMemoryTopk(String(defaults.text_memory_topk ?? DEFAULT_TEXT_MEMORY_TOPK))
+        setImageMemoryTopk(String(defaults.image_memory_topk ?? DEFAULT_IMAGE_MEMORY_TOPK))
+        setUsePageInTextRetrieve(Boolean(defaults.use_page_in_text_retrieve))
+        setPageRetrieveTopk(String(defaults.page_retrieve_topk ?? DEFAULT_PAGE_RETRIEVE_TOPK))
+        setTextSearchMode(defaults.text_search_mode || DEFAULT_TEXT_SEARCH_MODE)
+    }, [chatDetail?.qa_config_defaults])
 
     function resetQaControls() {
-        setRetrievalMode(DEFAULT_RETRIEVAL_MODE)
-        setSearchMode(DEFAULT_SEARCH_MODE)
-        setTopK(DEFAULT_TOP_K)
-        setPageTopK(DEFAULT_PAGE_TOP_K)
-        setElemTypes([...DEFAULT_ELEM_TYPES])
-        setMaxHistoryTurns(DEFAULT_MAX_HISTORY_TURNS)
-        setEnablePageFilter(false)
-        setEnableImageVqa(false)
-        setEnableMemorySummarizer(false)
+        const defaults = chatDetail?.qa_config_defaults
+        if (defaults) {
+            setUseImage(Boolean(defaults.use_image))
+            setTextRetrieveTopk(String(defaults.text_retrieve_topk ?? DEFAULT_TEXT_RETRIEVE_TOPK))
+            setImageRetrieveTopk(String(defaults.image_retrieve_topk ?? DEFAULT_IMAGE_RETRIEVE_TOPK))
+            setTextMemoryTopk(String(defaults.text_memory_topk ?? DEFAULT_TEXT_MEMORY_TOPK))
+            setImageMemoryTopk(String(defaults.image_memory_topk ?? DEFAULT_IMAGE_MEMORY_TOPK))
+            setUsePageInTextRetrieve(Boolean(defaults.use_page_in_text_retrieve))
+            setPageRetrieveTopk(String(defaults.page_retrieve_topk ?? DEFAULT_PAGE_RETRIEVE_TOPK))
+            setTextSearchMode(defaults.text_search_mode || DEFAULT_TEXT_SEARCH_MODE)
+            return
+        }
+        setUseImage(DEFAULT_USE_IMAGE)
+        setTextRetrieveTopk(DEFAULT_TEXT_RETRIEVE_TOPK)
+        setImageRetrieveTopk(DEFAULT_IMAGE_RETRIEVE_TOPK)
+        setTextMemoryTopk(DEFAULT_TEXT_MEMORY_TOPK)
+        setImageMemoryTopk(DEFAULT_IMAGE_MEMORY_TOPK)
+        setUsePageInTextRetrieve(DEFAULT_USE_PAGE_IN_TEXT_RETRIEVE)
+        setPageRetrieveTopk(DEFAULT_PAGE_RETRIEVE_TOPK)
+        setTextSearchMode(DEFAULT_TEXT_SEARCH_MODE)
     }
 
     const pageHighlights = useMemo(() => {
@@ -694,40 +706,34 @@ export default function CollectionChat() {
             addToast({ type: "error", title: "缺少 chatId", message: "请先创建或选择聊天" })
             return
         }
-        const parsedTopK = topK === "" ? undefined : Number(topK)
-        const normalizedTopK =
-            parsedTopK === undefined || Number.isNaN(parsedTopK)
-                ? undefined
-                : Math.min(30, Math.max(1, Math.floor(parsedTopK)))
-        const parsedHistory = maxHistoryTurns === "" ? undefined : Number(maxHistoryTurns)
-        const normalizedHistory =
-            parsedHistory === undefined || Number.isNaN(parsedHistory)
-                ? undefined
-                : Math.max(0, Math.floor(parsedHistory))
-        const parsedPageTopK = pageTopK === "" ? undefined : Number(pageTopK)
-        const normalizedPageTopK =
-            parsedPageTopK === undefined || Number.isNaN(parsedPageTopK)
-                ? undefined
-                : Math.min(50, Math.max(1, Math.floor(parsedPageTopK)))
-        if (normalizedTopK !== undefined) {
-            setTopK(String(normalizedTopK))
+        const normalizeTopk = (value) => {
+            if (value === "" || value === undefined || value === null) return undefined
+            const numeric = Number(value)
+            if (Number.isNaN(numeric)) return undefined
+            return Math.min(20, Math.max(1, Math.floor(numeric)))
         }
-        if (normalizedPageTopK !== undefined) {
-            setPageTopK(String(normalizedPageTopK))
-        }
+        const normalizedTextTopk = normalizeTopk(textRetrieveTopk)
+        const normalizedImageTopk = normalizeTopk(imageRetrieveTopk)
+        const normalizedTextMemTopk = normalizeTopk(textMemoryTopk)
+        const normalizedImageMemTopk = normalizeTopk(imageMemoryTopk)
+        const normalizedPageTopK = normalizeTopk(pageRetrieveTopk)
+        if (normalizedTextTopk !== undefined) setTextRetrieveTopk(String(normalizedTextTopk))
+        if (normalizedImageTopk !== undefined) setImageRetrieveTopk(String(normalizedImageTopk))
+        if (normalizedTextMemTopk !== undefined) setTextMemoryTopk(String(normalizedTextMemTopk))
+        if (normalizedImageMemTopk !== undefined) setImageMemoryTopk(String(normalizedImageMemTopk))
+        if (normalizedPageTopK !== undefined) setPageRetrieveTopk(String(normalizedPageTopK))
         setSending(true)
         try {
             await createTurn(chatId, {
                 question,
-                retrievalMode,
-                searchMode,
-                topK: normalizedTopK,
-                pageTopK: normalizedPageTopK,
-                enablePageFilter,
-                elemTypes,
-                maxHistoryTurns: normalizedHistory,
-                enableImageVqa,
-                enableMemorySummarizer,
+                useImage,
+                textRetrieveTopk: normalizedTextTopk,
+                imageRetrieveTopk: normalizedImageTopk,
+                textMemoryTopk: normalizedTextMemTopk,
+                imageMemoryTopk: normalizedImageMemTopk,
+                usePageInTextRetrieve,
+                pageRetrieveTopk: normalizedPageTopK,
+                textSearchMode,
             })
             setDraftQuestion("")
             await loadChatDetail()
@@ -966,7 +972,7 @@ export default function CollectionChat() {
                             <div className="stack" style={{ gap: "4px" }}>
                                 <strong>QA 控制面板</strong>
                                 <span className="caption muted">
-                                    默认遵循 env_setting，可按需强制/跳过检索，切换混合/向量/全文、调整 Chunk/Page TopK 与 chunk 类型。
+                                    仅保留检索/记忆相关可调参数：文本/图片检索 TopK、记忆 TopK、是否页级过滤与搜索模式。
                                 </span>
                             </div>
                             <Button variant="ghost" onClick={resetQaControls} type="button">
@@ -982,29 +988,28 @@ export default function CollectionChat() {
                             }}
                         >
                             <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="retrieval-mode-select">
-                                    检索模式
+                                <label className="caption" htmlFor="use-image-switch">
+                                    启用图片路径
                                 </label>
-                                <select
-                                    id="retrieval-mode-select"
-                                    className="search-bar__select"
-                                    value={retrievalMode}
-                                    onChange={(event) => setRetrievalMode(event.target.value)}
-                                >
-                                    <option value="auto">Auto · 决策模式</option>
-                                    <option value="force">Force · 强制检索</option>
-                                    <option value="skip">Skip · 直接回答</option>
-                                </select>
+                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                                    <input
+                                        id="use-image-switch"
+                                        type="checkbox"
+                                        checked={useImage}
+                                        onChange={(event) => setUseImage(event.target.checked)}
+                                    />
+                                    <span className="caption">use_image</span>
+                                </label>
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
                                 <label className="caption" htmlFor="search-mode-select">
-                                    搜索模式
+                                    文本检索模式
                                 </label>
                                 <select
                                     id="search-mode-select"
                                     className="search-bar__select"
-                                    value={searchMode}
-                                    onChange={(event) => setSearchMode(event.target.value)}
+                                    value={textSearchMode}
+                                    onChange={(event) => setTextSearchMode(event.target.value)}
                                 >
                                     <option value="hybrid">混合</option>
                                     <option value="vector">向量</option>
@@ -1012,116 +1017,89 @@ export default function CollectionChat() {
                                 </select>
                             </div>
                             <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="topk-input">
-                                    Chunk TopK
+                                <label className="caption" htmlFor="page-toggle">
+                                    页级过滤
                                 </label>
-                                <input
-                                    id="topk-input"
-                                    className="input"
-                                    type="number"
-                                    min="1"
-                                    max="30"
-                                    value={topK}
-                                    onChange={(event) => setTopK(event.target.value)}
-                                    placeholder="默认跟随后端"
-                                />
-                                <span className="caption muted">chunk 检索返回条数（空则使用后端默认）。</span>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="history-turns-input">
-                                    历史轮数
-                                </label>
-                                <input
-                                    id="history-turns-input"
-                                    className="input"
-                                    type="number"
-                                    min="0"
-                                    value={maxHistoryTurns}
-                                    onChange={(event) => setMaxHistoryTurns(event.target.value)}
-                                    placeholder="默认为 8"
-                                />
-                                <span className="caption muted">设为 0 表示不带入历史轮次。</span>
-                            </div>
-                            <div className="stack" style={{ gap: "4px" }}>
-                                <label className="caption" htmlFor="page-topk-input">
-                                    Page TopK
+                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                                    <input
+                                        id="page-toggle"
+                                        type="checkbox"
+                                        checked={usePageInTextRetrieve}
+                                        onChange={(event) => setUsePageInTextRetrieve(event.target.checked)}
+                                    />
+                                    <span className="caption">use_page_in_text_retrieve</span>
                                 </label>
                                 <input
                                     id="page-topk-input"
                                     className="input"
                                     type="number"
                                     min="1"
-                                    max="50"
-                                    value={pageTopK}
-                                    onChange={(event) => setPageTopK(event.target.value)}
-                                    placeholder="页级二段过滤 topK（空则默认）"
+                                    max="20"
+                                    value={pageRetrieveTopk}
+                                    onChange={(event) => setPageRetrieveTopk(event.target.value)}
+                                    placeholder="Page TopK（空则使用后端默认）"
                                 />
-                                <label className="inline-kv" style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={enablePageFilter}
-                                        onChange={(event) => setEnablePageFilter(event.target.checked)}
-                                    />
-                                    <span className="caption">启用 Page-Chunk 二级检索</span>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="text-retrieve-topk-input">
+                                    文本检索 TopK
                                 </label>
-                            </div>
-                        </div>
-
-                        <div className="stack" style={{ gap: "6px", marginTop: "10px" }}>
-                            <span className="caption">Chunk 类型过滤</span>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                                {ELEMENT_TYPE_OPTIONS.map((option) => (
-                                    <label
-                                        key={option.value}
-                                        className="pill"
-                                        style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: "6px",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={elemTypeSet.has(option.value)}
-                                            onChange={() => toggleElemType(option.value)}
-                                        />
-                                        <span>{option.label}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div
-                            style={{
-                                display: "flex",
-                                gap: "16px",
-                                flexWrap: "wrap",
-                                marginTop: "10px",
-                            }}
-                        >
-                            <label
-                                className="inline-kv"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                            >
                                 <input
-                                    type="checkbox"
-                                    checked={enableMemorySummarizer}
-                                    onChange={(event) => setEnableMemorySummarizer(event.target.checked)}
+                                    id="text-retrieve-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={textRetrieveTopk}
+                                    onChange={(event) => setTextRetrieveTopk(event.target.value)}
+                                    placeholder="默认 8"
                                 />
-                                <span className="caption">记忆摘要开关</span>
-                            </label>
-                            <label
-                                className="inline-kv"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}
-                            >
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="image-retrieve-topk-input">
+                                    图片检索 TopK
+                                </label>
                                 <input
-                                    type="checkbox"
-                                    checked={enableImageVqa}
-                                    onChange={(event) => setEnableImageVqa(event.target.checked)}
+                                    id="image-retrieve-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={imageRetrieveTopk}
+                                    onChange={(event) => setImageRetrieveTopk(event.target.value)}
+                                    placeholder="默认 2"
                                 />
-                                <span className="caption">视觉问答（VQA）</span>
-                            </label>
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="text-memory-topk-input">
+                                    记忆文本 TopK
+                                </label>
+                                <input
+                                    id="text-memory-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={textMemoryTopk}
+                                    onChange={(event) => setTextMemoryTopk(event.target.value)}
+                                    placeholder="默认 4"
+                                />
+                            </div>
+                            <div className="stack" style={{ gap: "4px" }}>
+                                <label className="caption" htmlFor="image-memory-topk-input">
+                                    记忆图片 TopK
+                                </label>
+                                <input
+                                    id="image-memory-topk-input"
+                                    className="input"
+                                    type="number"
+                                    min="1"
+                                    max="20"
+                                    value={imageMemoryTopk}
+                                    onChange={(event) => setImageMemoryTopk(event.target.value)}
+                                    placeholder="默认 1"
+                                />
+                            </div>
                         </div>
                     </div>
 

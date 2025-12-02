@@ -18,9 +18,10 @@ from ...schemas import (
     TurnResponse,
     TurnResponseEnvelope,
     TurnWithEvidence,
+    QAConfigDefaults,
 )
 from ...services.mapping import evidence_mapper
-from ...services.qa_flow import ChatNotFoundError, QAFlowError, run_qa_turn
+from ...services.qa_flow import ChatNotFoundError, QAFlowConfig, QAFlowError, run_qa_turn
 
 router = APIRouter(tags=["chats"])
 
@@ -186,6 +187,7 @@ def get_chat_detail(
         created_at=chat["created_at"],
         turns=formatted_turns,
         evidence_no_mapping=mapping,
+        qa_config_defaults=_build_default_config(),
     )
     return ChatDetailEnvelope(code="OK", data=detail)
 
@@ -271,20 +273,18 @@ def create_turn(
     chat_id: int,
     payload: TurnCreateRequest,
 ) -> TurnResponseEnvelope:
-    top_k = payload.top_k or 8
     try:
         result = run_qa_turn(
             chat_id=chat_id,
             question=payload.question,
-            top_k=top_k,
-            retrieval_mode=payload.retrieval_mode,
-            elem_types=payload.elem_types,
-            search_mode=payload.search_mode,
-            max_history_turns=payload.max_history_turns,
-            enable_image_vqa=payload.enable_image_vqa,
-            enable_memory_summarizer=payload.enable_memory_summarizer,
-            enable_page_filter=payload.enable_page_filter,
-            page_top_k=payload.page_top_k,
+            use_image=payload.use_image,
+            text_retrieve_topk=payload.text_retrieve_topk,
+            image_retrieve_topk=payload.image_retrieve_topk,
+            text_memory_topk=payload.text_memory_topk,
+            image_memory_topk=payload.image_memory_topk,
+            use_page_in_text_retrieve=payload.use_page_in_text_retrieve,
+            page_retrieve_topk=payload.page_retrieve_topk,
+            text_search_mode=payload.text_search_mode,
         )
     except ChatNotFoundError as exc:
         raise HTTPException(
@@ -301,11 +301,13 @@ def create_turn(
         for item in result.evidences
         if item.get("evidence_no") is not None
     }
+    evidence_map = {f"Elem#{elem_id}": evidence_no for elem_id, evidence_no in mapping.items()}
     response = TurnResponse(
         turn_id=result.turn_id,
         chat_id=result.chat_id,
         answer_text=result.answer_text,
         evidences=result.evidences,
+        evidence_map=evidence_map or None,
         answer_with_evidence=evidence_mapper.replace_elem_tags_with_evidence(result.answer_text, mapping) if mapping else result.answer_text,
     )
     return TurnResponseEnvelope(code="OK", data=response)
@@ -367,6 +369,20 @@ def _to_chat_read(row: dict[str, object]) -> ChatRead:
         title=row.get("title"),
         max_turn_order=int(row.get("max_turn_order") or 0),
         created_at=row["created_at"],
+    )
+
+
+def _build_default_config() -> QAConfigDefaults:
+    cfg = QAFlowConfig.from_settings()
+    return QAConfigDefaults(
+        use_image=cfg.use_image,
+        text_retrieve_topk=cfg.text_retrieve_topk,
+        image_retrieve_topk=cfg.image_retrieve_topk,
+        text_memory_topk=cfg.text_memory_topk,
+        image_memory_topk=cfg.image_memory_topk,
+        use_page_in_text_retrieve=cfg.use_page_in_text_retrieve,
+        page_retrieve_topk=cfg.page_retrieve_topk,
+        text_search_mode=cfg.text_search_mode,
     )
 
 
