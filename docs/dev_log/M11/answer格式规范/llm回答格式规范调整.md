@@ -7,3 +7,5 @@
 - 对排版格式的要求：
 	- 使用markdown格式，避免使用和markdown冲突的排版。
 	- 数学公式用`$`包裹行内公式，用`$$`包裹行间公式。
+
+在完成后请在系统的 docs/dev_log/M11/answer格式规范/dev_result_normalize_answer_agent.md 文档中写出你修改的关键位置供人工审阅。
