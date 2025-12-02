@@ -23,17 +23,18 @@ class RetrievalDecision:
 
 
 class DSPyPredictorFactory:
-    """Creates DSPy Predict modules without mutating global settings."""
+    """Creates DSPy Predict modules without mutating global settings (text LLM only)."""
 
-    def __init__(self, settings: LLMSettings | None = None) -> None:
-        self._settings = settings or get_llm_settings()
+    def __init__(self, *, text_llm_settings: LLMSettings | None = None, settings: LLMSettings | None = None) -> None:
+        # `settings` kept for backward compatibility with older call sites.
+        self._text_settings = text_llm_settings or settings or get_llm_settings()
         self._lm = None
         self._lm_params = {
-            "model": f"openai/{self._settings.model}",
-            "api_key": self._settings.api_key,
-            "api_base": self._settings.api_base,
-            "temperature": self._settings.temperature,
-            "max_tokens": self._settings.max_output_tokens,
+            "model": f"openai/{self._text_settings.model}",
+            "api_key": self._text_settings.api_key,
+            "api_base": self._text_settings.api_base,
+            "temperature": self._text_settings.temperature,
+            "max_tokens": self._text_settings.max_output_tokens,
         }
         if dspy is not None:
             self._lm = self._init_lm()

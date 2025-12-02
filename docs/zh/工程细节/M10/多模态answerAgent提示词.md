@@ -1,5 +1,7 @@
 # ✅《AnswerAgent Prompt（带括号版，最终稳定工程版）》
 
+> 适用场景：`use_image=true` 且实际传入了 `image_base64` 的多模态回答，默认走 vision LLM `x-ai/grok-4-fast`（OpenRouter）。文本版提示词见《文本answerAgent提示词.md》。
+
 ## 🔹 system message（必须）
 
 ```text

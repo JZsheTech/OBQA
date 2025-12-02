@@ -7,7 +7,15 @@ from typing import Iterable, Mapping, Sequence
 
 from openai import OpenAI
 
-from ...env_setting import PER_EVIDENCE_ELEM_CHAR_LIMIT, LLMSettings, QAFlowSettings, get_llm_settings, get_qa_flow_settings
+from ...env_setting import (
+    PER_EVIDENCE_ELEM_CHAR_LIMIT,
+    LLMSettings,
+    QAFlowSettings,
+    VisionLLMSettings,
+    get_llm_settings,
+    get_qa_flow_settings,
+    get_vision_llm_settings,
+)
 from ...repositories import ChatsRepository, DocumentsRepository, ElementsRepository, TurnsRepository
 from ..llm import DSPyPredictorFactory, QueryRewriter
 from ..mapping import evidence_mapper
@@ -317,9 +325,18 @@ class MemoryAgent:
 
 
 class AnswerAgent:
-    """OpenAI VLM wrapper following the M10 AnswerAgent prompt."""
+    """OpenAI text/vision wrapper following the M10 AnswerAgent prompts."""
 
-    SYSTEM_PROMPT = (
+    TEXT_SYSTEM_PROMPT = (
+        "You are AnswerAgent in an evidence-based QA system.\n\n"
+        "RULES:\n"
+        "1. Only answer using the provided text evidence elements.\n"
+        "2. Every evidence citation MUST use the exact format: [Elem#<id>]\n"
+        "3. Do NOT fabricate element_ids or content not provided.\n"
+        "4. If the question cannot be answered from provided text, say so clearly."
+    )
+
+    VISION_SYSTEM_PROMPT = (
         "You are AnswerAgent in a multimodal evidence-based QA system.\n\n"
         "RULES:\n"
         "1. Only answer using the provided evidence elements.\n"
@@ -331,9 +348,16 @@ class AnswerAgent:
         "7. If the question cannot be answered from provided elements, say so clearly."
     )
 
-    def __init__(self, *, llm_settings: LLMSettings | None = None) -> None:
-        self._llm_settings = llm_settings or get_llm_settings()
-        self._client = self._init_client(self._llm_settings)
+    def __init__(
+        self,
+        *,
+        text_llm_settings: LLMSettings | None = None,
+        vision_llm_settings: VisionLLMSettings | None = None,
+    ) -> None:
+        self._text_llm_settings = text_llm_settings or get_llm_settings()
+        self._vision_llm_settings = vision_llm_settings or get_vision_llm_settings()
+        self._text_client = self._init_client(self._text_llm_settings)
+        self._vision_client = self._init_client(self._vision_llm_settings)
 
     def answer(
         self,
@@ -343,33 +367,67 @@ class AnswerAgent:
         text_elements: Sequence[CandidateElement],
         image_elements: Sequence[CandidateElement],
         use_image: bool,
-    ) -> tuple[str, list[int]]:
-        prompt = self._build_user_prompt(question, memory_summary, text_elements, image_elements if use_image else [])
-        messages = [
-            {"role": "system", "content": [{"type": "text", "text": self.SYSTEM_PROMPT}]},
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": prompt}]
-                + self._build_image_blocks(image_elements if use_image else []),
-            },
-        ]
-        answer_text = self._generate(messages)
-        element_ids = evidence_mapper.extract_element_ids_from_answer(answer_text)
-        return answer_text, element_ids
+    ) -> tuple[str, list[int], str]:
+        usable_images = [elem for elem in image_elements if elem.image_base64] if use_image else []
+        if use_image and image_elements and len(usable_images) < len(image_elements):
+            logger.info(
+                "AnswerAgent dropping %s image elements without base64 payloads before calling vision model.",
+                len(image_elements) - len(usable_images),
+            )
+        use_vision_prompt = bool(use_image and usable_images)
+        if use_image and image_elements and not usable_images:
+            logger.info("AnswerAgent requested vision mode but no image_base64 provided; using text prompt instead.")
 
-    def _generate(self, messages: list[dict[str, object]]) -> str:
+        if use_vision_prompt:
+            prompt = self._build_vision_prompt(question, memory_summary, text_elements, usable_images)
+            messages = [
+                {"role": "system", "content": [{"type": "text", "text": self.VISION_SYSTEM_PROMPT}]},
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": prompt}] + self._build_image_blocks(usable_images),
+                },
+            ]
+            settings = self._vision_llm_settings
+            client = self._vision_client
+            mode = "vision"
+        else:
+            prompt = self._build_text_prompt(question, memory_summary, text_elements)
+            messages = [
+                {"role": "system", "content": [{"type": "text", "text": self.TEXT_SYSTEM_PROMPT}]},
+                {"role": "user", "content": [{"type": "text", "text": prompt}]},
+            ]
+            settings = self._text_llm_settings
+            client = self._text_client
+            mode = "text"
+
+        logger.info(
+            "AnswerAgent using model=%s mode=%s text_elems=%s image_elems=%s",
+            settings.model,
+            mode,
+            len(text_elements),
+            len(usable_images),
+        )
+        answer_text = self._generate(messages=messages, settings=settings, client=client)
+        element_ids = evidence_mapper.extract_element_ids_from_answer(answer_text)
+        return answer_text, element_ids, settings.model
+
+    def _generate(
+        self,
+        *,
+        messages: list[dict[str, object]],
+        settings: LLMSettings | VisionLLMSettings,
+        client: OpenAI,
+    ) -> str:
         try:
-            completion = self._client.chat.completions.create(
-                model=self._llm_settings.model,
+            completion = client.chat.completions.create(
+                model=settings.model,
                 messages=messages,
-                max_tokens=self._llm_settings.max_output_tokens,
-                temperature=self._llm_settings.temperature,
+                max_tokens=settings.max_output_tokens,
+                temperature=settings.temperature,
             )
             content = completion.choices[0].message.content if completion and completion.choices else None
             if isinstance(content, list):
-                joined = "\n".join(
-                    part.get("text") or "" for part in content if isinstance(part, dict)
-                ).strip()
+                joined = "\n".join(part.get("text") or "" for part in content if isinstance(part, dict)).strip()
                 if joined:
                     return joined
             if isinstance(content, str) and content.strip():
@@ -378,21 +436,32 @@ class AnswerAgent:
             logger.warning("AnswerAgent failed, using fallback: %s", exc)
         return "I could not generate an answer with the provided evidences. Please try again with more context."
 
-    def _build_user_prompt(
+    def _build_text_prompt(
+        self,
+        question: str,
+        memory_summary: str,
+        text_elements: Sequence[CandidateElement],
+    ) -> str:
+        text_serialized = self._serialize_text_elements(text_elements)
+        return (
+            f"# USER QUESTION\n{question}\n\n"
+            f"# MEMORY SUMMARY (may contain [Elem#id])\n{memory_summary or 'None'}\n\n"
+            "# TEXT ELEMENTS\n"
+            "Each text element has:\n- ElemID: [Elem#<id>]\n- Content: <text>\n\n"
+            f"{text_serialized}\n\n"
+            "Please answer the question using only the provided text elements. "
+            "If the evidence is insufficient, say so clearly while keeping the [Elem#id] references accurate."
+        )
+
+    def _build_vision_prompt(
         self,
         question: str,
         memory_summary: str,
         text_elements: Sequence[CandidateElement],
         image_elements: Sequence[CandidateElement],
     ) -> str:
-        text_serialized = "\n".join(
-            f"- ElemID: [Elem#{elem.element_id}]\n  Content: {self._truncate(elem.text_content)}"
-            for elem in text_elements
-        ) or "- none"
-        image_serialized = "\n".join(
-            f"- ElemID: [Elem#{elem.element_id}]\n  ImageIndex: {idx + 1}\n  Caption: {self._truncate(elem.text_caption)}"
-            for idx, elem in enumerate(image_elements)
-        ) or "- none"
+        text_serialized = self._serialize_text_elements(text_elements)
+        image_serialized = self._serialize_image_elements(image_elements)
         return (
             f"# USER QUESTION\n{question}\n\n"
             f"# MEMORY SUMMARY (may contain [Elem#id])\n{memory_summary or 'None'}\n\n"
@@ -405,6 +474,20 @@ class AnswerAgent:
             f"{image_serialized}\n\n"
             "Please answer the question following all rules in the system message."
         )
+
+    def _serialize_text_elements(self, text_elements: Sequence[CandidateElement]) -> str:
+        serialized = "\n".join(
+            f"- ElemID: [Elem#{elem.element_id}]\n  Content: {self._truncate(elem.text_content)}"
+            for elem in text_elements
+        )
+        return serialized or "- none"
+
+    def _serialize_image_elements(self, image_elements: Sequence[CandidateElement]) -> str:
+        serialized = "\n".join(
+            f"- ElemID: [Elem#{elem.element_id}]\n  ImageIndex: {idx + 1}\n  Caption: {self._truncate(elem.text_caption)}"
+            for idx, elem in enumerate(image_elements)
+        )
+        return serialized or "- none"
 
     def _build_image_blocks(self, image_elements: Sequence[CandidateElement]) -> list[dict[str, object]]:
         blocks: list[dict[str, object]] = []
@@ -433,7 +516,7 @@ class AnswerAgent:
         return cleaned
 
     @staticmethod
-    def _init_client(settings: LLMSettings) -> OpenAI:
+    def _init_client(settings: LLMSettings | VisionLLMSettings) -> OpenAI:
         client_kwargs: dict[str, object] = {"base_url": settings.api_base, "api_key": settings.api_key}
         extra_headers: dict[str, str] = {}
         if settings.api_key and settings.api_key_header.lower() != "authorization":
@@ -458,9 +541,12 @@ class QAOrchestrator:
         config: QAFlowConfig | None = None,
         qa_settings: QAFlowSettings | None = None,
         llm_settings: LLMSettings | None = None,
+        text_llm_settings: LLMSettings | None = None,
+        vision_llm_settings: VisionLLMSettings | None = None,
     ) -> None:
         self._qa_settings = qa_settings or get_qa_flow_settings()
-        self._llm_settings = llm_settings or get_llm_settings()
+        self._text_llm_settings = text_llm_settings or llm_settings or get_llm_settings()
+        self._vision_llm_settings = vision_llm_settings or get_vision_llm_settings()
         self._chats_repo = chats_repo or ChatsRepository()
         self._documents_repo = documents_repo or DocumentsRepository()
         self._turns_repo = turns_repo or TurnsRepository()
@@ -469,14 +555,17 @@ class QAOrchestrator:
         self._query_rewriter = query_rewriter or QueryRewriter()
         self._text_agent = TextRetrieveAgent(retriever=self._retriever, query_rewriter=self._query_rewriter)
         self._image_agent = ImageRetrieveAgent(retriever=self._retriever, query_rewriter=self._query_rewriter)
-        predictor_factory = DSPyPredictorFactory(settings=self._llm_settings)
+        predictor_factory = DSPyPredictorFactory(text_llm_settings=self._text_llm_settings)
         self._memory_agent = MemoryAgent(
             predictor_factory=predictor_factory,
             elements_repo=self._elements_repo,
             max_memory_length=self._qa_settings.memory_max_length,
             max_summary_memory_length=self._qa_settings.max_summary_memory_length,
         )
-        self._answer_agent = AnswerAgent(llm_settings=self._llm_settings)
+        self._answer_agent = AnswerAgent(
+            text_llm_settings=self._text_llm_settings,
+            vision_llm_settings=self._vision_llm_settings,
+        )
         self._config = config or QAFlowConfig.from_settings(self._qa_settings)
 
     def run(
@@ -559,11 +648,11 @@ class QAOrchestrator:
             use_image=config.use_image,
         )
 
-        answer_text, used_element_ids = self._answer_agent.answer(
+        answer_text, used_element_ids, used_model = self._answer_agent.answer(
             question=question_text,
             memory_summary=last_memory,
             text_elements=merged_text,
-            image_elements=merged_image,
+            image_elements=merged_image if config.use_image else [],
             use_image=config.use_image,
         )
 
@@ -575,7 +664,7 @@ class QAOrchestrator:
             user_question=question_text,
             llm_answer_text=answer_text,
             memory=new_memory,
-            used_llm_model=self._llm_settings.model,
+            used_llm_model=used_model,
         )
         self._chats_repo.update_chat(chat_id, max_turn_order=next_order)
         history_turns.append(turn)
@@ -594,10 +683,12 @@ class QAOrchestrator:
             used_element_ids=used_element_ids,
         )
         logger.info(
-            "QAFlow completed chat=%s turn=%s cited_elements=%s",
+            "QAFlow completed chat=%s turn=%s cited_elements=%s used_model=%s use_image=%s",
             chat_id,
             turn.get("id"),
             used_element_ids,
+            used_model,
+            bool(config.use_image and merged_image),
         )
         return QATurnResult(
             turn_id=int(turn["id"]),

@@ -127,8 +127,14 @@ OLLAMA_PORT: int = _get_int_env("OLLAMA_PORT", 11434)
 OLLAMA_BASE_URL: str = f"{OLLAMA_PROTOCOL}://{OLLAMA_HOST}:{OLLAMA_PORT}"
 OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
-DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4-fast")
+DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4.1-fast")
+DEFAULT_VISION_LLM_MODEL: str = _get_env("DEFAULT_VISION_LLM_MODEL", "x-ai/grok-4-fast")
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
+LLM_API_BASE_DEFAULT: str = _get_env("LLM_API_BASE", OPENROUTER_API_BASE_URL)
+LLM_API_KEY_DEFAULT: str = _get_env("LLM_API_KEY", OPENROUTER_API_KEY)
+LLM_API_KEY_HEADER_DEFAULT: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
+LLM_TEMPERATURE_DEFAULT: float = _get_float_env("LLM_TEMPERATURE", 0.2)
+LLM_MAX_OUTPUT_TOKENS_DEFAULT: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 30000)
 MIN_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MIN_CHARACTOR_CHUNK_SIZE", 256)
 MAX_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MAX_CHARACTOR_CHUNK_SIZE", 3200)
 MAX_ELEM_CHUNK_SIZE: int = _get_int_env("MAX_ELEM_CHUNK_SIZE", 6)
@@ -171,11 +177,21 @@ class EmbeddingSettings:
 @dataclass(frozen=True)
 class LLMSettings:
     model: str = _get_env("LLM_MODEL_NAME", DEFAULT_TEXT_LLM_MODEL)
-    api_base: str = _get_env("LLM_API_BASE", OPENROUTER_API_BASE_URL)
-    api_key: str = _get_env("LLM_API_KEY", OPENROUTER_API_KEY)
-    api_key_header: str = _get_env("LLM_API_KEY_HEADER", "Authorization")
-    temperature: float = _get_float_env("LLM_TEMPERATURE", 0.2)
-    max_output_tokens: int = _get_int_env("LLM_MAX_OUTPUT_TOKENS", 30000)
+    api_base: str = LLM_API_BASE_DEFAULT
+    api_key: str = LLM_API_KEY_DEFAULT
+    api_key_header: str = LLM_API_KEY_HEADER_DEFAULT
+    temperature: float = LLM_TEMPERATURE_DEFAULT
+    max_output_tokens: int = LLM_MAX_OUTPUT_TOKENS_DEFAULT
+
+
+@dataclass(frozen=True)
+class VisionLLMSettings:
+    model: str = _get_env("VISION_LLM_MODEL", _get_env("VISION_VQA_MODEL", DEFAULT_VISION_LLM_MODEL))
+    api_base: str = _get_env("VISION_LLM_API_BASE", LLM_API_BASE_DEFAULT)
+    api_key: str = _get_env("VISION_LLM_API_KEY", LLM_API_KEY_DEFAULT)
+    api_key_header: str = _get_env("VISION_LLM_API_KEY_HEADER", LLM_API_KEY_HEADER_DEFAULT)
+    temperature: float = _get_float_env("VISION_LLM_TEMPERATURE", LLM_TEMPERATURE_DEFAULT)
+    max_output_tokens: int = _get_int_env("VISION_LLM_MAX_OUTPUT_TOKENS", LLM_MAX_OUTPUT_TOKENS_DEFAULT)
 
 
 @dataclass(frozen=True)
@@ -223,6 +239,12 @@ def get_llm_settings() -> LLMSettings:
 
 
 @lru_cache(maxsize=1)
+def get_vision_llm_settings() -> VisionLLMSettings:
+    """Return OpenAI-compatible vision LLM configuration."""
+    return VisionLLMSettings()
+
+
+@lru_cache(maxsize=1)
 def get_qa_flow_settings() -> QAFlowSettings:
     """Return QA flow defaults including retrieval/memory toggles."""
     return QAFlowSettings()
@@ -244,6 +266,7 @@ __all__ = [
     "OLLAMA_OPENAI_BASE_URL",
     "OPENROUTER_API_BASE_URL",
     "DEFAULT_TEXT_LLM_MODEL",
+    "DEFAULT_VISION_LLM_MODEL",
     "RETRIEVAL_TOPK_CHUNK",
     "RETRIEVAL_TOPK_PAGE",
     "ENABLE_PAGE_CHUNK_RETRIEVAL",
@@ -253,11 +276,13 @@ __all__ = [
     "UploadSettings",
     "EmbeddingSettings",
     "LLMSettings",
+    "VisionLLMSettings",
     "QAFlowSettings",
     "get_oceanbase_settings",
     "get_mineru_settings",
     "get_upload_settings",
     "get_embedding_settings",
     "get_llm_settings",
+    "get_vision_llm_settings",
     "get_qa_flow_settings",
 ]
