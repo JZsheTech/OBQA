@@ -16,7 +16,6 @@ OPENROUTER_API_KEY: "your-openrouter-key-here"
 # OLLAMA_PORT: 11434
 # OPENROUTER_API_BASE_URL: "https://openrouter.ai/api/v1"
 # DEFAULT_TEXT_LLM_MODEL: "x-ai/grok-4.1-fast"
-# DEFAULT_VLSION_MODEL: "x-ai/grok-4-fast"
 # MINERU_MODE: "http"
 # MINERU_ENDPOINT: "http://127.0.0.1:18543/file_parse"
 # MINERU_BACKEND: "vllm-async-engine"
@@ -36,17 +35,10 @@ OPENROUTER_API_KEY: "your-openrouter-key-here"
 # LLM_API_KEY_HEADER: "Authorization"
 # LLM_TEMPERATURE: 0.2
 # LLM_MAX_OUTPUT_TOKENS: 16000
-# VISION_VQA_ENDPOINT: "https://openrouter.ai/api/v1"
-# VISION_VQA_MODEL: "x-ai/grok-4-fast"
-# VISION_VQA_API_KEY: ""
-# VISION_VQA_API_KEY_HEADER: "Authorization"
-# VISION_VQA_TIMEOUT_S: 120
-# VISION_VQA_MAX_TOKENS: 400
 # QA_MAX_HISTORY_TURNS: 8
 # QA_TEXT_EVIDENCE_LIMIT: 8
 # QA_IMAGE_EVIDENCE_LIMIT: 4
 # QA_ENABLE_MEMORY_SUMMARIZER: false
-# QA_ENABLE_IMAGE_VQA: false
 # QA_DEFAULT_RETRIEVAL_MODE: "auto"
 # QA_DEFAULT_SEARCH_MODE: "hybrid"
 # QA_DEFAULT_ELEM_TYPES: "text,header,table,image"

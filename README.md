@@ -83,7 +83,6 @@
   - 检索服务：`services/retrieval/retriever.py`，在 Python 侧做 TopK 相似度计算，支持向量/全文模式。
 - LLM 编排与 Agent：
   - DSPy（`dspy`）用于文本任务编排（问句重写、答案生成、记忆摘要等），在 `services/llm` 与 `services/memory` 中落地。
-  - 图像理解通过独立的视觉问答接口（OpenAI 兼容，默认走 `env_setting.py` 中的 `VisionVQASettings`），仅在 QA 流程中将结果转为文字后再喂给 DSPy。
 
 ---
 
@@ -176,29 +175,17 @@ uvicorn EviQAsys.backend.app.main:app --app-dir EviQAsys/backend --reload --port
 
 - 文档：`docs/zh/工程细节/dspy问答Agent设计.md`、`docs/zh/工程细节/Evidence渲染规范.md`。
 - 核心 orchestrator：`services/qa_flow/qa_orchestrator.py`
-  - 输入：`chat_id`、用户 `question`、检索 TopK、是否开启图像 VQA / 记忆摘要。
+  - 输入：`chat_id`、用户 `question`、检索 TopK、是否开启 `use_image`、记忆相关参数。
   - 步骤概览：
-    1. 从 `ChatsRepository` 查询 chat 元数据，并根据 `type` 判定是 collection 级 chat 还是 document 级 chat（`_resolve_chat_scope`）。
-    2. 从 `TurnsRepository` 读取历史轮次，通过 `history_loader.format_history_text` 拼接上下文，必要时通过 `MemoryService` 做摘要（feature flag）。
-    3. 调用 `RetrievalDecider`（DSPy 模块）判断是否需要检索，以及需要的元素类型集合。
-    4. 如需检索，则通过 `QueryRewriter` 得到检索 query，再调用 `Retriever` 获取候选元素，将 text 元素与 image 候选分开。
-    5. 对于 image 候选：
-       - 使用 `ImageQuestionGenerator` 基于 question + memory + local_context 生成图像子问题；
-       - 若启用图像 VQA 且配置了 `VisionVQAClient`，则：
-         - 从 DB 读取对应 `image_base64`；
-         - 调用视觉问答接口获取摘要文本；
-         - 将摘要文本与原 caption 拼接为增强后的 `text_content`，参与回答。
-    6. 调用 `AnswerComposer`（DSPy 模块）生成最终回答，回答中直接使用 `[Elem#<element_id>]` 锚点，而不是用户可见的 `[Evidence#no]`。
-    7. 在 `turns` 表中写入新轮记录，在 `chats` 中更新 `max_turn_order`。
-    8. 使用 `services/mapping/evidence_mapper.py`：
-       - 从回答文本中解析出真实出现的 `[Elem#id]` 集合；
-       - 将这些 `element_id` 与当前 `chat_id/turn_id` 批量写入 `turn2element`；
-       - 基于整个 chat 历史的 `turns` 构建“首次出现顺序”的 `element_id → evidence_no` 映射；
-       - 加载对应元素的元数据（`doc_id/page_no/bbox/elem_type/level_nav/text_content/text_caption`），构造 `EvidenceItem` 列表。
-    9. 返回 `QATurnResult(turn_id, chat_id, answer_text, evidences)`。
+    1. 解析 chat 范围（collection/document），读取历史 turn 的 memory。
+    2. TextRetrieveAgent 做文本检索（可选页过滤）；use_image=true 时 ImageRetrieveAgent 做图片检索。
+    3. MemoryAgent 从历史记忆中挑选相关元素（文本/图片分支可独立关闭）。
+    4. 按 element_id 去重合并候选元素，保持检索顺序优先。
+    5. AnswerAgent 直接用 text+image 元素生成回答（图片通过 OpenAI 多模态接口传入），回答中引用 `[Elem#<id>]`。
+    6. turns 表写入回答与 memory，更新 chats.max_turn_order，构建 evidence_no 映射并返回。
 - API 路由：`api/routes/chats.py`
   - `POST /api/chats/{chat_id}/turns`
-    - 请求体：`TurnCreateRequest`（`question`, 可选 `top_k`, `enable_image_vqa`, `enable_memory_summarizer`）。
+    - 请求体：`TurnCreateRequest`（`question`, 可选 `use_image/text_retrieve_topk/image_retrieve_topk/text_memory_topk/image_memory_topk/use_page_in_text_retrieve/page_retrieve_topk/text_search_mode`）。
     - 返回：`TurnResponseEnvelope(code="OK", data=TurnResponse)`，其中：
       - `answer_text`：包含 `[Elem#<element_id>]` 锚点的 LLM 文本；
       - `evidences`: `EvidenceItem` 数组（`element_id/evidence_no/document_id/page_index/bbox/elem_type/snippet/title`）。

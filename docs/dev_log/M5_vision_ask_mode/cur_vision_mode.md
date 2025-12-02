@@ -1,5 +1,7 @@
 # 当前 enable_image_vqa=True 时的问答行为
 
+> 已废弃：VisionVQASettings 及独立 VisionVQAClient 路径已从代码中移除，本笔记仅保留历史记录，后续实现不再复用此流程。
+
 - 触发方式：前端在 `POST /api/chats/{chat_id}/turns` 传 `enable_image_vqa=true`，或通过环境变量 `QA_ENABLE_IMAGE_VQA=1` 设为默认。`QAOrchestrator` 在 `run()` 中用 `QAFlowConfig.with_overrides` 合并请求值与 env 默认，最终 `config.enable_image_vqa` 为真时才进入视觉分支。
 - 执行路径：检索阶段把 `elem_type=image` 的命中收集到 `image_candidates`（受 `image_evidence_limit` 约束，默认 4）。若启用视觉分支，会懒加载 `VisionVQAClient` 并传递给 `_build_image_evidences`。
 - VQA 调用：`_build_image_evidences` 对每个图片候选用 `ImageQuestionGenerator.generate`（DSPy，有回退）生成派生问句，再调用 `VisionVQAClient.summarize(element_id, derived_question, local_context)`。`summarize` 会查库拿 `image_base64`，拼出包含 question/caption/附近上下文的 prompt，使用 OpenAI Python SDK 调用 `VISION_VQA_ENDPOINT`（默认 `https://openrouter.ai/api/v1/`）与指定 `model`（默认 `x-ai/grok-4-fast`），并从 `choices[0].message.content`/`result` 提取文本。

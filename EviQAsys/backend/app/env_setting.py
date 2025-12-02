@@ -129,7 +129,6 @@ OLLAMA_OPENAI_BASE_URL: str = f"{OLLAMA_BASE_URL}/v1"
 OPENROUTER_API_BASE_URL: str = _get_env("OPENROUTER_API_BASE_URL", "https://openrouter.ai/api/v1")
 DEFAULT_TEXT_LLM_MODEL: str = _get_env("DEFAULT_TEXT_LLM_MODEL", "x-ai/grok-4-fast")
 OPENROUTER_API_KEY = _get_env("OPENROUTER_API_KEY")
-DEFAULT_VLSION_MODEL = _get_env("DEFAULT_VLSION_MODEL", "x-ai/grok-4-fast")
 MIN_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MIN_CHARACTOR_CHUNK_SIZE", 256)
 MAX_CHARACTOR_CHUNK_SIZE: int = _get_int_env("MAX_CHARACTOR_CHUNK_SIZE", 3200)
 MAX_ELEM_CHUNK_SIZE: int = _get_int_env("MAX_ELEM_CHUNK_SIZE", 6)
@@ -180,17 +179,6 @@ class LLMSettings:
 
 
 @dataclass(frozen=True)
-class VisionVQASettings:
-    endpoint: str = _get_env("VISION_VQA_ENDPOINT", OPENROUTER_API_BASE_URL)
-    model: str = _get_env("VISION_VQA_MODEL",DEFAULT_VLSION_MODEL ) #  "x-ai/grok-4-fast"
-    api_key: str = _get_env("VISION_VQA_API_KEY", OPENROUTER_API_KEY)
-    api_key_header: str = _get_env("VISION_VQA_API_KEY_HEADER", "Authorization")
-    timeout_s: int = _get_int_env("VISION_VQA_TIMEOUT_S", 120)
-    max_tokens: int = _get_int_env("VISION_VQA_MAX_TOKENS", 400)
-
-
-
-@dataclass(frozen=True)
 class QAFlowSettings:
     default_use_image: bool = _get_bool_env("QA_USE_IMAGE_DEFAULT", False)
     default_text_retrieve_topk: int = _get_int_env("QA_TEXT_RETRIEVE_TOPK_DEFAULT", 8)
@@ -230,19 +218,13 @@ def get_embedding_settings() -> EmbeddingSettings:
 
 @lru_cache(maxsize=1)
 def get_llm_settings() -> LLMSettings:
-    """Return DSPy/OpenAI LLM configuration (OpenRouter grok-4.1-fast by default)."""
+    """Return DSPy/OpenAI LLM configuration (text LLM)."""
     return LLMSettings()
 
 
 @lru_cache(maxsize=1)
-def get_vision_vqa_settings() -> VisionVQASettings:
-    """Return settings for the optional visual question answering client."""
-    return VisionVQASettings()
-
-
-@lru_cache(maxsize=1)
 def get_qa_flow_settings() -> QAFlowSettings:
-    """Return QA flow defaults including retrieval/memory/VQA toggles."""
+    """Return QA flow defaults including retrieval/memory toggles."""
     return QAFlowSettings()
 
 
@@ -271,13 +253,11 @@ __all__ = [
     "UploadSettings",
     "EmbeddingSettings",
     "LLMSettings",
-    "VisionVQASettings",
     "QAFlowSettings",
     "get_oceanbase_settings",
     "get_mineru_settings",
     "get_upload_settings",
     "get_embedding_settings",
     "get_llm_settings",
-    "get_vision_vqa_settings",
     "get_qa_flow_settings",
 ]
