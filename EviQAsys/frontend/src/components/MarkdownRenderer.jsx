@@ -105,7 +105,7 @@ function EvidenceCapsule({ evidenceNo, onSelectEvidence }) {
                 if (onSelectEvidence) onSelectEvidence(evidenceNo)
             }}
         >
-            Evidence #{evidenceNo}
+            {evidenceNo}
         </button>
     )
 }
