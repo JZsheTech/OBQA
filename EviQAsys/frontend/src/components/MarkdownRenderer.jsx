@@ -6,87 +6,101 @@ import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import "katex/dist/katex.min.css"
 
-const EVIDENCE_PATTERN = /\b(Evidence|Elem)\s*#\s*(\d+)\b/i
+const EVIDENCE_REGEX = /(\[?\s*(Evidence|Elem)\s*#\s*(\d+)\s*\]?)/gi
+const BRACKET_BLOCK_MATH_PATTERN = /\\\[(.+?)\\\]/gs
+const BRACKET_INLINE_MATH_PATTERN = /\\\((.+?)\\\)/gs
 
-function createEvidencePlugin({ resolveElementToEvidence }) {
-    const tokenizeEvidence = (eat, value, silent) => {
-        const match = EVIDENCE_PATTERN.exec(value)
-        if (!match || match.index !== 0) return
+function normalizeMathDelimiters(value) {
+    if (!value) return ""
+    return value
+        .replace(BRACKET_BLOCK_MATH_PATTERN, (_, inner) => `$$${inner.trim()}$$`)
+        .replace(BRACKET_INLINE_MATH_PATTERN, (_, inner) => `$${inner.trim()}$`)
+}
 
-        const [raw, tokenType, rawNo] = match
-        if (silent) return true
+function remarkEvidencePlugin(options = {}) {
+    const { resolveElementToEvidence } = options
+    const shouldSkipType = (type) => type === "code" || type === "inlineCode" || type === "math"
 
-        const numeric = Number(rawNo)
-        if (!Number.isFinite(numeric)) {
-            return eat(raw)({ type: "text", value: raw })
-        }
+    return function transformer(tree) {
+        if (!tree || !Array.isArray(tree.children)) return
 
-        const evidenceNo =
-            tokenType.toLowerCase() === "elem" && typeof resolveElementToEvidence === "function"
-                ? resolveElementToEvidence(numeric)
-                : numeric
+        const splitTextToNodes = (text) => {
+            const nodes = []
+            let lastIndex = 0
+            let match
 
-        if (evidenceNo == null) {
-            return eat(raw)({ type: "text", value: raw })
-        }
+            EVIDENCE_REGEX.lastIndex = 0
 
-        return eat(raw)({
-            type: "evidenceReference",
-            value: evidenceNo,
-            data: {
-                hName: "evidence-reference",
-                hProperties: { "data-evidence": evidenceNo },
-                hChildren: [{ type: "text", value: `Evidence #${evidenceNo}` }],
-            },
-        })
-    }
+            while ((match = EVIDENCE_REGEX.exec(text)) !== null) {
+                const [raw, , tokenType, rawNo] = match
+                const start = match.index
 
-    tokenizeEvidence.locator = (value, fromIndex) => {
-        const cursor = typeof fromIndex === "number" ? fromIndex : 0
-        const match = EVIDENCE_PATTERN.exec(value.slice(cursor))
-        return match ? cursor + match.index : -1
-    }
+                if (start > lastIndex) {
+                    nodes.push({ type: "text", value: text.slice(lastIndex, start) })
+                }
 
-    return function attacher() {
-        const Parser = this?.Parser
-        if (!Parser?.prototype?.inlineTokenizers || !Parser.prototype.inlineMethods) return
+                const numeric = Number(rawNo)
+                const evidenceNo =
+                    Number.isFinite(numeric) && tokenType?.toLowerCase() === "elem"
+                        ? resolveElementToEvidence?.(numeric)
+                        : Number.isFinite(numeric)
+                          ? numeric
+                          : null
 
-        const tokenizers = Parser.prototype.inlineTokenizers
-        const methods = Parser.prototype.inlineMethods
+                if (evidenceNo != null) {
+                    nodes.push({
+                        type: "evidenceReference",
+                        value: evidenceNo,
+                        data: {
+                            hName: "evidence-reference",
+                            hProperties: { "data-evidence": evidenceNo },
+                        },
+                    })
+                } else {
+                    nodes.push({ type: "text", value: raw })
+                }
 
-        tokenizers.evidenceReference = tokenizeEvidence
-        if (!methods.includes("evidenceReference")) {
-            const textIndex = methods.indexOf("text")
-            if (textIndex === -1) {
-                methods.push("evidenceReference")
-            } else {
-                methods.splice(textIndex, 0, "evidenceReference")
+                lastIndex = start + raw.length
             }
+
+            if (lastIndex < text.length) {
+                nodes.push({ type: "text", value: text.slice(lastIndex) })
+            }
+
+            return nodes
         }
+
+        const transformChildren = (children, parentType) => {
+            if (!Array.isArray(children)) return children
+            const mapped = children.flatMap((node) => {
+                if (!node) return []
+                if (node.type === "text" && !shouldSkipType(parentType)) {
+                    return splitTextToNodes(node.value || "")
+                }
+                if (node.children && Array.isArray(node.children)) {
+                    return {
+                        ...node,
+                        children: transformChildren(node.children, node.type),
+                    }
+                }
+                return node
+            })
+            return mapped.filter(Boolean)
+        }
+
+        tree.children = transformChildren(tree.children, tree.type)
     }
 }
 
-function EvidenceCapsule({ node, children, onSelectEvidence, ...props }) {
-    const rawValue =
-        props["data-evidence"] ??
-        node?.properties?.["data-evidence"] ??
-        node?.data?.hProperties?.["data-evidence"] ??
-        node?.value
-    const evidenceNo = Number(rawValue)
-
-    if (!Number.isFinite(evidenceNo)) {
-        return <span {...props}>{children}</span>
-    }
-
+function EvidenceCapsule({ evidenceNo, onSelectEvidence }) {
+    if (!Number.isFinite(evidenceNo)) return null
     return (
         <button
             type="button"
             className="evidence-tag"
             aria-label={`Evidence #${evidenceNo}`}
             onClick={() => {
-                if (onSelectEvidence) {
-                    onSelectEvidence(evidenceNo)
-                }
+                if (onSelectEvidence) onSelectEvidence(evidenceNo)
             }}
         >
             Evidence #{evidenceNo}
@@ -98,6 +112,11 @@ export default function MarkdownRenderer({ content, evidences, onSelectEvidence,
     const rootClassName = useMemo(
         () => ["markdown-body", className].filter(Boolean).join(" "),
         [className],
+    )
+
+    const normalizedContent = useMemo(
+        () => normalizeMathDelimiters(content || ""),
+        [content],
     )
     const evidenceNoByElement = useMemo(() => {
         const mapping = new Map()
@@ -121,14 +140,10 @@ export default function MarkdownRenderer({ content, evidences, onSelectEvidence,
         [evidenceNoByElement],
     )
 
-    const remarkEvidencePlugin = useMemo(
-        () => createEvidencePlugin({ resolveElementToEvidence }),
-        [resolveElementToEvidence],
-    )
-
     const remarkPlugins = useMemo(
-        () => [remarkGfm, remarkMath, remarkBreaks, remarkEvidencePlugin],
-        [remarkEvidencePlugin],
+        // Run evidence transform first to avoid later remark plugins changing node shapes.
+        () => [[remarkEvidencePlugin, { resolveElementToEvidence }], remarkGfm, remarkMath, remarkBreaks],
+        [resolveElementToEvidence],
     )
 
     const rehypePlugins = useMemo(() => [rehypeKatex], [])
@@ -173,7 +188,15 @@ export default function MarkdownRenderer({ content, evidences, onSelectEvidence,
             ),
             th: ({ children }) => <th className="markdown-table__cell head">{children}</th>,
             td: ({ children }) => <td className="markdown-table__cell">{children}</td>,
-            "evidence-reference": (props) => <EvidenceCapsule {...props} onSelectEvidence={onSelectEvidence} />,
+            "evidence-reference": ({ node }) => {
+                const evidenceNo =
+                    Number(
+                        node?.data?.hProperties?.["data-evidence"] ??
+                            node?.properties?.["data-evidence"] ??
+                            node?.value,
+                    ) || null
+                return <EvidenceCapsule evidenceNo={evidenceNo} onSelectEvidence={onSelectEvidence} />
+            },
         }),
         [onSelectEvidence],
     )
@@ -191,7 +214,7 @@ export default function MarkdownRenderer({ content, evidences, onSelectEvidence,
                     rehypePlugins={rehypePlugins}
                     components={components}
                 >
-                    {content}
+                    {normalizedContent}
                 </ReactMarkdown>
             </div>
         )
