@@ -41,10 +41,6 @@
 	- 按标题/摘要/作者检索收藏夹中已有的arxiv论文
 	- 选定collection，将一个收藏夹中的arxiv论文添加到collection中，从而可以在问答系统中进行问答。
 
-# 系统问答截图展示
-
-
-
 # 系统技术栈
 后端：
 - oceanbase/seekdb 数据库:
@@ -89,5 +85,7 @@ AI-assisted coding
   - `sample_data/`: 真实样例数据挂载点（只读、不提交）。
   - `log/`、`debug/`: 日志与调试输出挂载点（不提交）。
   - 其他: `AGENTS.md`（贡献指南与约束）、`README.md`（项目说明）。
+
+# 系统问答截图展示
 
 

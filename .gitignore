@@ -13,6 +13,7 @@
 !docs/dev_log/M11/M11_dev_result
 !*.sql
 !dependency/frontUI_design/**
+!docs/image_asset/**
 
 EviQAsys/frontend/node_modules/**
 EviQAsys/frontend/.vite/**
