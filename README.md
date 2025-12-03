@@ -71,4 +71,19 @@ AI-assisted coding
 前端实现： openai codex-gpt5.1 + 人工
 前端浏览器: chrome
 
+# 项目部署方式
+
+## 仓库结构总览
+- 根目录
+  - `EviQAsys/backend/app`: FastAPI 应用入口 (`main.py`)，包含 `api` 路由、`repositories` 数据访问层、`schemas` Pydantic 模型，以及 `services` 下的 `qa_flow`、`retrieval`、`integrations`、`embedding`、`ingestion`、`index`、`llm/image`、`mapping`、`memory`、`parser`、`preprocess` 等服务模块。
+  - `EviQAsys/backend/tests`: 手动测试脚本与仓储层验证样例。
+  - `EviQAsys/frontend/src`: React 前端骨架，按 `api`、`components`（含 `layout`、`ui`）、`pages`（含 `image`）、`assets`、`config` 分层。
+  - `dependency/`: MinerU、OceanBase、DsPy 与多模态 embedding 演示脚本及示例（参考实现，不随主线发布）。
+  - `docs/`: 架构图与设计文档（如 `docs/image_asset/OBPaperQA.png`）。
+  - `scripts/`: 辅助脚本与运维工具。
+  - `model/`: 预置或导出的模型资源占位目录。
+  - `sample_data/`: 真实样例数据挂载点（只读、不提交）。
+  - `log/`、`debug/`: 日志与调试输出挂载点（不提交）。
+  - 其他: `AGENTS.md`（贡献指南与约束）、`README.md`（项目说明）。
+
 
