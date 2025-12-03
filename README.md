@@ -88,4 +88,41 @@ AI-assisted coding
 
 # 系统问答截图展示
 
+- **OBPaperQA.png — 系统架构与问答链路总览**：从 PDF 解析（MinerU）、索引（OceanBase SeekDB）、到多模态问答和前端渲染的整体流程示意。
+  ![OBPaperQA](./docs/image_asset/OBPaperQA.png)
 
+- **collection_home.png — Collection 列表页**：展示已创建的论文集合，支持按名称/描述检索并新建 Collection，进入后可查看文档与聊天历史。
+  ![collection_home](./docs/image_asset/collection_home.png)
+
+- **document_home.png — Document 详情页**：展示单篇论文的标题、摘要、页数、切分文件统计，并可发起向量检索或聊天。
+  ![document_home](./docs/image_asset/document_home.png)
+
+- **document-QA-text.png — 文本片段问答示例**：对单篇论文提问时，返回含高亮证据链接的文本答案，体现文本块向量检索与高亮跳转能力。
+  ![document-QA-text](./docs/image_asset/document-QA-text.png)
+
+- **document-QA-table.png — 表格问答示例**：展示对表格内容的理解与引用，答案中附带表格证据定位。
+  ![document-QA-table](./docs/image_asset/document-QA-table.png)
+
+- **document-QA-picture.png — 图片问答示例**：多模态问答返回图片证据及说明，突出图文联合检索与呈现。
+  ![document-QA-picture](./docs/image_asset/document-QA-picture.png)
+
+- **document-QA-equation.png — 公式问答示例**：展示数学公式的渲染与定位，验证对 PDF 公式区域的识别与跨页跳转。
+  ![document-QA-equation](./docs/image_asset/document-QA-equation.png)
+
+- **collection-QA.png — Collection 级问答**：在集合维度提问，聚合多文档检索结果并返回带证据的答案，支持对聊天历史的回溯。
+  ![collection-QA](./docs/image_asset/collection-QA.png)
+
+- **collection-QA-switch.png — 聊天上下文切换**：在同一 Collection 内切换不同会话/上下文，便于管理多轮对话。
+  ![collection-QA-switch](./docs/image_asset/collection-QA-switch.png)
+
+- **arXiv-paper-search.png — arXiv 检索页**：根据关键词/作者/时间等条件搜索最新论文，列表展示标题、摘要等关键信息。
+  ![arXiv-paper-search](./docs/image_asset/arXiv-paper-search.png)
+
+- **arxiv-paper-card.png — arXiv 论文卡片**：卡片式展示单篇检索结果的分类、作者与摘要，并可跳转到 arXiv 原文。
+  ![arxiv-paper-card](./docs/image_asset/arxiv-paper-card.png)
+
+- **arxiv_favorite.png — arXiv 收藏夹**：管理已收藏的 arXiv 论文，支持按标题/摘要/作者筛选，便于后续加入问答集合。
+  ![arxiv_favorite](./docs/image_asset/arxiv_favorite.png)
+
+- **add_arxiv_paper_to_qa_collection.png — 将 arXiv 论文加入问答 Collection**：在收藏夹中选择目标 Collection，一键把论文送入索引与问答流程。
+  ![add_arxiv_paper_to_qa_collection](./docs/image_asset/add_arxiv_paper_to_qa_collection.png)
