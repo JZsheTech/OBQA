@@ -4,10 +4,10 @@
 - 当前 `LLMSettings` 仅持有一个 `model`，默认值是 `x-ai/grok-4-fast`，被 DSPy（query rewrite/memory 等）和 AnswerAgent 共享。
 - AnswerAgent 在 `qa_orchestrator.py` 内通过 `self._llm_settings.model` 创建唯一的 OpenAI 客户端；即便 `use_image=false` 也会沿用同一模型和「多模态」提示词，user prompt 中包含空的 IMAGE ELEMENTS 描述。
 - 旧的 `VisionVQASettings` 与 `VisionVQAClient` 已移除（历史文档保留备查），当前多模态仅走 AnswerAgent。
-- 需求：`text_llm=x-ai/grok-4.1-fast`，`vision_llm=x-ai/grok-4-fast`；只有 `use_image=true` 的 AnswerAgent 调用才用 vision_llm，其余路径（DSPy 组件与 text-only AnswerAgent）全部用 text_llm，且 text-only 需要替换去掉图片描述的提示词。
+- 需求：`text_llm=x-ai/grok-4.1-fast:free`，`vision_llm=x-ai/grok-4-fast`；只有 `use_image=true` 的 AnswerAgent 调用才用 vision_llm，其余路径（DSPy 组件与 text-only AnswerAgent）全部用 text_llm，且 text-only 需要替换去掉图片描述的提示词。
 
 ## 目标
-1) 明确区分 text_llm 与 vision_llm 配置，默认值分别落到 `x-ai/grok-4.1-fast` 与 `x-ai/grok-4-fast`。  
+1) 明确区分 text_llm 与 vision_llm 配置，默认值分别落到 `x-ai/grok-4.1-fast:free` 与 `x-ai/grok-4-fast`。  
 2) AnswerAgent 运行时根据 `use_image` 选择模型与提示词：多模态版仅在传入图片时启用，否则使用文本版提示。  
 3) 其他 LLM 依赖（DSPy QueryRewriter/Memory 等）只走 text_llm。  
 4) 存储与日志能反映本轮实际使用的模型，便于审计与回溯。  
@@ -17,7 +17,7 @@
 1) 配置层拆分  
    - 在 `env_setting.py` 增加独立的 text_llm / vision_llm 默认值，引入 `DEFAULT_VISION_LLM_MODEL`（无旧 VQA 依赖）。  
    - `LLMSettings` 保持文本模型（或改为 `TextLLMSettings`），新增 `VisionLLMSettings`（可复用 `VisionVQASettings` 结构但默认绑定 vision_llm）。  
-   - 衔接环境变量：`LLM_MODEL_NAME` 默认改为 `x-ai/grok-4.1-fast`；新增/对齐 `VISION_LLM_MODEL`（默认 `x-ai/grok-4-fast`），并保留向后兼容读取旧变量。  
+   - 衔接环境变量：`LLM_MODEL_NAME` 默认改为 `x-ai/grok-4.1-fast:free`；新增/对齐 `VISION_LLM_MODEL`（默认 `x-ai/grok-4-fast`），并保留向后兼容读取旧变量。  
    - 输出到 `__all__`，确保外层可导入。
 
 2) DSPy/文本链路归一到 text_llm  
@@ -49,6 +49,6 @@
    - 运行时使用 `sample_data` 的真实解析结果或现有库数据，打印日志供人工核查。
 
 7) 风险与回滚点  
-   - 默认模型切换为 `x-ai/grok-4.1-fast` 可能需更新线上配置/额度，需上线前确认。  
+   - 默认模型切换为 `x-ai/grok-4.1-fast:free` 可能需更新线上配置/额度，需上线前确认。  
    - AnswerAgent 双客户端初始化需关注超时/headers 差异；可通过配置开关快速回退到单模型（保留旧配置读取路径）。  
    - 提示词拆分后需确保输出格式一致（citation 规则不变），避免前端解析受影响。

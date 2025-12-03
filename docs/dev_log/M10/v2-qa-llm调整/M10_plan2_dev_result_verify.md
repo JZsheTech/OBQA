@@ -1,7 +1,7 @@
 # M10 QA LLM 拆分 & AnswerAgent 双模型改造结果
 
 ## 完成内容
-- 配置层拆分：`DEFAULT_TEXT_LLM_MODEL` 默认切到 `x-ai/grok-4.1-fast`，新增 `DEFAULT_VISION_LLM_MODEL` / `VisionLLMSettings` / `get_vision_llm_settings`，`LLMSettings` 仅代表文本链路（统一复用 API base/key/header/温度/输出长度）。`template_config.yaml` 补充了 vision 相关占位。
+- 配置层拆分：`DEFAULT_TEXT_LLM_MODEL` 默认切到 `x-ai/grok-4.1-fast:free`，新增 `DEFAULT_VISION_LLM_MODEL` / `VisionLLMSettings` / `get_vision_llm_settings`，`LLMSettings` 仅代表文本链路（统一复用 API base/key/header/温度/输出长度）。`template_config.yaml` 补充了 vision 相关占位。
 - DSPy 仅注入文本 LLM：`DSPyPredictorFactory` 接收 `text_llm_settings`，QAFlow 初始化时传入文本 LLM 配置给 QueryRewriter/MemoryAgent。
 - AnswerAgent 双客户端：构造时同时持有文本/视觉 OpenAI 客户端；`answer()` 基于 `use_image` 与是否存在 `image_base64` 自动选择文本或多模态 prompt，并返回实际使用的 `used_model`。`use_image=true` 但缺少图片时降级为文本提示词，日志记录丢弃的图片元素。
 - QAOrchestrator 衔接：初始化时注入 text+vision LLM 设置，`used_llm_model` 入库时写入本轮实际模型；use_image=false 时强制忽略传入的图片列表。日志附带 used_model 与 use_image 状态。

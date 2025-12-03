@@ -83,7 +83,7 @@
   - 检索服务：`services/retrieval/retriever.py`，在 Python 侧做 TopK 相似度计算，支持向量/全文模式。
 - LLM 编排与 Agent：
   - DSPy（`dspy`）用于文本任务编排（问句重写、答案生成、记忆摘要等），在 `services/llm` 与 `services/memory` 中落地。
-  - 默认 LLM：文本链路使用 `x-ai/grok-4.1-fast`（OpenRouter）；`use_image=true` 且携带图片时 AnswerAgent 切换到视觉模型 `x-ai/grok-4-fast`，提示词按文本/多模态两套模板分流。
+  - 默认 LLM：文本链路使用 `x-ai/grok-4.1-fast:free`（OpenRouter）；`use_image=true` 且携带图片时 AnswerAgent 切换到视觉模型 `x-ai/grok-4-fast`，提示词按文本/多模态两套模板分流。
 
 ---
 

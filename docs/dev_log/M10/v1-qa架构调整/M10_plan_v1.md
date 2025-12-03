@@ -12,7 +12,7 @@
   - 默认值：`use_image=false`，`text_retrieve_topk=8`，`image_retrieve_topk=2`，`text_memory_topk=4`，`image_memory_topk=1`，`use_page_in_text_retrieve=false`，`page_retrieve_topk=4`，`text_search_mode="hybrid"`。
   - 前端输入范围（建议）：TopK 类允许 1–20（步长 1），布尔用开关，`text_search_mode ∈ {hybrid, vector, fulltext}`。
 - Memory 规格：`MEMORY_MAX_LEN=4000`，总结软限 `max_summary_memory_length=1000`，仅存一份 turns.memory。
-- DSPy/LLM/Embedding：rewrite/summary/element 选择复用线上基座；embedding 用 `jina-embedding-v4`；文本链路默认 `x-ai/grok-4.1-fast`，`use_image=true` 且有图片时 AnswerAgent 切到 vision 模型 `x-ai/grok-4-fast`。
+- DSPy/LLM/Embedding：rewrite/summary/element 选择复用线上基座；embedding 用 `jina-embedding-v4`；文本链路默认 `x-ai/grok-4.1-fast:free`，`use_image=true` 且有图片时 AnswerAgent 切到 vision 模型 `x-ai/grok-4-fast`。
 - AnswerAgent 提示词/打包：按docs/zh/工程细节/M10/多模态answerAgent提示词.md 《多模态answerAgent提示词.md》最终版执行（system + 结构化 user + image 顺序严格对应 ImageIndex）。
 - 候选去重排序：按 element_id 去重；文本：检索得到的 element 维持相关性顺序，记忆返回的文本元素按给定顺序追加；图片同理。
 - turn2element 历史数据：删除表后无需迁移，用户会手动重建数据库。

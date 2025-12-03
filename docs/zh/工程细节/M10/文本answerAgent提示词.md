@@ -1,6 +1,6 @@
 # 文本 AnswerAgent 提示词（use_image=false）
 
-> 适用场景：仅文本回答或未携带图片时（`use_image=false` 或缺少 `image_base64`）。默认文本 LLM `x-ai/grok-4.1-fast`（OpenRouter），保持 `[Elem#id]` 引用格式。
+> 适用场景：仅文本回答或未携带图片时（`use_image=false` 或缺少 `image_base64`）。默认文本 LLM `x-ai/grok-4.1-fast:free`（OpenRouter），保持 `[Elem#id]` 引用格式。
 
 ## 🔹 system message
 
