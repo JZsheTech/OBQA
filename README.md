@@ -72,8 +72,9 @@ AI-assisted coding
 前端浏览器: chrome
 
 # 项目部署方式
+见仓库内 docs/zh/env_install.md 文档
 
-## 仓库结构总览
+# 仓库结构总览
 - 根目录
   - `EviQAsys/backend/app`: FastAPI 应用入口 (`main.py`)，包含 `api` 路由、`repositories` 数据访问层、`schemas` Pydantic 模型，以及 `services` 下的 `qa_flow`、`retrieval`、`integrations`、`embedding`、`ingestion`、`index`、`llm/image`、`mapping`、`memory`、`parser`、`preprocess` 等服务模块。
   - `EviQAsys/backend/tests`: 手动测试脚本与仓储层验证样例。
