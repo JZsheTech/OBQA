@@ -9,7 +9,7 @@ import requests
 import json
 import os
 
-url = "http://localhost:8000/file_parse"
+url = "http://localhost:18543/file_parse"
 
 def remove_ext_from_fname(fname):
     len_fname = len(fname)
@@ -41,7 +41,7 @@ files = [
 payload = {
     "output_dir": None,
     "lang_list": ["ch"],
-    "backend": "pipeline", # "pipeline" or "vlm-sglang"
+    "backend": "pipeline", # "pipeline" 
     "parse_method": "auto",
     "formula_enable": True,
     "table_enable": True,

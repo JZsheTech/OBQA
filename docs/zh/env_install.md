@@ -1,7 +1,7 @@
 
-已知我写在这里的环境都已经部署好了。
+# MinerU部署
 
-# 用conda部署minerU，并以web-api形式启动
+用conda部署minerU，并以web-api形式启动
 
 ```
 conda create -n jzMinerUVllm python=3.12
@@ -35,7 +35,8 @@ cd sample_data/minerUtemp
 mineru-api --host 0.0.0.0 --port 18543
 ```
 
-# 混合检索数据库支持-seekdb-docker部署
+# seekDB/oceanbase 部署
+混合检索数据库支持-seekdb-docker部署
 
 ```
 sudo docker run -d \
@@ -46,67 +47,11 @@ sudo docker run -d \
 ```
 
 
-# 用docker部署oceanbase
+# evidence-paper-QA-conda环境部署
 
-OceanBase持久化存储路径：
-/oceanBaseData
-
-test 租户的passwd 
-12345678
-
-```
-sudo docker pull oceanbase/oceanbase-ce:4.3.5-lts
-国内如果不行可以尝试下面的镜像：
-sudo docker pull quay.io/oceanbase/oceanbase-ce:4.3.5-lts
-
-
-对于高性能服务器：具有大内存
-```
-sudo docker run -p 2881:2881 -v /oceanBaseData/ob:/root/ob   --name obstandalone  --restart=always  -e MODE=NORMAL -e OB_TENANT_PASSWORD=12345678 -e OB_MEMORY_LIMIT=32G -d  oceanbase/oceanbase-ce:4.3.5-lts
-```
-
-对于本地单机测试：只有32GB内存。
-```
-sudo    docker run   --name obstandalone -e MINI_MODE=1 -d    -e OB_MEMORY_LIMIT=8G -e OB_DATAFILE_SIZE=10G  --restart=always  -e OB_CLUSTER_NAME=ailab2024 -e OB_SERVER_IP=127.0.0.1 -p 127.0.0.1:2881:2881  -e OB_TENANT_PASSWORD=12345678     quay.io/oceanbase/oceanbase-ce:4.3.5-lts
-
-```
-
-> sudo docker logs obstandalone | tail -50
-# 出现下面的输出表示启动成功,并且前面几行没有Error出现。
-< boot success!
-
-sudo docker exec -it obstandalone /bin/bash
-obclient -h127.0.0.1 -P2881 -uroot@test -p
-# 密码输入 12345678
-```
-
-进入了test租户的root用户界面
-之后可以在数据库中创建用户和DataBase：
-
-我们实际开发demo时,按下面的方法创建用户即可：
-```
-# Create a database user 'paperQA' and database schema 'default1' within the tenant. Replace <password> with the actual password of your choice.
-CREATE USER paperQA IDENTIFIED BY '12345678';
-CREATE DATABASE default1;
-GRANT ALL ON default1.* TO paperQA;
-```
-
-为test租户的paperQA用户授予建表权限和远程访问权限
-```
-
-GRANT CREATE ON *.* TO paperQA;
--- 给 paperQA@test 授予数据库 obqademo 的常规数据操作权限
-GRANT SELECT, INSERT, UPDATE, DELETE, DROP ON *.* TO paperQA;
-GRANT ALL PRIVILEGES ON *.* TO paperQA WITH GRANT OPTION;
-```
-
-执行下面的命令开启向量数据库的检索功能
-ALTER SYSTEM SET ob_vector_memory_limit_percentage = 30;
-
-# 部署后端的python-conda环境：
+部署后端的python-conda环境：
 
 conda create -n quest python=3.10
-
 
 conda activate quest
 pip install dspy==3.0.3  -i https://pypi.org/simple/
