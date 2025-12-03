@@ -15,7 +15,8 @@ pip install --upgrade pip
 pip install uv
 或者
 pip install uv -i https://pypi.org/simple/
-uv pip install -U "mineru[core]"
+uv pip install "mineru[core,vllm]"
+(这里只所以要装vllm，不是要给minerU用，是后面给jinaembeddingv4用的)
 
 # 首次运行时指定镜像站下载必要的模型文件，然后转换一个文件触发所有模型的下载
 export MINERU_MODEL_SOURCE=modelscope
@@ -35,6 +36,8 @@ cd sample_data/minerUtemp
 mineru-api --host 0.0.0.0 --port 18543
 ```
 
+后端minerU api以 "pipeline"模式调用时, 大概只占用 3GB显存(jzMinerUVllm/bin/python3       2526MiB |)
+
 # seekDB/oceanbase 部署
 混合检索数据库支持-seekdb-docker部署
 
@@ -45,6 +48,45 @@ sudo docker run -d \
   -v /data2/jproject/seekdbData:/var/lib/oceanbase/store \
   oceanbase/seekdb:latest
 ```
+
+# jina-embedding-v4 统一多模态嵌入模型部署
+
+由于之前的uv pip install "mineru[core,vllm]" 已经在jzMinerUVllm conda环境中安装了vllm的环境，所以直接在新的tmux终端中复用它来启动 jina-embedding-v4 服务
+
+```
+#!/bin/bash
+# ==========================================================
+# Launch vLLM server for Jina Embeddings v4 (multi-modal)
+# ==========================================================
+
+conda activate  jzMinerUVllm
+# 指定显卡 (此处使用 GPU 2)
+export CUDA_VISIBLE_DEVICES=0,1
+
+# 启动服务
+vllm serve  jinaai/jina-embeddings-v4-vllm-retrieval \
+    --served-model-name jinaembeddingv4 \
+    --task embed \
+    --tensor-parallel-size 2 \
+    --gpu-memory-utilization 0.95 \
+    --port 7701 \
+    --limit-mm-per-prompt '{"image":1}' \
+    --dtype float16 \
+    --trust-remote-code
+    # 如果你想启用自定义池化，可取消下行注释（但通常无显著影响）
+    # --override-pooler-config '{"pooling_type": "LAST", "normalize": true}'
+
+预计显存需求：
+2张 24GB显存的显卡，比如 2张RTX 3090
+
+如果本地部署显存不够，后续我们会提供一种api调用方式，使用下面api服务商提供的版本，但调用接口会有微调。
+https://aihubmix.com/model/jina-embeddings-v4
+
+具体接口区别见下面：
+dependency/multiModalEmbedding
+
+```
+
 
 
 # evidence-paper-QA-conda环境部署

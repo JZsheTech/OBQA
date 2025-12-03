@@ -41,6 +41,10 @@
 	- 按标题/摘要/作者检索收藏夹中已有的arxiv论文
 	- 选定collection，将一个收藏夹中的arxiv论文添加到collection中，从而可以在问答系统中进行问答。
 
+# 系统问答截图展示
+
+
+
 # 系统技术栈
 后端：
 - oceanbase/seekdb 数据库:

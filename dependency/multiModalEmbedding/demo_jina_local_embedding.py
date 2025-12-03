@@ -127,7 +127,7 @@ def get_multi_embeddings(
 # ==========================================================
 if __name__ == "__main__":
     text = "Describe the image."
-    image_path = "/mnt/data/sharedData/dataset/jztest/sample_image/demo1.jpg"
+    image_path = "/data2/jproject/OBQA/sample_data/images/cat.png"
 
     embeddings = get_multi_embeddings(
         text=text,
