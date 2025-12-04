@@ -3,8 +3,10 @@
 
 # SeekDB-paperQA-system
 
-BIT
+BIT(北京理工大学)
+
 开发者：佘俊志
+
 指导教师：柴成亮、王国仁
 
 ![架构图](./docs/image_asset/OBPaperQA.png)
