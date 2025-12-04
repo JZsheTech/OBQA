@@ -71,8 +71,21 @@ AI-assisted coding
 前端实现： openai codex-gpt5.1 + 人工
 前端浏览器: chrome
 
+## seekdb/oceanbase
+
+https://www.oceanbase.ai/
+
+![seekdb介绍](./docs/image_asset/seekdb-mainpage.png)
+seekdb特有的向量全文混合检索功能能有效提高对论文文本块的召回率，本项目内使用seekdb的混合检索功能进行RAG。
+![seekdb-hybrid-search](docs/image_asset/seekdb-hybridsearch.png)
+
+seekdb与oceanbase兼容性良好，在SQL语法方面可以无缝迁移(seekdb v1.0.0 与 oceanbase community v4.4.1 完全兼容)
+seekdb可通过pyseekdb连接oceanbase实例；seekdb和oceanbase在使用sqlAlchemy、PyMYSQL和pyobvector库时所使用的python语法完全兼容。
+
+
 # 项目部署方式
 见仓库内 docs/zh/env_install.md 文档
+
 
 # 仓库结构总览
 - 根目录

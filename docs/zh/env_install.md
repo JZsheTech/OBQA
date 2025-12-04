@@ -1,4 +1,24 @@
 
+# 项目整体部署
+
+请先完成后续几个组件部署后再进行项目的整体部署
+```
+git clone https://github.com/JZsheTech/OBQA
+cd <Project_Root>
+前端启动方式：
+cd  EviQAsys/frontend
+npm run dev -- --host --port 5273
+
+后端启动方式：
+cd <Project_Root>
+conda activate quest
+uvicorn  app.main:app --app-dir EviQAsys/backend --reload   --port 9075
+
+vscode PORTS端口映射服务器 5273端口到本地5273端口，9075端口转发到本地9075端口，用浏览器打开
+
+前端也可以单独在本地电脑上部署并打开，从而省去对前端5273端口的转发。
+```
+
 # MinerU部署
 
 用conda部署minerU，并以web-api形式启动
@@ -89,7 +109,7 @@ dependency/multiModalEmbedding
 
 
 
-# evidence-paper-QA-conda环境部署
+# seekdb-paper-QA-conda环境部署
 
 部署后端的python-conda环境：
 
