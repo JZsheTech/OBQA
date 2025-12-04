@@ -101,80 +101,8 @@ def hybrid_search_method2_with_boost():
 
 
 # ================================
-# 2. 混合搜索 - 方法2（json.dumps 参数绑定）
-# ================================
-def hybrid_search_method2_no_boost():
-    print("=== 混合检索（无 boost）- 方法2：绑定 JSON 字符串参数 ===")
-
-    param_dict = {
-        "query": {
-            "query_string": {
-                "fields": ["query", "content"],
-                "query": "hello oceanbase"
-            }
-        },
-        "knn": {
-            "field": "vector",
-            "k": 5,
-            "query_vector": [1, 2, 3]
-        }
-    }
-
-    json_str = json.dumps(param_dict)
-
-    sql = text("""
-        SELECT JSON_PRETTY(DBMS_HYBRID_SEARCH.SEARCH(
-            'doc_table',
-            :parm
-        ));
-    """)
-
-    with engine_conn() as conn:
-        row = conn.execute(sql, {"parm": json_str}).fetchone()
-        print(row[0], "\n")
-
-
-# ================================
-# 3. 混合搜索 - 方法3（SQL literal）
-# ================================
-def hybrid_search_method3_with_boost():
-    print("=== 混合检索（带 boost）- 方法3：SQL literal 拼接 ===")
-
-    param_dict = {
-        "query": {
-            "query_string": {
-                "fields": ["query", "content"],
-                "query": "hello oceanbase",
-                "boost": 2.0
-            }
-        },
-        "knn": {
-            "field": "vector",
-            "k": 5,
-            "query_vector": [1, 2, 3],
-            "boost": 1.0
-        }
-    }
-
-    json_literal = json.dumps(param_dict).replace("'", "\\'")
-
-    sql = text(f"""
-        SELECT JSON_PRETTY(DBMS_HYBRID_SEARCH.SEARCH(
-            'doc_table',
-            '{json_literal}'
-        ));
-    """)
-
-    with engine_conn() as conn:
-        row = conn.execute(sql).fetchone()
-        print(row[0], "\n")
-
-
-# ================================
 # 4. MAIN
 # ================================
 if __name__ == "__main__":
     setup_doc_table()
-    # hybrid_search_method2_no_boost()
     hybrid_search_method2_with_boost()
-    # hybrid_search_method3_with_boost()
