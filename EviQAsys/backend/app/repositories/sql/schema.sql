@@ -162,6 +162,24 @@ PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
+SET @missing_chunks_vec_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chunks' AND INDEX_NAME = 'idx_chunks_vec_embedding'
+);
+SET @sql := IF(@missing_chunks_vec_idx = 0, 'CREATE VECTOR INDEX idx_chunks_vec_embedding ON chunks(vec_embedding) WITH (distance=l2, type=hnsw, lib=vsag)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @missing_chunks_fulltext_idx := (
+  SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'chunks' AND INDEX_NAME = 'idx_chunks_fulltext'
+);
+SET @sql := IF(@missing_chunks_fulltext_idx = 0, 'CREATE FULLTEXT INDEX idx_chunks_fulltext ON chunks(chunk_text_main)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
 CREATE TABLE IF NOT EXISTS page_text_chunks (
   id BIGINT NOT NULL AUTO_INCREMENT,
   doc_id BIGINT NOT NULL,

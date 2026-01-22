@@ -10,7 +10,13 @@ from sqlalchemy.engine import Connection
 
 from .base import RepositoryResult, dict_to_update, row_to_dict, rows_to_dicts
 from .db import db_connection
-from ..env_setting import VECTOR_DIM
+from ..env_setting import (
+    HYBRID_K_MULTIPLIER,
+    HYBRID_SEARCH_BACKEND,
+    HYBRID_TEXT_BOOST,
+    HYBRID_VECTOR_BOOST,
+    VECTOR_DIM,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +261,142 @@ class ChunksRepository:
         fulltext_weight: float = 0.35,
         max_candidates: int | None = 200,
     ) -> list[dict[str, Any]]:
+        backend = (HYBRID_SEARCH_BACKEND or "").strip().lower()
+        if backend == "python":
+            return self._search_hybrid_python(
+                collection_id=collection_id,
+                query=query,
+                query_vec=query_vec,
+                k=k,
+                doc_id=doc_id,
+                chunk_types=chunk_types,
+                page_filters=page_filters,
+                vector_weight=vector_weight,
+                fulltext_weight=fulltext_weight,
+                max_candidates=max_candidates,
+            )
+        try:
+            return self._search_hybrid_seekdb(
+                collection_id=collection_id,
+                query=query,
+                query_vec=query_vec,
+                k=k,
+                doc_id=doc_id,
+                chunk_types=chunk_types,
+                page_filters=page_filters,
+                max_candidates=max_candidates,
+            )
+        except Exception as exc:  # pragma: no cover - runtime guard
+            logger.warning("Seekdb hybrid search failed; falling back to python blend: %s", exc)
+            return self._search_hybrid_python(
+                collection_id=collection_id,
+                query=query,
+                query_vec=query_vec,
+                k=k,
+                doc_id=doc_id,
+                chunk_types=chunk_types,
+                page_filters=page_filters,
+                vector_weight=vector_weight,
+                fulltext_weight=fulltext_weight,
+                max_candidates=max_candidates,
+            )
+
+    def _search_hybrid_seekdb(
+        self,
+        *,
+        collection_id: int,
+        query: str,
+        query_vec: Sequence[float],
+        k: int,
+        doc_id: int | None,
+        chunk_types: set[str] | None,
+        page_filters: Sequence[tuple[int, int]] | None,
+        max_candidates: int | None,
+    ) -> list[dict[str, Any]]:
+        if len(query_vec) != VECTOR_DIM:
+            raise ValueError("query_vec dimension mismatch.")
+        query = (query or "").strip()
+        if not query:
+            raise ValueError("query text must be provided for hybrid search.")
+
+        normalized_types = {entry.lower() for entry in chunk_types} if chunk_types else None
+        use_filters = doc_id is not None or bool(chunk_types) or bool(page_filters)
+        multiplier = max(1, int(HYBRID_K_MULTIPLIER))
+        expanded_k = max(1, int(k))
+        if use_filters:
+            expanded_k = expanded_k * multiplier
+        if max_candidates is not None:
+            expanded_k = min(expanded_k, max_candidates)
+        expanded_k = max(expanded_k, int(k))
+
+        param = {
+            "query": {
+                "query_string": {
+                    "fields": ["chunk_text_main"],
+                    "query": query,
+                    "boost": float(HYBRID_TEXT_BOOST),
+                },
+            },
+            "knn": {
+                "field": "vec_embedding",
+                "k": int(expanded_k),
+                "query_vector": [float(value) for value in query_vec],
+                "boost": float(HYBRID_VECTOR_BOOST),
+            },
+        }
+        param_str = json.dumps(param, separators=(",", ":"))
+        sql = text(
+            f"SELECT DBMS_HYBRID_SEARCH.SEARCH('{self.table_name}', :param)",
+        )
+        with self._connection_provider() as connection:
+            result = connection.execute(sql, {"param": param_str}).fetchone()
+        if not result:
+            return []
+        payload = self._safe_json_loads(result[0])
+        if not isinstance(payload, list):
+            logger.warning("Unexpected seekdb hybrid search payload: %s", payload)
+            return []
+
+        scored_results: list[dict[str, Any]] = []
+        for item in payload:
+            if not isinstance(item, Mapping):
+                continue
+            row = self._coerce_seekdb_row(item)
+            if row is None:
+                continue
+            if int(row.get("collection_id") or 0) != int(collection_id):
+                continue
+            if doc_id is not None and int(row.get("doc_id") or 0) != int(doc_id):
+                continue
+            chunk_type = (row.get("chunk_type") or "").lower()
+            if normalized_types and chunk_type not in normalized_types:
+                continue
+            if page_filters and not self._match_page_filters(row, page_filters):
+                continue
+            score_raw = row.get("_score")
+            if score_raw is None:
+                score_raw = row.get("score")
+            if score_raw is None:
+                continue
+            scored_results.append(self._format_row(row, score=float(score_raw)))
+
+        scored_results.sort(key=lambda item: item["score"], reverse=True)
+        return scored_results[:k]
+
+    def _search_hybrid_python(
+        self,
+        *,
+        collection_id: int,
+        query: str,
+        query_vec: Sequence[float],
+        k: int,
+        doc_id: int | None,
+        chunk_types: set[str] | None,
+        page_filters: Sequence[tuple[int, int]] | None,
+        vector_weight: float,
+        fulltext_weight: float,
+        max_candidates: int | None,
+    ) -> list[dict[str, Any]]:
         if len(query_vec) != VECTOR_DIM:
             raise ValueError("query_vec dimension mismatch.")
         query = (query or "").strip()
@@ -422,6 +564,31 @@ class ChunksRepository:
             return json.loads(raw_value)
         except (TypeError, json.JSONDecodeError):
             return None
+
+    @staticmethod
+    def _coerce_seekdb_row(payload: Mapping[str, Any]) -> dict[str, Any] | None:
+        lowered = {str(key).lower(): value for key, value in payload.items()}
+
+        def _get(name: str) -> Any:
+            if name in payload:
+                return payload[name]
+            return lowered.get(name.lower())
+
+        row_id = _get("id") or _get("chunk_id")
+        if row_id is None:
+            return None
+        return {
+            "id": row_id,
+            "doc_id": _get("doc_id"),
+            "collection_id": _get("collection_id"),
+            "order": _get("order"),
+            "level_nav": _get("level_nav"),
+            "chunk_type": _get("chunk_type"),
+            "chunk_text_main": _get("chunk_text_main"),
+            "elem_ids": _get("elem_ids"),
+            "page_start": _get("page_start"),
+            "page_end": _get("page_end"),
+        }
 
     @staticmethod
     def _cosine_similarity(vec_a: Sequence[float], vec_b: Sequence[float]) -> float | None:

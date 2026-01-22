@@ -146,6 +146,10 @@ RETRIEVAL_TOPK_CHUNK: int = _get_int_env("RETRIEVAL_TOPK_CHUNK", 6)
 RETRIEVAL_TOPK_PAGE: int = _get_int_env("RETRIEVAL_TOPK_PAGE", 3)
 ENABLE_PAGE_CHUNK_RETRIEVAL: bool = _get_bool_env("ENABLE_PAGE_CHUNK_RETRIEVAL", False)
 ENABLE_PAGE_TEXT_CHUNKS: bool = _get_bool_env("ENABLE_PAGE_TEXT_CHUNKS", True)
+HYBRID_SEARCH_BACKEND: str = _get_env("HYBRID_SEARCH_BACKEND", "seekdb")
+HYBRID_TEXT_BOOST: float = _get_float_env("HYBRID_TEXT_BOOST", 2.0)
+HYBRID_VECTOR_BOOST: float = _get_float_env("HYBRID_VECTOR_BOOST", 1.0)
+HYBRID_K_MULTIPLIER: int = _get_int_env("HYBRID_K_MULTIPLIER", 3)
 
 @dataclass(frozen=True)
 class MinerUSettings:
@@ -271,6 +275,10 @@ __all__ = [
     "RETRIEVAL_TOPK_PAGE",
     "ENABLE_PAGE_CHUNK_RETRIEVAL",
     "ENABLE_PAGE_TEXT_CHUNKS",
+    "HYBRID_SEARCH_BACKEND",
+    "HYBRID_TEXT_BOOST",
+    "HYBRID_VECTOR_BOOST",
+    "HYBRID_K_MULTIPLIER",
     "OceanBaseSettings",
     "MinerUSettings",
     "UploadSettings",
